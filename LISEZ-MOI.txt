@@ -1,0 +1,43 @@
+TP SYSTÈME DIGESTIF · MISE EN LIGNE DE L'APPLICATION
+=====================================================
+
+1. Créer la base (une seule fois)
+   - Aller sur console.firebase.google.com, créer un projet (ex. « tp-digestif »).
+   - Ajouter une application Web, copier le bloc « firebaseConfig ».
+   - Coller ces valeurs dans le fichier firebase-config.js (à la place des A_REMPLIR).
+   - Créer une base Firestore (région europe-west), puis coller le contenu de
+     firestore.rules dans l'onglet « Règles » et publier.
+
+2. Formule gratuite (Spark) : suffisante
+   Chaque téléphone ne lit que sa séance et son groupe : une séance de 60
+   étudiants consomme environ 10 000 à 20 000 lectures, pour un plafond de
+   50 000 par jour. Ne faites pas deux séances le même jour sans vérifier dans
+   la console Firebase (onglet Utilisation). Si le plafond était atteint malgré
+   tout, les notes restent gardées sur les téléphones et partent dès le
+   lendemain 9 h (remise à zéro du compteur), et les codes de secours restent
+   valables.
+
+3. Héberger le dossier
+   Déposer tout le contenu de ce dossier sur un hébergement web en https
+   (Netlify : glisser-déposer le dossier sur app.netlify.com/drop, ou GitHub Pages).
+   Le QR code de l'espace encadrants pointe vers l'adresse obtenue.
+
+4. Avant chaque séance
+   - Espace encadrants > Réglages : vérifier la séance, l'heure de formation des
+     groupes et la durée des rotations.
+   - Faire une répétition avec le bouton « Tester les ateliers comme un étudiant ».
+
+5. Sûreté des notes (rien à faire, pour information)
+   - Chaque note est gardée sur le téléphone qui l'a produite et renvoyée
+     automatiquement tant que le serveur ne l'a pas confirmée.
+   - Une copie historique de chaque note est gardée (collection journal_notes).
+   - Toutes les notes de la séance sont archivées toutes les 3 minutes sur le
+     serveur (collection archives) et sur chaque téléphone.
+   - Chaque étudiant a un code de secours (texte + QR code) qui contient ses
+     notes. En cas de problème : scanner le QR code avec l'appareil photo, ou
+     coller le code dans Espace encadrants > Suivi de la séance.
+   - Un atelier non terminé à temps reçoit une note de repli (R) : calculée sur
+     ce qui a été fait (ateliers 2, 3 et 4) ou, pour une maquette jamais
+     évaluée, moyenne des autres maquettes. Une note peut être saisie à la
+     main en dernier recours (M).
+   - Après la séance : Espace encadrants > « Télécharger les notes (CSV) ».
