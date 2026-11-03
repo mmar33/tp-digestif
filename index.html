@@ -1932,7 +1932,7 @@ function vBienvenue(){
   return `${enteteApp()}<div class="bienv">
    <div><span class="eyebrow">Bienvenue</span><h1>Les ateliers du <span class="a">système digestif</span></h1>
     <div class="parade" aria-hidden="true">${MASCOTTES.map((m,k)=>`<span style="animation-delay:${k*0.12}s">${mascSVG(m,48)}</span>`).join("")}</div>
-    <p>Mettez-vous avec vos amis : l'application forme ensuite des groupes de 10 et vous guide d'atelier en atelier.</p></div>
+    <p>Formez un petit groupe de 1 à 5 personnes : l'application constitue ensuite des groupes de 10 et vous guide d'atelier en atelier.</p></div>
    <div class="card etape"><span class="num1">1</span><div style="flex:1"><h3>Votre séance</h3>
      ${ids.length?`<select id="selSeance" class="gros">${ids.map(x=>`<option value="${x}" ${x===sid?"selected":""}>${esc(seances[x].nom)}</option>`).join("")}</select>`:`<p class="note">Aucune séance n'est encore enregistrée.</p>`}</div></div>
    <div class="card etape"><span class="num1">2</span><div style="flex:1"><h3>Qui êtes-vous ?</h3>
@@ -1943,16 +1943,16 @@ function vInscriptionBande(){const sid=moiE.sid,s=seances[sid],p=phaseSeance(sid
   const moiNom=etu(sid,moiE.eid);
   let corps="";
   if(p.phase!=="inscription"){corps=`<div class="card"><h3>Les groupes sont déjà formés</h3><p>Vous arrivez après la formation des groupes : l'application vous place dans le groupe le plus petit.</p><button class="btn pen gros" id="enRetard">Rejoindre un groupe</button></div>`}
-  else if(b){corps=`<div class="card"><span class="eyebrow">Votre bande</span><h2 style="margin:4px 0 8px">${b.membres.map(m=>esc(nomCourt(sid,m))).join(" · ")}</h2>
-     <p>Les groupes de 10 seront formés à <b>${new Date(debutSeance(s)).toLocaleTimeString("fr-FR",{hour:"2-digit",minute:"2-digit"})}</b> (dans <b id="cptRot">${fmt(p.reste)}</b>). Vos amis de la bande seront dans le même groupe.</p>
-     ${b.membres.length<5?`<p class="note">Il reste ${5-b.membres.length} place${5-b.membres.length>1?"s":""} dans votre bande : un ami peut la rejoindre depuis son téléphone.</p>`:""}</div>`}
+  else if(b){corps=`<div class="card"><span class="eyebrow">Votre petit groupe</span><h2 style="margin:4px 0 8px">${b.membres.map(m=>esc(nomCourt(sid,m))).join(" · ")}</h2>
+     <p>Les groupes de 10 seront formés à <b>${new Date(debutSeance(s)).toLocaleTimeString("fr-FR",{hour:"2-digit",minute:"2-digit"})}</b> (dans <b id="cptRot">${fmt(p.reste)}</b>). Les membres de votre petit groupe seront dans le même groupe de 10.</p>
+     ${b.membres.length<5?`<p class="note">Il reste ${5-b.membres.length} place${5-b.membres.length>1?"s":""} dans votre petit groupe : un camarade peut le rejoindre depuis son téléphone.</p>`:""}</div>`}
   else{const libres=s.etudiants.filter(e=>!deja.has(e.id)&&e.id!==moiE.eid).sort((a,b)=>a.n.localeCompare(b.n,"fr"));
     const ouvertes=bandes.filter(x=>x.seance===sid&&x.membres.length<5);
     if(!choixBande)choixBande=[];
-    corps=`<div class="card"><h3>Avec qui êtes-vous ?</h3><p class="note" style="margin-top:0">Formez une « bande » de 1 à 5 amis : vous serez dans le même groupe de 10. Ne cochez que des personnes <b>présentes</b> dans la salle.</p>
+    corps=`<div class="card"><h3>Avec qui travaillez-vous ?</h3><p class="note" style="margin-top:0">Formez un groupe de 1 à 5 personnes : vous serez ensemble dans le même groupe de 10. Ne cochez que des personnes <b>présentes</b> dans la salle.</p>
       <div class="chk" id="libres">${libres.map(e=>`<button class="chkb ${choixBande.includes(e.id)?"on":""}" data-ami="${e.id}">${choixBande.includes(e.id)?ico("coche"):""}${esc(e.p)} ${esc(e.n)}</button>`).join("")}</div>
-      <div class="row" style="margin-top:12px"><button class="btn pen gros" id="creerBande">${choixBande.length?"Créer notre bande ("+(choixBande.length+1)+")":"Je viens seul·e"}</button></div></div>
-     ${ouvertes.length?`<div class="card"><h3>Ou rejoindre une bande déjà créée</h3><div class="grlist">${ouvertes.map(x=>`<button class="grbtn" data-jbande="${x.id}" style="--c:#2f7a4a"><span><b>${x.membres.map(m=>esc(nomCourt(sid,m))).join(", ")}</b><small>${5-x.membres.length} place(s)</small></span></button>`).join("")}</div></div>`:""}`}
+      <div class="row" style="margin-top:12px"><button class="btn pen gros" id="creerBande">${choixBande.length?"Valider notre groupe ("+(choixBande.length+1)+")":"Je travaille seul·e"}</button></div></div>
+     ${ouvertes.length?`<div class="card"><h3>Ou rejoindre un groupe déjà formé</h3><div class="grlist">${ouvertes.map(x=>`<button class="grbtn" data-jbande="${x.id}" style="--c:#2f7a4a"><span><b>${x.membres.map(m=>esc(nomCourt(sid,m))).join(", ")}</b><small>${5-x.membres.length} place(s)</small></span></button>`).join("")}</div></div>`:""}`}
   return `${enteteApp()}<div class="center" style="text-align:left;justify-items:stretch;max-width:780px;gap:14px">
    <div class="row" style="justify-content:space-between"><span class="eyebrow">${esc(s.nom)} · ${esc(moiNom)}</span><button class="link" id="pasMoi">Ce n'est pas moi</button></div>${corps}</div>`}
 function vHub(){
@@ -2000,7 +2000,7 @@ function vRepartition(){const g=monGroupe(),aid=repart.aid,B=BESOIN[aid];const s
   const nm=x=>g.id==="TEST"?x:nomCourt(g.seance,x);
   return `<div class="bar a1bar"><span class="tag" style="background:${g.couleur};color:#fff">ATELIER ${aid.slice(1)}</span><b style="font-size:18px">Former les ${B.type==="duos"?"duos":"équipes"}</b><span class="sp"></span><button class="btn ghost sm" id="retourHub">Retour</button></div>
    <div class="a1form" style="max-width:820px;margin:14px auto">
-    <div class="card"><p style="margin-top:0">Proposition qui garde les amis ensemble. Pour changer, <b>touchez un nom puis un autre</b> : ils échangent leur place. Touchez un nom puis le titre d'une ${B.type==="duos"?"case":"équipe"} pour l'y déplacer.</p>
+    <div class="card"><p style="margin-top:0">Proposition qui garde ensemble les petits groupes formés au début. Pour changer, <b>touchez un nom puis un autre</b> : ils échangent leur place. Touchez un nom puis le titre d'une ${B.type==="duos"?"case":"équipe"} pour l'y déplacer.</p>
      <div class="eqgrid">${repart.eq.map((e,i)=>`<div class="eqcol"><button class="eqtitre" data-eqt="${i}">${B.type==="duos"?"Duo":"Équipe"} ${i+1} <small>(${e.length})</small></button>${e.map(x=>`<button class="eqm ${repart.sel===x?"sel":""}" data-eqm="${x}">${esc(nm(x))}</button>`).join("")}</div>`).join("")}</div>
      <div class="row" style="margin-top:14px;justify-content:space-between"><button class="btn ghost" id="repHasard">Autre proposition au hasard</button><button class="btn pen gros" id="repValider">Valider la répartition</button></div></div></div>`}
 function repTap(x){const e=repart.eq;if(!repart.sel){repart.sel=x;return}
@@ -2121,7 +2121,7 @@ function vProfSeance(){
   const gs=groupesDe(sid), p=phaseSeance(sid), dans=new Set(gs.flatMap(g=>g.membres||[])), enBande=new Set(bandes.filter(b=>b.seance===sid).flatMap(b=>b.membres));
   const absents=s.etudiants.filter(e=>!dans.has(e.id)&&!enBande.has(e.id)).sort((a,b)=>a.n.localeCompare(b.n,"fr")), dispo=ATELIERS_APP();
   const hd=new Date(debutSeance(s)).toLocaleTimeString("fr-FR",{hour:"2-digit",minute:"2-digit"});
-  const etat=p.phase==="inscription"?`Inscriptions en cours (${enBande.size} étudiants dans ${bandes.filter(b=>b.seance===sid).length} bandes) · groupes formés à <b>${hd}</b> (dans ${fmt(p.reste)})`:p.phase==="prepa"?`Groupes formés · démarrage quand tous sont prêts (${gs.filter(g=>p.prets[g.id]).length}/${gs.length})`:p.phase==="rot"?`Rotation <b>${p.r+1} sur ${NB_ROT}</b> · ${gs.filter(g=>p.prets[g.id]).length}/${gs.length} groupes prêts · changement au plus tard dans ${fmt(p.reste)}`:p.phase==="fin"?"Séance terminée":"Formation des groupes…";
+  const etat=p.phase==="inscription"?`Inscriptions en cours (${enBande.size} étudiants dans ${bandes.filter(b=>b.seance===sid).length} petits groupes) · groupes formés à <b>${hd}</b> (dans ${fmt(p.reste)})`:p.phase==="prepa"?`Groupes formés · démarrage quand tous sont prêts (${gs.filter(g=>p.prets[g.id]).length}/${gs.length})`:p.phase==="rot"?`Rotation <b>${p.r+1} sur ${NB_ROT}</b> · ${gs.filter(g=>p.prets[g.id]).length}/${gs.length} groupes prêts · changement au plus tard dans ${fmt(p.reste)}`:p.phase==="fin"?"Séance terminée":"Formation des groupes…";
   const cartes=gs.map(g=>{const a=p.phase==="rot"?atelierDe(g.k,p.r):null;return `<div class="card tcard"><div class="row" style="justify-content:space-between">${mascSVG(g.mascotte,30)}<b style="font-size:17px;color:${g.couleur};flex:1">${esc(g.nom)}</b>${a?`<span class="chip encours">atelier ${a.n}</span>`:""}${p.prets&&p.prets[g.id]?`<span class="chip fait">prêt</span>`:""}</div><p class="note" style="margin:6px 0 0">${(g.membres||[]).map(m=>esc(nomCourt(sid,m))).join(", ")}</p></div>`}).join("");
   const lignes=gs.flatMap(g=>(g.membres||[]).map(m=>({g,m}))).sort((a,b)=>etu(sid,a.m).localeCompare(etu(sid,b.m),"fr")).map(({g,m})=>{const n=noteEtudiant(g,m);
     return `<tr><td>${esc(etu(sid,m))}</td><td><span style="color:${g.couleur};font-weight:650">${esc(g.nom)}</span></td>${dispo.map(a=>celluleNote(g,m,a.id)).join("")}<td class="num"><b>${n.finale!=null?fr(n.finale):"–"}</b></td></tr>`}).join("");
@@ -2140,7 +2140,7 @@ function csvEtudiants(){const sid=profSeance, s=seances[sid]; if(!s)return "";co
   return "﻿"+[h,...lignes].map(l=>l.map(c=>`"${String(c).replace(/"/g,'""')}"`).join(";")).join("\n")}
 function carteSeances(){const sid=profSeance||seanceSel||seanceParDefaut(), s=seances[sid];
   const h=s?new Date(debutSeance(s)).toTimeString().slice(0,5):"08:10";
-  return (s?`<div class="card"><h3>Horaires · ${esc(s.nom)}</h3><p class="note" style="margin-top:0">À régler une fois avant le TP. À l'heure de formation, les bandes sont assemblées en groupes de ~10 ; les ateliers démarrent quand tous les groupes sont prêts, et chaque rotation change quand tous les groupes sont prêts ou au bout de la durée prévue.</p>
+  return (s?`<div class="card"><h3>Horaires · ${esc(s.nom)}</h3><p class="note" style="margin-top:0">À régler une fois avant le TP. À l'heure de formation, les petits groupes (1 à 5 personnes) sont assemblés en groupes de ~10 ; les ateliers démarrent quand tous les groupes sont prêts, et chaque rotation change quand tous les groupes sont prêts ou au bout de la durée prévue.</p>
     <div class="settings"><label for="nsDebut">Formation des groupes à<input id="nsDebut" type="time" value="${h}" style="padding:8px;border:1.5px solid var(--rule);border-radius:8px"></label>
     <label for="nsDuree">Durée max. d'une rotation (min)<input id="nsDuree" type="number" min="5" max="60" value="${(s.dureeRot||10)}"></label></div>
     <div class="row" style="margin-top:10px"><button class="btn pen" id="nsHoraire">Enregistrer</button><button class="btn ghost" id="nsMaintenant">Répétition : former les groupes dans 1 minute</button></div></div>`:"")+carteSeancesBase()}
@@ -2151,11 +2151,11 @@ function brancherV2(){
   const all=(s,f)=>document.querySelectorAll(s).forEach(b=>b.addEventListener("click",()=>f(b)));
   on("#selMoi","change",e=>{if(!e.target.value)return;moiE={sid:seanceSel,eid:e.target.value};LS.set("moiEtu",moiE);choixBande=null;majMonGid();vue="hub";rendre();window.scrollTo(0,0)});
   document.querySelectorAll("#pasMoi").forEach(b=>b.addEventListener("click",()=>modale("Changer de personne ?","Ce téléphone ne sera plus associé à votre nom. Rien n'est effacé : choisissez de nouveau votre nom pour tout retrouver.","Oui",()=>{moiE=null;LS.set("moiEtu",null);monGid=null;vue="hub";rendre()},"","Non")));
-  all("[data-ami]",b=>{const id=b.dataset.ami;const i=choixBande.indexOf(id);if(i>=0)choixBande.splice(i,1);else if(choixBande.length<4)choixBande.push(id);else toast("5 personnes au maximum par bande");const y=window.scrollY;rendre();window.scrollTo(0,y)});
-  on("#creerBande","click",()=>{const m=[moiE.eid,...choixBande];modale(m.length>1?"Créer votre bande ?":"Venir seul·e ?",m.length>1?`${m.map(x=>esc(etu(moiE.sid,x))).join("<br>")}<br><br>Ne mettez que des personnes <b>présentes</b>. Ce choix est définitif.`:"Vous serez placé·e dans un groupe avec d'autres étudiants.","Oui, valider",async()=>{
-    const deja=new Set(bandes.filter(x=>x.seance===moiE.sid).flatMap(x=>x.membres));if(m.some(x=>deja.has(x))){toast("Quelqu'un vient d'être pris dans une autre bande : vérifiez");rendre();return}
+  all("[data-ami]",b=>{const id=b.dataset.ami;const i=choixBande.indexOf(id);if(i>=0)choixBande.splice(i,1);else if(choixBande.length<4)choixBande.push(id);else toast("5 personnes au maximum par groupe");const y=window.scrollY;rendre();window.scrollTo(0,y)});
+  on("#creerBande","click",()=>{const m=[moiE.eid,...choixBande];modale(m.length>1?"Valider votre groupe ?":"Travailler seul·e ?",m.length>1?`${m.map(x=>esc(etu(moiE.sid,x))).join("<br>")}<br><br>Ne mettez que des personnes <b>présentes</b>. Ce choix est définitif.`:"Vous serez placé·e dans un groupe de 10 avec d'autres étudiants.","Oui, valider",async()=>{
+    const deja=new Set(bandes.filter(x=>x.seance===moiE.sid).flatMap(x=>x.membres));if(m.some(x=>deja.has(x))){toast("Une des personnes cochées vient de rejoindre un autre groupe : vérifiez");rendre();return}
     const id="b"+Date.now().toString(36)+Math.random().toString(36).slice(2,5),doc={seance:moiE.sid,membres:m,cree:Date.now()};bandes.push(Object.assign({id},doc));choixBande=null;rendre();await ecrire("bandes",id,doc)},"","Non")});
-  all("[data-jbande]",b=>{const x=bandes.find(y=>y.id===b.dataset.jbande);modale("Rejoindre cette bande ?",x.membres.map(m=>esc(etu(moiE.sid,m))).join("<br>"),"Oui",async()=>{if(x.membres.length>=5){toast("Bande complète");return}x.membres=[...x.membres,moiE.eid];rendre();await ecrire("bandes",x.id,{membres:x.membres},"update")},"","Non")});
+  all("[data-jbande]",b=>{const x=bandes.find(y=>y.id===b.dataset.jbande);modale("Rejoindre ce groupe ?",x.membres.map(m=>esc(etu(moiE.sid,m))).join("<br>"),"Oui",async()=>{if(x.membres.length>=5){toast("Groupe complet (5 personnes)");return}x.membres=[...x.membres,moiE.eid];rendre();await ecrire("bandes",x.id,{membres:x.membres},"update")},"","Non")});
   on("#enRetard","click",rejoindreEnRetard);
   all("[data-pmasc]",b=>{const g=monGroupe();g.mascotte=b.dataset.pmasc;g.nom=($("#pNom")||{}).value||g.nom;rendre()});
   all("[data-pcoul]",b=>{const g=monGroupe();g.couleur=b.dataset.pcoul;g.nom=($("#pNom")||{}).value||g.nom;rendre()});
