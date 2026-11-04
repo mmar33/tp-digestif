@@ -554,6 +554,12 @@ html[data-format="tel"] .home,html[data-format="tel"] .game,html[data-format="te
 .secours{background:#fff;border:1.5px dashed var(--rule);border-radius:12px;padding:10px 14px}.secours summary{font-weight:700;cursor:pointer}
 .secoursin{display:flex;gap:14px;align-items:center;flex-wrap:wrap}.secoursin svg{width:150px;height:150px;flex:none}.secoursin code{font-size:15px;word-break:break-all;background:var(--sheet);padding:8px 10px;border-radius:8px;flex:1;min-width:180px}
 .cellnote{font:inherit;border:none;background:none;cursor:pointer;padding:2px 6px;border-radius:6px}.cellnote:hover{background:var(--sheet)}.cellnote sup{font-size:10px;font-weight:800;margin-left:2px}.cellnote.repli{color:#9a6b00}.cellnote.secours{color:#1f5d8c}.cellnote.manuelle{color:#b3261e}
+
+.affgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:14px}
+.affg{background:#fff;border-radius:16px;padding:14px 16px;border-top:8px solid var(--c);box-shadow:0 4px 16px rgba(0,0,0,.06)}.affg h3{display:flex;align-items:center;gap:8px;margin:0 0 8px;color:var(--c);font-size:22px}
+.affg ul{margin:0;padding-left:18px;columns:2;font-size:16px}.affg p{margin:6px 0;font-size:15px}
+.a4attente{margin:10px 0;padding:8px 12px;border-radius:10px;background:#fff6dd;border-left:4px solid #e0a800}.a4attente.ok{background:#e2f1e6;border-left-color:#2f7a4a}.a4attente .ric{width:18px;height:18px;vertical-align:-3px}
+[data-attente]:disabled{opacity:.45;cursor:not-allowed}
 </style>
 
 <div class="wrap" id="app"></div>
@@ -1191,11 +1197,11 @@ function planche(pl,tout){
 function rendre(){
   try{if(typeof reabonner==="function")reabonner()}catch(e){}
   const app=$("#app");
-  app.innerHTML = vue==="hub"?vHub(): vue==="inscr"?vInscription(): vue==="a1"?vA1(): vue==="a3"?vA3(): vue==="a4"?vA4(): vue==="fam"?vFam(): vue==="rejoindre"?vRejoindre(): vue==="repartition"?vRepartition(): vue==="accueil"?vAccueil(): vue==="salle"?vSalle(): vue==="decompte"?vDecompte(): (vue==="m1"||vue==="demo")?vM1(): vue==="m2"?vM2(): vue==="attente"?vAttente(): vue==="fin"?vFin(): vProf();
+  app.innerHTML = vue==="hub"?vHub(): vue==="inscr"?vInscription(): vue==="a1"?vA1(): vue==="a3"?vA3(): vue==="a4"?vA4(): vue==="fam"?vFam(): vue==="a5"?vA5(): vue==="affiche"?vAffiche(): vue==="rejoindre"?vRejoindre(): vue==="repartition"?vRepartition(): vue==="accueil"?vAccueil(): vue==="salle"?vSalle(): vue==="decompte"?vDecompte(): (vue==="m1"||vue==="demo")?vM1(): vue==="m2"?vM2(): vue==="attente"?vAttente(): vue==="fin"?vFin(): vProf();
   document.body.dataset.team=(duel&&moi&&["salle","decompte","m1","m2","attente","fin"].includes(vue))?moi:""; document.body.dataset.vue=vue;
   appliquerCouleurs();
   const gC=monGroupe(); if(gC&&["hub","a1","a3","a4","fam","repartition","accueil","inscr"].includes(vue))document.body.style.setProperty("--team",gC.couleur); else if(vue==="inscr"&&insc&&insc.couleur)document.body.style.setProperty("--team",insc.couleur); else document.body.style.removeProperty("--team");
-  brancher(); brancherPortail(); brancherV2(); brancherA4(); brancherFam(); brancherSurete(); majBandeaux();
+  brancher(); brancherPortail(); brancherV2(); brancherA4(); brancherFam(); brancherSurete(); brancherA5(); brancherAffiche(); majBandeaux();
 }
 function vAccueil(){
   const etat=dbEtat==="absent"||dbEtat==="erreur"?`<div class="banner demo">Pas de connexion au serveur pour l'instant : vérifiez le réseau.</div>`:"";
@@ -1515,7 +1521,7 @@ function initPortail(){
   db.collection("duels").where("statut","==","en_cours").onSnapshot(s=>{duelsEnCours=s.docs.map(x=>Object.assign({id:x.id},x.data()));if(vue==="prof")rendre()},()=>{});
   viderFile();
 }
-function rendrePortail(){if(["hub","inscr","a1","a3","a4","prof","accueil"].includes(vue)&&!document.querySelector(".modale")&&!(vue==="a1"&&a1Form)&&!(vue==="inscr")&&!(vue==="rejoindre")&&!(vue==="prof"&&grpEdit))rendre()}
+function rendrePortail(){if(["hub","inscr","a1","a3","a4","a5","affiche","repartition","prof","accueil"].includes(vue)&&!document.querySelector(".modale")&&!(vue==="a1"&&a1Form)&&!(vue==="inscr")&&!(vue==="rejoindre")&&!(vue==="prof"&&grpEdit))rendre()}
 
 /* ----- état des ateliers d'un groupe ----- */
 function noteA1(gid){if(gid==="TEST"){const e=evals.find(x=>x.evaluateur==="TEST"&&x.statut==="envoyee");return e?+e.total:null}const a=a1docs[gid];if(a&&a.noteProf!=null&&a.noteProf!=="")return +a.noteProf;
@@ -1826,7 +1832,7 @@ TEST_G.membres=TEST_MEMBRES; TEST_G.k=0;
 
 /* ----- temps ----- */
 function debutSeance(s){if(!s)return null;const t=Date.parse(s.debut||(s.date+"T08:10"));return isNaN(t)?null:t}
-const dureeRot=s=>((s&&+s.dureeRot)||10)*60e3;
+const dureeRot=s=>((s&&+s.dureeRot)||30)*60e3;
 const groupesDe=sid=>groupes.filter(g=>g.seance===sid).sort((a,b)=>(a.k||0)-(b.k||0));
 function phaseSeance(sid){const s=seances[sid],d=deroules[sid],H0=debutSeance(s);
   if(d&&d.r>=NB_ROT)return {phase:"fin"};
@@ -1932,7 +1938,7 @@ function vBienvenue(){
   return `${enteteApp()}<div class="bienv">
    <div><span class="eyebrow">Bienvenue</span><h1>Les ateliers du <span class="a">système digestif</span></h1>
     <div class="parade" aria-hidden="true">${MASCOTTES.map((m,k)=>`<span style="animation-delay:${k*0.12}s">${mascSVG(m,48)}</span>`).join("")}</div>
-    <p>Formez un petit groupe de 1 à 5 personnes : l'application constitue ensuite des groupes de 10 et vous guide d'atelier en atelier.</p></div>
+    <p>Choisissez votre nom : l'application tire au sort des groupes de 10, mélangés, et vous guide d'atelier en atelier.</p></div>
    <div class="card etape"><span class="num1">1</span><div style="flex:1"><h3>Votre séance</h3>
      ${ids.length?`<select id="selSeance" class="gros">${ids.map(x=>`<option value="${x}" ${x===sid?"selected":""}>${esc(seances[x].nom)}</option>`).join("")}</select>`:`<p class="note">Aucune séance n'est encore enregistrée.</p>`}</div></div>
    <div class="card etape"><span class="num1">2</span><div style="flex:1"><h3>Qui êtes-vous ?</h3>
@@ -2078,10 +2084,10 @@ function lienA3(g,duoId){const duos=duosA3(g).map(d=>({id:d.id,nom:d.nom}));retu
 function vA3(){const g=monGroupe();if(!g){vue="hub";return vHub()}const duos=duosA3(g),t=monEquipe(g,"a3");
   return `<div class="bar a1bar"><span class="tag" style="background:${g.couleur};color:#fff">ATELIER 3</span><b style="font-size:18px">Le jeu des 7 familles</b><span class="sp"></span><button class="btn ghost sm" id="retourHub">Retour aux ateliers</button></div>
    <div class="a1form" style="max-width:860px;margin:14px auto">
-    <div class="card brief"><span class="eyebrow">Avant de commencer · environ 10 minutes</span><h2 style="margin:4px 0 10px">Ce qui vous attend</h2>
+    <div class="card brief"><span class="eyebrow">Avant de commencer · environ 30 minutes</span><h2 style="margin:4px 0 10px">Ce qui vous attend</h2>
      <div class="briefetapes">
       <div><b>1</b><span><b>Les duos</b> sont formés (voir la liste ci-dessous). Chaque duo joue comme un seul joueur, sur un de ses téléphones.</span></div>
-      <div><b>2</b><span><b>Le jeu des 7 familles</b> (environ 6 min, <span class="vert">non noté</span>). Six espèces (chien, chat, cheval, vache, porc, lapin) et une famille « Vaisseaux et péritoine », six cartes chacune.</span></div>
+      <div><b>2</b><span><b>Le jeu des 7 familles</b> (environ 15 min, <span class="vert">non noté</span>). Six espèces (chien, chat, cheval, vache, porc, lapin) et une famille « Vaisseaux et péritoine », six cartes chacune.</span></div>
       <div><b>3</b><span><b>L'évaluation de votre duo</b> (<span class="rouge">notée sur 20</span>) : repérer des structures sur des modèles 3D puis répondre à un petit quiz.</span></div></div>
      <details class="briefregles" open><summary>Les règles du jeu en 30 secondes</summary><ul>
       <li>À votre tour, demandez à un autre duo une carte d'une famille que vous avez déjà en main, <b>avec un critère</b> (« le cæcum du cheval, celui à 4 bandes charnues »). L'application vous propose 3 critères : un seul est juste.</li>
@@ -2128,6 +2134,7 @@ function vProfSeance(){
   return `<div class="row" style="align-items:end;gap:14px"><label class="field">Séance<select id="pSeance">${ids.map(x=>`<option value="${x}" ${x===sid?"selected":""}>${esc(seances[x].nom)}</option>`).join("")}</select></label>
     <div class="kpis"><span><b>${dans.size||enBande.size}</b>/${s.etudiants.length} présents</span><span><b>${gs.length}</b> groupes</span><span class="${absents.length?"rouge":""}"><b>${absents.length}</b> absent${absents.length>1?"s":""}</span></div></div>
    <div class="banner" style="background:var(--sheet);border:1px solid var(--rule)">${etat}. Tout se fait automatiquement : cette page sert seulement à suivre.</div>
+   <div class="row"><button class="btn pen" id="afficheOuvrir">Afficher qui est avec qui (groupes, équipes, binômes)</button></div>
    <div class="tgrid">${cartes}</div>
    <div class="tablebox"><table><tr><th>Étudiant·e</th><th>Groupe</th>${dispo.map(a=>`<th>Atelier ${a.n}</th>`).join("")}<th>Note finale</th></tr>${lignes||`<tr><td colspan="${3+dispo.length}" class="note">Les groupes ne sont pas encore formés.</td></tr>`}</table></div>
    <div class="card"><h3>Absents (${absents.length})</h3><div class="membres">${absents.map(e=>`<span>${esc(e.n)} ${esc(e.p)}</span>`).join("")||"<span class='note'>Personne.</span>"}</div></div>
@@ -2173,7 +2180,6 @@ function brancherV2(){
   on("#nsHoraire","click",async()=>{const sid=profSeance;const h=$("#nsDebut").value,dr=+$("#nsDuree").value||10;if(!h){toast("Indiquez l'heure");return}const iso=seances[sid].date+"T"+h;seances[sid].debut=iso;seances[sid].dureeRot=dr;await ecrire("seances",sid,{debut:iso,dureeRot:dr},"update");toast("Horaires enregistrés");rendre()});
   document.querySelectorAll("#retourHub").forEach(b=>b.addEventListener("click",()=>{ctxEquipe=null;repart=null}));
 }
-
 /* =========================================================
    ATELIER 4 : Enquête vétérinaire aux Acacias (introduction à la pathologie digestive)
    Dr Maria Zacharopoulou · autocorrigé, notation volontairement généreuse
@@ -2226,7 +2232,7 @@ function vA4(){const g=monGroupe();if(!g){vue="hub";return vHub()}const t=monEqu
       <div><b>2</b><span><b>Réunion des enquêteurs</b> : vos indices sont rassemblés dans un tableau.</span></div>
       <div><b>3</b><span><b>Carte surprise</b> : un nouvel élément de l'enquête, à discuter en équipe.</span></div>
       <div><b>4</b><span><b>Conclusion</b> : de quoi les chiens sont-ils morts ?</span></div></div>
-    <p><b>Ce qu'on attend de vous</b> : observer avant de répondre, utiliser le vocabulaire du cours d'anatomie (couleur, taille, bords, aspect de la muqueuse) et discuter en équipe. Personne ne vous demande de poser un diagnostic d'expert. Durée : environ 10 minutes.</p>
+    <p><b>Ce qu'on attend de vous</b> : observer avant de répondre, utiliser le vocabulaire du cours d'anatomie (couleur, taille, bords, aspect de la muqueuse) et discuter en équipe. Personne ne vous demande de poser un diagnostic d'expert. Durée : environ 25 minutes (prenez le temps d'observer, l'application vous laisse un temps minimum à chaque étape).</p>
     <div class="a4bareme">${ico("coche")}<span><b>Pas de piège, pas de stress.</b> Vous n'avez pas encore vu d'anapath : c'est une découverte. Une case mal cochée ne retire jamais de point, et pour « citez trois anomalies » deux bonnes réponses suffisent. Mener l'enquête jusqu'au bout rapporte déjà 6 points.</span></div>
     <p class="note">Une seule équipe, plusieurs téléphones : les réponses sont partagées, celui qui tient le téléphone lit à voix haute.</p>
     <button class="btn pen gros" id="a4go">Ouvrir le dossier</button></div>`;
@@ -2237,18 +2243,22 @@ function vA4(){const g=monGroupe();if(!g){vue="hub";return vHub()}const t=monEqu
        return `<div class="a4q"><h3>${i+1}. ${esc(q.t)}${q.type==="multi"?` <small>(jusqu'à ${q.max} réponses)</small>`:""}</h3><div class="chk">${q.opts.map(o=>{const on=sel.includes(o), bon=q.bonnes.includes(o);
          const cl=fait?(bon&&on?"on bon":on?"faux":bon?"manque":""):on?"on":"";return `<button class="chkb ${cl}" ${fait?"disabled":`data-a4="${p.id}|${q.id}|${esc(o)}"`}>${on||fait&&bon?ico("coche"):""}${esc(o)}</button>`}).join("")}</div>
         ${fait?`<p class="a4corr"><b>${fr(a4PtsQ(q,fait[q.id]))}/${q.pts} pt${q.pts>1?"s":""}</b> · Réponse attendue : ${esc(q.corr)}</p>`:""}</div>`}).join("")}
-     ${fait?`<button class="btn pen gros" id="a4suite">Pièce suivante</button>`:`<button class="btn pen gros" id="a4valider" data-p="${p.id}">Valider nos réponses</button>`}</div>`}
+     ${fait?(d[p.id+"_obs"]?`<p class="note"><b>Vos observations</b> : ${esc(d[p.id+"_obs"])}</p>`:"")+`<button class="btn pen gros" id="a4suite">Pièce suivante</button>`
+       :`<div class="a4q"><h3>4. Vos observations, avec vos mots <small>(non noté)</small></h3><textarea id="a4obs" rows="3" style="width:100%;padding:10px;border-radius:10px;border:1.5px solid var(--rule);font:inherit" placeholder="Couleur, taille, bords, aspect, ce qui vous frappe…">${esc(a4Obs[p.id]||"")}</textarea></div>
+        ${a4Minuteur(t.id,p.id,150,"Observez et discutez en équipe avant de valider")}<button class="btn pen gros" id="a4valider" data-p="${p.id}" data-attente>Valider nos réponses</button>`}</div>`}
   else if(e==="reunion")c=`<div class="card"><span class="eyebrow">Réunion des enquêteurs</span><h2 style="margin:6px 0 10px">Vos trois indices</h2>
     <div class="tablebox"><table><tr><th>Organe</th><th>Anomalies observées</th></tr>${A4_PIECES.map(p=>{const r=d[p.id]||{};return `<tr><td><b>${esc([].concat(r.q1||[]).join(", ")||"?")}</b></td><td>${esc([].concat(r.q3||[]).join(" · ")||"?")}</td></tr>`}).join("")}</table></div>
-    <p>Trois organes du tube digestif touchés en même temps, des hémorragies partout, des chiens en bonne santé la veille… Un indice supplémentaire vous attend.</p>
-    <button class="btn pen gros" id="a4carteGo">Tirer une carte surprise</button></div>`;
+    <p>Trois organes du tube digestif touchés en même temps, des hémorragies partout, des chiens en bonne santé la veille…</p>
+    <div class="a4bareme">${ico("main")}<span><b>Discutez en équipe</b> : quels organes sont touchés ? Quelles lésions ont-ils en commun ? Qu'est-ce qui pourrait abîmer plusieurs organes en même temps, en quelques heures ?</span></div>
+    ${a4Minuteur(t.id,"reunion",180,"Temps de discussion")}<button class="btn pen gros" id="a4carteGo" data-attente>Tirer une carte surprise</button></div>`;
   else if(e==="carte"){const ca=A4_CARTES.find(x=>x[0]===d.carte)||A4_CARTES[0];
     c=`<div class="card"><span class="eyebrow">Carte surprise</span><div class="a4carte"><b>${ca[0]}</b><p>« ${esc(ca[1])} »</p></div>
      <h3>Discutez : cette information renforce-t-elle l'hypothèse d'une intoxication ?</h3><p class="note">Pas de point ici : c'est la discussion qui compte. Choisissez votre avis pour continuer.</p>
-     <div class="chk">${["Oui, elle la renforce","Non, elle ne change rien","On ne peut pas savoir"].map(o=>`<button class="chkb" data-a4carte="${esc(o)}">${esc(o)}</button>`).join("")}</div></div>`}
+     ${a4Minuteur(t.id,"carte",120,"Discutez avant de choisir")}<div class="chk">${["Oui, elle la renforce","Non, elle ne change rien","On ne peut pas savoir"].map(o=>`<button class="chkb" data-a4carte="${esc(o)}" data-attente>${esc(o)}</button>`).join("")}</div></div>`}
   else if(e==="concl")c=`<div class="card"><span class="eyebrow">Conclusion</span>${d.avisCarte?`<p class="a4corr">Carte ${esc(d.carte)} : elle renforce bien l'hypothèse d'une intoxication (les autres équipes ont reçu d'autres cartes qui vont dans le même sens : même parc, appâts suspects, mort en moins de 24 h, aucun antécédent).</p>`:""}
      <h2 style="margin:6px 0 10px">D'après votre enquête, de quoi les chiens sont-ils morts ?</h2>
-     <div class="chk">${A4_CONCL.map(o=>`<button class="chkb" data-a4concl="${esc(o)}">${esc(o)}</button>`).join("")}</div></div>`;
+     <div class="a4q"><h3>Justifiez en 2 ou 3 phrases <small>(non noté)</small></h3><textarea id="a4justif" rows="3" style="width:100%;padding:10px;border-radius:10px;border:1.5px solid var(--rule);font:inherit" placeholder="Nous pensons que… parce que…">${esc(a4Obs.justif||"")}</textarea></div>
+     ${a4Minuteur(t.id,"concl",90,"Rédigez votre justification")}<div class="chk">${A4_CONCL.map(o=>`<button class="chkb" data-a4concl="${esc(o)}" data-attente>${esc(o)}</button>`).join("")}</div></div>`;
   else{const n=a4Note(d);c=`<div class="card a4fin"><span class="eyebrow">Enquête bouclée</span><h2 style="margin:6px 0">${d.concl===A4_CONCL[0]?"Bien vu : c'est une intoxication.":"La réponse était : une intoxication."}</h2>
      <p>Hémorragies de l'estomac, de l'intestin, du foie et du pancréas chez des chiens en bonne santé la veille, morts en quelques heures après être passés au même endroit : tout concorde.</p>
      <div class="fnote">${fr(n)}<small>/20</small></div>
@@ -2256,24 +2266,34 @@ function vA4(){const g=monGroupe();if(!g){vue="hub";return vHub()}const t=monEqu
      <p class="note">Pour aller plus loin : la photothèque Noah's Arkive de la Davis-Thompson Foundation.</p>
      <button class="btn pen gros" id="retourHub2">Retour aux ateliers</button></div>`}
   return `${tete}<div class="a1form a4" style="max-width:820px;margin:14px auto">${e!=="intro"&&e!=="fin"?barre:""}${c}</div>`}
-function brancherA4(){const on=(s,ev,f)=>{const el=$(s);if(el)el.addEventListener(ev,f)};const g=monGroupe();if(vue!=="a4"||!g)return;const t=monEquipe(g,"a4");if(!t)return;
+function brancherA4(){setTimeout(a4MajAttente,0);const on=(s,ev,f)=>{const el=$(s);if(el)el.addEventListener(ev,f)};const g=monGroupe();if(vue!=="a4"||!g)return;const t=monEquipe(g,"a4");if(!t)return;
   const re=()=>{const y=window.scrollY;rendre();window.scrollTo(0,y)}, go=e=>{a4Etape=e;rendre();window.scrollTo(0,0)};
   on("#a4go","click",()=>{a4Ecrire(t.id,{vuIntro:true});go("p1")});
   document.querySelectorAll("[data-a4]").forEach(b=>b.addEventListener("click",()=>{const [p,qid,o]=b.dataset.a4.split("|");const q=A4_PIECES.find(x=>x.id===p).qs.find(x=>x.id===qid), k=p+qid;
     if(q.type==="un")a4Sel[k]=o;else{const s=[].concat(a4Sel[k]||[]);const i=s.indexOf(o);if(i>=0)s.splice(i,1);else if(s.length<q.max)s.push(o);else{toast(q.max+" réponses au maximum");return}a4Sel[k]=s}re()}));
   on("#a4valider","click",()=>{const p=A4_PIECES.find(x=>x.id===$("#a4valider").dataset.p);const rep={};p.qs.forEach(q=>rep[q.id]=a4Sel[p.id+q.id]||(q.type==="multi"?[]:""));
     const vides=p.qs.filter(q=>!rep[q.id]||!rep[q.id].length).length;
-    const ok=()=>{a4Ecrire(t.id,{[p.id]:rep});const pts=a4PtsPiece(p,rep);bip(pts>=3?[523,659,784]:[523,659]);if(pts>=3)confettis();re()};
+    const obs=(($("#a4obs")||{}).value||"").trim();
+    const ok=()=>{a4Ecrire(t.id,{[p.id]:rep,[p.id+"_obs"]:obs});const pts=a4PtsPiece(p,rep);bip(pts>=3?[523,659,784]:[523,659]);if(pts>=3)confettis();re()};
     if(vides)modale("Valider quand même ?",`${vides} question${vides>1?"s":""} sans réponse. Une réponse au hasard ne coûte rien !`,"Valider",ok,"","Je réponds");else ok()});
   on("#a4suite","click",()=>{const i=A4_PIECES.findIndex(p=>p.id===a4Etape);go(i<A4_PIECES.length-1?A4_PIECES[i+1].id:"reunion")});
   on("#a4carteGo","click",()=>{const d=a4Doc(t.id);const c=d.carte||A4_CARTES[Math.floor(Math.random()*4)][0];a4Ecrire(t.id,{carte:c});go("carte")});
   document.querySelectorAll("[data-a4carte]").forEach(b=>b.addEventListener("click",()=>{a4Ecrire(t.id,{avisCarte:b.dataset.a4carte});go("concl")}));
-  document.querySelectorAll("[data-a4concl]").forEach(b=>b.addEventListener("click",()=>modale("Votre conclusion",`« ${esc(b.dataset.a4concl)} » : c'est votre dernier mot ?`,"Oui",()=>{a4Ecrire(t.id,{concl:b.dataset.a4concl,fini:true,note:a4Note(Object.assign({},a4Doc(t.id),{concl:b.dataset.a4concl,fini:true}))});go("fin");setTimeout(()=>{confettis();bip([523,659,784,1047])},200)},"","Non")));
+  document.querySelectorAll("[data-a4concl]").forEach(b=>b.addEventListener("click",()=>modale("Votre conclusion",`« ${esc(b.dataset.a4concl)} » : c'est votre dernier mot ?`,"Oui",()=>{a4Ecrire(t.id,{justif:(($("#a4justif")||{}).value||a4Obs.justif||"").trim(),concl:b.dataset.a4concl,fini:true,note:a4Note(Object.assign({},a4Doc(t.id),{concl:b.dataset.a4concl,fini:true}))});go("fin");setTimeout(()=>{confettis();bip([523,659,784,1047])},200)},"","Non")));
   document.querySelectorAll("[data-zoom]").forEach(im=>im.addEventListener("click",()=>{const z=document.createElement("div");z.className="a4zoom";z.innerHTML=`<img src="${im.dataset.zoom}" alt=""><span>Touchez pour fermer</span>`;z.onclick=()=>z.remove();document.body.appendChild(z)}));
   on("#retourHub2","click",()=>{a4Etape=null;vue="hub";rendre();window.scrollTo(0,0)});
   document.querySelectorAll("#retourHub").forEach(b=>b.addEventListener("click",()=>{a4Etape=null}));
 }
 
+/* ----- temps minimum par étape (atelier d'environ 25 min) ----- */
+let a4T=LS.get("a4T",{}), a4Obs={};
+function a4Minuteur(tid,cle,sec,txt){if(String(tid).startsWith("TEST"))sec=5;const k=tid+"|"+cle;if(!a4T[k]){a4T[k]=Date.now();LS.set("a4T",a4T)}const fin=a4T[k]+sec*1000;
+  return `<p class="a4attente" data-fin="${fin}" data-txt="${esc(txt)}">${esc(txt)} : encore <b>${fmt(Math.max(0,fin-Date.now()))}</b></p>`}
+function a4MajAttente(){const el=document.querySelector(".a4attente");const btns=document.querySelectorAll("[data-attente]");if(!el){btns.forEach(b=>b.disabled=false);return}
+  const r=+el.dataset.fin-Date.now();if(r>0){el.innerHTML=`${el.dataset.txt} : encore <b>${fmt(r)}</b>`;btns.forEach(b=>b.disabled=true)}
+  else{el.innerHTML=`${ico("coche")} C'est bon, vous pouvez continuer.`;el.classList.add("ok");btns.forEach(b=>b.disabled=false)}}
+setInterval(()=>{if(vue==="a4")a4MajAttente()},1000);
+document.addEventListener("input",e=>{if(e.target.id==="a4obs"&&a4Etape)a4Obs[a4Etape]=e.target.value;if(e.target.id==="a4justif")a4Obs.justif=e.target.value});
 /* Cartes du jeu des 7 familles digestives (Morgane Robles) */
 const FAM_MEMBRES=["Estomac","Intestin grêle","Cæcum","Côlon","Foie & pancréas","Topographie"];
 const FAM_V_MEMBRES=["Tronc cœliaque","A. mésentérique crâniale","A. mésentérique caudale","Veine porte","Grand omentum","Mésentère"];
@@ -2330,13 +2350,12 @@ const FAMILLES=[
 FAMILLES.forEach(f=>{f.membres=f.membres||FAM_MEMBRES});
 const CARTES7={};FAMILLES.forEach(f=>f.cartes.forEach((c,i)=>{const id=f.id+"-"+i;CARTES7[id]={id,f:f.id,i,membre:f.membres[i],puces:c[0],savez:c[1]}}));
 const famDe=id=>FAMILLES.find(f=>f.id===id);
-
 /* =========================================================
    ATELIER 3 : le jeu des 7 familles sur téléphone (un téléphone par duo, parties synchronisées)
    ========================================================= */
 let famEtat=null, famId=null, famMoi=null, famUnsub=[], famVote=null, famVuEvt=-1, famDemande=null, famZoom=null, famPres={}, famBotT=null, famTick=null;
 const FAM_TEST_DUOS=["Duo 2","Duo 3","Duo 4","Duo 5"];
-const famDuree=g=>(((seances[g&&g.seance]||{}).famDuree)||6)*60e3;
+const famDuree=g=>(((seances[g&&g.seance]||{}).famDuree)||15)*60e3;
 function famCarteHTML(id,cls){const c=CARTES7[id],f=famDe(c.f);
   return `<div class="c7 ${cls||""}" style="--fc:${f.c};--fh:${f.fonce?"#23807a":f.c};--ft:${f.fonce?"#123":"#fff"}" data-c7="${id}"><div class="c7h"><b>${esc(f.nom.toUpperCase())}</b><small>${esc(f.sous)}</small></div>
    <div class="c7b"><h4>${esc(c.membre)}</h4><ul>${c.puces.map(p=>`<li>${esc(p)}</li>`).join("")}</ul><div class="c7s"><b>Le saviez-vous ?</b> ${esc(c.savez)}</div></div></div>`}
@@ -2350,7 +2369,7 @@ async function ouvrirFamilles(){const g=monGroupe();if(!g)return;const t=monEqui
   famMoi=t.id;famVuEvt=-1;famDemande=null;famZoom=null;famUnsub.forEach(u=>u());famUnsub=[];
   const duos=duosA3(g).map(d=>({id:d.id,nom:d.nom}));
   if(g.id==="TEST"){famId="TEST-fam";const ds=[{id:t.id,nom:"Votre duo"},...FAM_TEST_DUOS.map((n,i)=>({id:"BOT"+(i+1),nom:n+" (fictif)"}))];
-    famEtat={id:famId,test:true,statut:"attente",duos:ds,ordre:ds.map(d=>d.id),mains:{},poses:{},pioche:[],tour:null,evt:{n:0},journal:[],duree:6*60e3};famPres={};ds.forEach(d=>famPres[d.id]=1);vue="fam";rendre();return}
+    famEtat={id:famId,test:true,statut:"attente",duos:ds,ordre:ds.map(d=>d.id),mains:{},poses:{},pioche:[],tour:null,evt:{n:0},journal:[],duree:15*60e3};famPres={};ds.forEach(d=>famPres[d.id]=1);vue="fam";rendre();return}
   if(!db){toast("Pas de connexion au serveur");return}
   const p=phaseSeance(g.seance);famId=(g.id+"-fam-R"+(p.r!=null?p.r:0)).replace(/[^A-Za-z0-9-]/g,"");
   const ref=db.collection("familles").doc(famId);let sn=null;try{sn=await ref.get()}catch(e){}
@@ -2372,7 +2391,7 @@ const melange=a=>{a=[...a];for(let i=a.length-1;i>0;i--){const j=Math.floor(Math
 const famNb=(main,f)=>main.filter(c=>CARTES7[c].f===f).length;
 const famCompletes=main=>FAMILLES.filter(f=>famNb(main,f.id)===6).map(f=>f.id);
 function famEvt(o,log){famEtat.evt=Object.assign({n:(famEtat.evt.n||0)+1,t:Date.now()},o);if(log){famEtat.journal=[log,...(famEtat.journal||[])].slice(0,8)}}
-function famCommencer(){const E=famEtat;E.ordre=E.test?E.duos.map(d=>d.id):E.duos.map(d=>d.id).filter(id=>famPres[id]);
+function famCommencer(){const E=famEtat;E.duree=E.duree||15*60e3;E.ordre=E.test?E.duos.map(d=>d.id):E.duos.map(d=>d.id).filter(id=>famPres[id]);
   if(E.ordre.length<2){toast("Il faut au moins 2 duos connectés");return}
   const p=melange(Object.keys(CARTES7));E.mains={};E.poses={};E.ordre.forEach(id=>{E.mains[id]=p.splice(0,6);E.poses[id]=[]});E.pioche=p;
   E.tour=E.ordre[Math.floor(Math.random()*E.ordre.length)];E.statut="en_cours";E.debut=Date.now();E.enValidation=null;
@@ -2514,7 +2533,6 @@ function brancherFam(){if(vue!=="fam")return;const on=(s,ev,f)=>{const el=$(s);i
 }
 setInterval(()=>{if(vue!=="fam"||!famEtat||famEtat.statut!=="en_cours")return;const el=$("#famChrono");const r=famEtat.duree-(Date.now()-famEtat.debut);if(el)el.textContent=fmt(Math.max(0,r));
   if(r<=0&&(famEtat.tour===famMoi||famEtat.test)){famFin();famEcrire()}},1000);
-
 /* =========================================================
    Format tablette / téléphone (bouton en haut à droite)
    ========================================================= */
@@ -2530,7 +2548,6 @@ function appliquerFormat(){const r=document.documentElement;r.dataset.format=FOR
   b.innerHTML=`<span class="${FORMAT==="tel"?"on":""}" title="Format téléphone">${tel}</span><span class="${FORMAT==="tab"?"on":""}" title="Format tablette">${tab}</span>`;
   b.setAttribute("aria-label",FORMAT==="tel"?"Passer en format tablette":"Passer en format téléphone")}
 appliquerFormat();
-
 /* =========================================================
    SÛRETÉ DES NOTES
    1. Journal local de chaque note écrite (jamais effacé) + renvoi automatique jusqu'à confirmation du serveur
@@ -2628,7 +2645,6 @@ function brancherSurete(){const on=(s,ev,f)=>{const el=$(s);if(el)el.addEventLis
   document.querySelectorAll("[data-manu]").forEach(b=>b.addEventListener("click",()=>{const k=b.dataset.manu,[sid,eid,aid]=k.split("~"),m=notesManu[k];
     modale("Note à la main",`${esc(etu(sid,eid))} · atelier ${aid.slice(1)}<br><br>À n'utiliser qu'en dernier recours (note perdue, situation particulière). Elle remplace la note calculée.<br><br><input id="manuVal" type="number" min="0" max="20" step="0.5" value="${m&&m.note!=null?m.note:""}" style="font-size:22px;width:120px;padding:6px" placeholder="/20"> /20<br><span class="note">Laissez vide pour revenir à la note calculée.</span>`,"Enregistrer",()=>{
       const v=($("#manuVal")||{}).value;const note=v===""?null:Math.max(0,Math.min(20,+v));notesManu[k]={note,t:Date.now()};ecrireBase("notes_manuelles",k,{note,t:Date.now()});rendre()},"","Annuler")}))}
-
 /* =========================================================
    ÉCONOMIE DE LECTURES (quota gratuit de Firebase)
    Chaque téléphone d'étudiant n'écoute que sa séance et son groupe.
@@ -2650,6 +2666,7 @@ function reabonner(){if(!db)return;const c=portee();if(c===aboCle)return;aboCle=
     S(db.collection("a4"),coll("a4",d=>{a4docs={};d.forEach(x=>a4docs[x.id]=x.data())}));
     S(db.collection("notes_a3"),coll("notes_a3",d=>{notesA3=d.map(x=>Object.assign({id:x.id},x.data()))}));
     S(db.collection("a3prog"),coll("a3prog",d=>{a3prog={};d.forEach(x=>a3prog[x.id]=x.data())}));
+    S(db.collection("notes_a5"),coll("notes_a5",d=>{notesA5=d.map(x=>Object.assign({id:x.id},x.data()))}));
     S(db.collection("resultats"),coll("resultats",d=>{resultats=d.map(x=>Object.assign({},x.data()))}));
     S(db.collection("secours"),coll("secours",d=>{secoursDocs={};d.forEach(x=>secoursDocs[x.id]=x.data())}));
     S(db.collection("notes_manuelles"),coll("nm",d=>{notesManu={};d.forEach(x=>notesManu[x.id]=x.data())}));
@@ -2671,6 +2688,7 @@ function reabonner(){if(!db)return;const c=portee();if(c===aboCle)return;aboCle=
   docs({c:"a4",a:"a4"},3,(id,d)=>{if(d)a4docs[id]=d;else delete a4docs[id]});
   docs({c:"notes_a3",a:"a3"},6,(id,d)=>upsert(notesA3,id,d));
   docs({c:"a3prog",a:"a3"},6,(id,d)=>{if(d)a3prog[id]=d;else delete a3prog[id]});
+  docs({c:"notes_a5",a:"a5"},6,(id,d)=>upsert(notesA5,id,d));
   /* les bandes ne servent plus une fois les groupes formés : une seule lecture pour l'affichage */
   db.collection("bandes").where("seance","==",sid).get().then(s=>{bandes=s.docs.map(x=>Object.assign({id:x.id},x.data()))}).catch(()=>{})}
 function initPortail(){
@@ -2688,15 +2706,15 @@ setInterval(()=>{if(!db||!moiE||monGid==="TEST")return;const g=monGroupeDe();if(
 /* ----- atelier 2 : duel resté inachevé (téléphones éteints, temps écoulé) → note calculée à partir des points marqués ----- */
 let a2Verif=0;
 setInterval(async()=>{if(!db||!moiE||monGid==="TEST"||Date.now()-a2Verif<45000)return;const g=monGroupeDe();if(!g||!atelierPasse(g,"a2"))return;
-  const sd=subsDe(g.id,"a2");if(!sd)return;const manque=sd.equipes.map((_,i)=>g.id+"-a2-e"+(i+1)).filter(t=>!resultats.some(r=>r.groupe===t));if(!manque.length)return;a2Verif=Date.now();
-  let r=-1;for(let k=0;k<NB_ROT;k++)if(atelierDe(g.k,k).id==="a2"){r=k;break}
-  const id=(g.id+"-R"+r).replace(/[^A-Za-z0-9-]/g,"");
-  try{const ds=await db.collection("duels").doc(id).get();if(!ds.exists)return;const D=ds.data();const sc=await db.collection("duels/"+id+"/scores").get();const S={};sc.docs.forEach(x=>S[x.id]=x.data());
-    for(const role of ["A","B"]){const tid=D["groupe"+role];if(!tid||!manque.includes(tid))continue;const mi=S[role];if(!mi)continue;
-      const adv=D.solo?{tot:mi.tot}:(S[role==="A"?"B":"A"]||{tot:0});const max=PTS_M1+(D.qids||[]).length-(mi.jokers||0)+2;
-      const gagne=(mi.tot||0)>(adv.tot||0),egal=(mi.tot||0)===(adv.tot||0);
-      await ecrire("resultats",id+"-"+role,{cle:id+"-"+role,duel:id,groupe:tid,seance:g.seance,equipe:D.equipes[role],adversaire:D.equipes[role==="A"?"B":"A"],planche:D.planche,date:new Date(D.debut||D.cree).toISOString(),
-        total:mi.tot||0,totalAdv:adv.tot||0,max,resultat:gagne?"victoire":egal?"égalité":"défaite",note:noteDe(mi.tot||0,max,gagne,egal),repli:1})}}catch(e){}},15000);
+  const sd=subsDe(g.id,"a2");if(!sd)return;let r=-1;for(let k=0;k<NB_ROT;k++)if(atelierDe(g.k,k).id==="a2"){r=k;break}
+  for(const n of [1,2]){const id=(g.id+"-R"+r+"-D"+n).replace(/[^A-Za-z0-9-]/g,"");
+    const manque=sd.equipes.map((_,i)=>g.id+"-a2-e"+(i+1)).filter(t=>!resultats.some(x=>x.groupe===t&&x.duel===id));if(!manque.length)continue;a2Verif=Date.now();
+    try{const ds=await db.collection("duels").doc(id).get();if(!ds.exists)continue;const D=ds.data();const sc=await db.collection("duels/"+id+"/scores").get();const S={};sc.docs.forEach(x=>S[x.id]=x.data());
+      for(const role of ["A","B"]){const tid=D["groupe"+role];if(!tid||!manque.includes(tid))continue;const mi=S[role];if(!mi)continue;
+        const adv=D.solo?{tot:mi.tot}:(S[role==="A"?"B":"A"]||{tot:0});const max=PTS_M1+(D.qids||[]).length-(mi.jokers||0)+2;
+        const gagne=(mi.tot||0)>(adv.tot||0),egal=(mi.tot||0)===(adv.tot||0);
+        await ecrire("resultats",id+"-"+role,{cle:id+"-"+role,duel:id,num:n,groupe:tid,seance:g.seance,equipe:D.equipes[role],adversaire:D.equipes[role==="A"?"B":"A"],planche:D.planche,date:new Date(D.debut||D.cree).toISOString(),
+          total:mi.tot||0,totalAdv:adv.tot||0,max,resultat:gagne?"victoire":egal?"égalité":"défaite",note:noteDe(mi.tot||0,max,gagne,egal),repli:1})}}catch(e){}}},15000);
 
 /* ----- archive par groupe (chaque groupe garde la trace de ses propres notes) ----- */
 let dernArchiveG=0;
@@ -2707,7 +2725,182 @@ async function archiverGroupe(){if(!db||!moiE||monGid==="TEST")return;const g=mo
   if(Date.now()-dernArchiveG<170000&&p.phase!=="fin")return;dernArchiveG=Date.now();
   try{const L=await db.collection("config").doc("archive-"+g.id).acquire({holder:DEVICE,ttlMs:160000});if(L.acquired)await db.collection("archives").doc(g.id).set({t:Date.now(),seance:g.seance,phase:p.phase,lignes})}catch(e){}}
 setInterval(archiverGroupe,30000);
+/* =========================================================
+   VERSION 4 : groupes tirés au sort par l'application (mixtes filles/garçons),
+   sous-groupes de chaque atelier faits d'avance, ateliers de ~30 min, atelier 5 « Défi foie »
+   ========================================================= */
+ATELIERS[4]={id:"a5",n:5,titre:"Défi foie",sous:"Anatomie comparée du foie : puzzles par espèce, correction croisée et quiz",par:"",ic:"etoile"};
+if(!AVEC_CONTENU.includes("a5"))AVEC_CONTENU.push("a5");
+BESOIN.a5={type:"duos",titre:"5 binômes"};
+BESOIN.a4={type:"equipes",n:2,titre:"2 équipes de 5"};
+let notesA5=[];
 
+/* ----- prénoms masculins (le reste est compté comme féminin, sauf prénoms mixtes) : sert seulement à mélanger ----- */
+const PRENOMS_M=new Set("adrien augustin bastien emmeran esteban etienne felix florent leonard loann louis marius paul-jean thibault victor hugo lucas theo thomas nathan maxime antoine alexandre arthur jules paul pierre nicolas julien baptiste mathis tom raphael gabriel leo enzo clement romain benjamin quentin valentin simon martin hugues vincent axel noah ethan sacha".split(" "));
+const PRENOMS_MIXTES=new Set("camille dominique claude sasha charlie alex lou morgan".split(" "));
+const sansAccent=t=>String(t||"").normalize("NFD").replace(/[̀-ͯ]/g,"").toLowerCase().trim();
+function sexe(sid,eid){const s=seances[sid];const e=s&&s.etudiants.find(x=>x.id===eid);if(!e)return "x";const p=sansAccent(e.p);
+  if(PRENOMS_MIXTES.has(p))return "x";if(PRENOMS_M.has(p)||PRENOMS_M.has(p.split("-")[0]))return "m";return "f"}
+/* mélange : filles et garçons alternés au hasard, puis distribués à tour de rôle */
+function ordreMixte(sid,ids){const F=shuffle(ids.filter(e=>sexe(sid,e)==="f")),M=shuffle(ids.filter(e=>sexe(sid,e)==="m")),X=shuffle(ids.filter(e=>sexe(sid,e)==="x"));
+  const tous=[...F.map((e,i)=>[e,(i+.5)/F.length]),...M.map((e,i)=>[e,(i+.5)/M.length]),...X.map((e,i)=>[e,(i+.5)/X.length])];
+  return tous.sort((a,b)=>a[1]-b[1]||Math.random()-.5).map(x=>x[0])}
+function repartirEn(sid,ids,tailles){const out=tailles.map(()=>[]);const ordre=shuffle(tailles.map((_,i)=>i));
+  /* chaque sexe est réparti à son tour : chaque personne va dans le groupe qui en compte le moins (puis le moins rempli) */
+  for(const sx of ["m","x","f"]){for(const e of shuffle(ids.filter(x=>sexe(sid,x)===sx))){let best=-1,bv=null;
+    for(const i of ordre){if(out[i].length>=tailles[i])continue;const v=[out[i].filter(x=>sexe(sid,x)===sx).length,out[i].length/tailles[i]];
+      if(best<0||v[0]<bv[0]||(v[0]===bv[0]&&v[1]<bv[1])){best=i;bv=v}}
+    if(best<0)best=out.reduce((bi,o,i)=>o.length<out[bi].length?i:bi,0);out[best].push(e)}}
+  return out.map(o=>shuffle(o))}
+function taillesEgales(N,G){return [...Array(G)].map((_,i)=>Math.floor(N/G)+(i<N%G?1:0))}
+function sousGroupes(g,aid){const B=BESOIN[aid],m=g.membres||[],N=m.length;if(!N)return [];
+  if(B.type==="equipes"){const n=N>=4?(B.n||2):1;return repartirEn(g.seance,m,taillesEgales(N,n))}
+  /* duos : une fille et un garçon autant que possible ; trio si nombre impair */
+  const nb=Math.max(1,Math.floor(N/2));const t=taillesEgales(N,nb);return repartirEn(g.seance,m,t)}
+async function creerSousGroupes(g){for(const a of ATELIERS_APP()){const id=idSub(g.id,a.id);if(subsDocs[id])continue;const doc={groupe:g.id,aid:a.id,equipes:sousGroupes(g,a.id),t:Date.now(),auto:1};subsDocs[id]=doc;
+  if(g.id==="TEST")continue;try{await db.collection("subs").doc(id).set(doc)}catch(e){ecrire("subs",id,doc)}}}
+
+/* ----- formation des groupes : tirage au sort parmi les présents ----- */
+async function assurerFormation(sid){if(!db||formEnCours||!sid)return;const p=phaseSeance(sid);if(p.phase!=="formation")return;
+  formEnCours=true;
+  try{const L=await db.collection("config").doc("form-"+sid).acquire({holder:DEVICE,ttlMs:15000});
+    if(L.acquired&&!groupesDe(sid).length){const presents=[...new Set(bandes.filter(b=>b.seance===sid).flatMap(b=>b.membres))];const N=presents.length;
+      if(N){const G=Math.max(1,Math.min(NB_ROT,Math.round(N/10)));const parts=repartirEn(sid,presents,taillesEgales(N,G));
+        const gs=parts.map((m,i)=>({id:sid+"-G"+(i+1),seance:sid,k:i,nom:"Groupe "+(i+1),mascotte:MASCOTTES[i%MASCOTTES.length],couleur:COULEURS[i%COULEURS.length][1],membres:m,perso:false,cree:Date.now(),tirage:1}));
+        for(const g of gs){groupes.push(g);await db.collection("groupes").doc(g.id).set(g)}
+        for(const g of gs)await creerSousGroupes(g);
+        deroules[sid]={r:-1,t:Date.now()};await db.collection("deroule").doc(sid).set(deroules[sid])}}}catch(e){}
+  formEnCours=false}
+
+/* ----- inscription : il suffit de choisir son nom (présence) ----- */
+function vInscriptionBande(){const sid=moiE.sid,s=seances[sid],p=phaseSeance(sid);const moiNom=etu(sid,moiE.eid);
+  const inscrit=bandes.some(b=>b.seance===sid&&b.membres.includes(moiE.eid));
+  if(!inscrit&&p.phase==="inscription"&&!inscrEnvoi){inscrEnvoi=true;const id="p-"+moiE.eid.replace(/[^A-Za-z0-9.-]/g,"");const doc={seance:sid,membres:[moiE.eid],cree:Date.now()};bandes.push(Object.assign({id},doc));ecrire("bandes",id,doc).finally(()=>{inscrEnvoi=false})}
+  const nb=new Set(bandes.filter(b=>b.seance===sid).flatMap(b=>b.membres)).size;
+  const h=new Date(debutSeance(s)).toLocaleTimeString("fr-FR",{hour:"2-digit",minute:"2-digit"});
+  const corps=p.phase!=="inscription"?`<div class="card"><h3>Les groupes sont déjà formés</h3><p>Vous arrivez après le tirage au sort : l'application vous place dans le groupe le plus petit.</p><button class="btn pen gros" id="enRetard">Rejoindre un groupe</button></div>`
+   :`<div class="card brief"><span class="eyebrow">Présence enregistrée</span><h2 style="margin:4px 0 8px">Bienvenue ${esc((s.etudiants.find(e=>e.id===moiE.eid)||{}).p||"")} !</h2>
+     <p>Les groupes de 10 sont <b>tirés au sort</b> par l'application à <b>${h}</b> (dans <b id="cptRot">${fmt(p.reste)}</b>), parmi les étudiants présents. Ils sont mélangés (filles et garçons). Les équipes et binômes de chaque atelier sont aussi faits d'avance.</p>
+     <p class="note">${nb} étudiant${nb>1?"s":""} présent${nb>1?"s":""} pour l'instant. Laissez cette page ouverte : votre groupe s'affichera ici.</p></div>`;
+  return `${enteteApp()}<div class="center" style="text-align:left;justify-items:stretch;max-width:780px;gap:14px">
+   <div class="row" style="justify-content:space-between"><span class="eyebrow">${esc(s.nom)} · ${esc(moiNom)}</span><button class="link" id="pasMoi">Ce n'est pas moi</button></div>${corps}</div>`}
+let inscrEnvoi=false;
+
+/* ----- ouvrir un atelier : les sous-groupes existent déjà (sinon on les crée) ----- */
+function ouvrirAtelier(aid){const g=monGroupe();if(!g)return;
+  if(!subsDe(g.id,aid)){creerSousGroupes(g).then(()=>ouvrirAtelier(aid));return}
+  const t=monEquipe(g,aid);if(!t){toast("Vous n'êtes dans aucune équipe de cet atelier");return}
+  if(aid==="a1"){ctxEquipe=t;vue="a1";a1Form=null;a1Photo=null;if(!(a1docs[t.id]||{}).debut){a1docs[t.id]=Object.assign({},a1docs[t.id],{debut:Date.now()});ecrire("a1",t.id,{debut:Date.now()},"set")}rendre();window.scrollTo(0,0);return}
+  if(aid==="a2"){if(duelsFaits(g,t.id)>=2){toast("Les deux duels sont joués");return}lancerDuelEquipes(g);return}
+  if(aid==="a3"){vue="a3";rendre();window.scrollTo(0,0)}
+  if(aid==="a4"){a4Etape=null;a4Sel={};vue="a4";rendre();window.scrollTo(0,0)}
+  if(aid==="a5"){vue="a5";rendre();window.scrollTo(0,0)}}
+
+/* ----- atelier 2 : deux duels (manche + revanche), note = moyenne des deux ----- */
+const resA2=tid=>resultats.filter(r=>r.groupe===tid);
+function duelsFaits(g,tid){if(g.id==="TEST")return testE&&testE.a2!=null?2:0;return new Set(resA2(tid).map(r=>r.duel)).size}
+async function lancerDuelEquipes(g){
+  if(g.id==="TEST"){partieTest("hasard");Object.assign(duel,{groupeA:"TEST",mascotteA:TEST_G.mascotte,couleurA:TEST_G.couleur,equipes:{A:TEST_G.nom,B:"Adversaire fictif"}});jeu.mascotte=TEST_G.mascotte;jeu.couleur=TEST_G.couleur;rendre();return}
+  if(!db){toast("Pas de connexion au serveur");return}
+  const sd=subsDe(g.id,"a2"), s=seances[g.seance]||{}, p=phaseSeance(g.seance);
+  const me=moiE.eid, idx=sd.equipes.findIndex(e=>e.includes(me)), role=idx===0?"A":"B", tid=g.id+"-a2-e"+(idx+1);
+  const n=Math.min(2,duelsFaits(g,tid)+1);
+  const id=(g.id+"-R"+(p.r!=null?p.r:0)+"-D"+n).replace(/[^A-Za-z0-9-]/g,"");
+  try{const L=await db.collection("verrous").doc(id+"-"+role).acquire({holder:DEVICE,ttlMs:60000});
+    if(!L.acquired){const v=await db.collection("verrous").doc(id+"-"+role+"-qui").get();const qui=v.exists&&v.data().eid;
+      modale("Votre équipe joue déjà",`Votre équipe joue sur le téléphone de <b>${esc(nomCourt(g.seance,qui))}</b>. Rejoignez-le. Si ce téléphone s'est éteint, réessayez dans une minute : la partie reprendra ici.`,"Compris",()=>{},"","Fermer");return}
+    db.collection("verrous").doc(id+"-"+role+"-qui").set({eid:me,t:Date.now()}).catch(()=>{})}catch(e){}
+  verrouDuel={doc:id+"-"+role,eid:me};
+  const ref=db.collection("duels").doc(id);let snap=null;try{snap=await ref.get()}catch(e){}
+  if(!snap||!snap.exists){let L={acquired:true};try{L=await db.collection("config").doc("lock-"+id).acquire({holder:DEVICE,ttlMs:8000})}catch(e){}
+    if(L.acquired){try{snap=await ref.get()}catch(e){}
+      if(!snap||!snap.exists){const solo=sd.equipes.length<2;const planche=await tirerPlanche();const qids=shuffle(QUESTIONS.map(q=>q.id)).slice(0,Math.min(Math.max(reglages.nq,8),QUESTIONS.length));
+        const nomE=i=>"Équipe "+(i+1)+" ("+sd.equipes[i].map(x=>nomCourt(g.seance,x).split(" ")[0]).join(", ")+")";
+        const alt=COULEURS.map(c=>c[1]).find(c=>c!==g.couleur);
+        const d={equipes:{A:nomE(0),B:solo?"Adversaire fictif":nomE(1)},groupeA:g.id+"-a2-e1",groupeB:solo?"":g.id+"-a2-e2",seance:g.seance,solo,num:n,
+          mascotteA:g.mascotte,mascotteB:solo?"Cochons":g.mascotte,couleurA:g.couleur,couleurB:alt,planche,mode1:n===2?"trous":choisirMode1(),qids,statut:"attente",cree:Date.now(),debut:null,
+          m1:+s.duelM1||6,m2:+s.duelM2||5,rejoint:solo,luB:solo};
+        try{await ref.set(d)}catch(e){toast("Création du duel impossible");return}}}
+    else await new Promise(r=>setTimeout(r,1500))}
+  rejoindre(id,role)}
+
+/* ----- atelier 5 : Défi foie, en binômes ; chaque binôme corrige le suivant ----- */
+function duosA5(g){const sd=subsDe(g.id,"a5");if(!sd)return [];const s=seances[g.seance]||{etudiants:[]};
+  return sd.equipes.map((m,i)=>({id:g.id+"-a5-e"+(i+1),num:i+1,membres:m,nom:"Binôme "+(i+1),noms:m.map(x=>g.id==="TEST"?x:((s.etudiants.find(e=>e.id===x)||{n:x,p:""}).n+" "+(s.etudiants.find(e=>e.id===x)||{p:""}).p).trim())}))}
+function lienA5(g,duoId){const duos=duosA5(g).map(d=>({id:d.id,nom:d.nom,noms:d.noms}));return "atelier5/index.html?duos="+encodeURIComponent(JSON.stringify(duos))+(duoId?"&duo="+encodeURIComponent(duoId):"")}
+function vA5(){const g=monGroupe();if(!g){vue="hub";return vHub()}const duos=duosA5(g),t=monEquipe(g,"a5");
+  const corrige=d=>duos[(duos.indexOf(d)+1)%duos.length];
+  return `<div class="bar a1bar"><span class="tag" style="background:${g.couleur};color:#fff">ATELIER 5</span><b style="font-size:18px">Défi foie</b><span class="sp"></span><button class="btn ghost sm" id="retourHub">Retour aux ateliers</button></div>
+   <div class="a1form" style="max-width:860px;margin:14px auto">
+    <div class="card brief"><span class="eyebrow">Avant de commencer · 30 minutes</span><h2 style="margin:4px 0 10px">Ce qui vous attend</h2>
+     <div class="briefetapes">
+      <div><b>1</b><span><b>Puzzle 1</b> (6 min) : sur le contour du foie de l'espèce de votre poste, placez les pièces des structures présentes et mettez de côté celles qui n'existent pas chez elle.</span></div>
+      <div><b>2</b><span><b>Correction croisée</b> : vous corrigez le puzzle d'un autre binôme (et un autre binôme corrige le vôtre).</span></div>
+      <div><b>3</b><span><b>Puzzle 2</b> (6 min) sur l'animal suivant, puis nouvelle correction.</span></div>
+      <div><b>4</b><span><b>Défi foie</b> (10 min) : repères sur le foie de six espèces, quiz, « Qui suis-je ? ».</span></div>
+      <div><b>5</b><span><b>Validation</b> : le binôme correcteur reporte votre score et valide votre fiche.</span></div></div>
+     <p style="margin:10px 0 0"><b>Note sur 20</b> : puzzle 1 (4 pts) + puzzle 2 (4 pts) + Défi foie (12 pts). Le chrono de l'atelier vous guide d'une étape à l'autre.</p></div>
+    <div class="card"><h3>Les binômes</h3><div class="duolist">${duos.map(d=>{const n=g.id==="TEST"?((testE.a5||{})[d.id]):(notesA5.find(x=>x.id===d.id)||{}).note;const moiD=t&&t.id===d.id;
+      return `<div class="duo ${moiD?"moi":""}"><span class="dn">${d.num}</span><b>${esc(d.noms.join(" & "))}${moiD?" (vous)":""}<small style="display:block;font-weight:500;opacity:.7">corrige le binôme ${corrige(d).num}</small></b>${n!=null?`<span class="chip fait">${ico("coche")} note reçue</span>`:""}</div>`}).join("")}</div></div>
+    <div class="card"><h3>Ouvrir l'atelier</h3><p class="note" style="margin-top:0">Un téléphone par binôme. Votre binôme et celui que vous corrigez sont déjà remplis.</p>
+     <button class="btn pen gros" id="a5ouvrir">Ouvrir le Défi foie</button></div></div>`}
+function brancherA5(){if(vue!=="a5")return;const b=$("#a5ouvrir");if(b)b.addEventListener("click",()=>{const g=monGroupe(),t=monEquipe(g,"a5");location.href=lienA5(g,t?t.id:"")})}
+
+/* ----- affichage des groupes en grand (vidéoprojecteur, espace encadrants) ----- */
+let afficheAt="groupes";
+function vAffiche(){const sid=profSeance||seanceSel,s=seances[sid]||{nom:""},gs=groupesDe(sid);
+  const onglets=[["groupes","Groupes de 10"],...ATELIERS_APP().map(a=>[a.id,"Atelier "+a.n])];
+  const nm=(x)=>esc(nomCourt(sid,x));
+  const carte=g=>{if(afficheAt==="groupes")return `<div class="affg" style="--c:${g.couleur}"><h3>${mascSVG(g.mascotte,34)} ${esc(g.nom)}</h3><ul>${(g.membres||[]).map(m=>`<li>${esc(etu(sid,m))}</li>`).join("")}</ul></div>`;
+    const sd=subsDe(g.id,afficheAt);const B=BESOIN[afficheAt]||{};
+    return `<div class="affg" style="--c:${g.couleur}"><h3>${mascSVG(g.mascotte,34)} ${esc(g.nom)}</h3>${sd?sd.equipes.map((e,i)=>`<p><b>${B.type==="duos"?"Binôme":"Équipe"} ${i+1}</b> : ${e.map(nm).join(", ")}</p>`).join(""):"<p class='note'>Pas encore formé.</p>"}</div>`};
+  return `<div class="bar a1bar"><b style="font-size:18px">${esc(s.nom)} · qui est avec qui</b><span class="sp"></span><button class="btn ghost sm" id="afficheRetour">Retour</button></div>
+   <div class="row" style="gap:8px;flex-wrap:wrap;margin:14px 0">${onglets.map(([k,l])=>`<button class="btn ${k===afficheAt?"pen":"ghost"} sm" data-affiche="${k}">${esc(l)}</button>`).join("")}</div>
+   ${gs.length?`<div class="affgrid">${gs.map(carte).join("")}</div>`:`<p class="note">Les groupes ne sont pas encore tirés au sort (ils le seront à l'heure prévue, parmi les présents).</p>`}`}
+function brancherAffiche(){const ao=$("#afficheOuvrir");if(ao)ao.addEventListener("click",()=>{vue="affiche";rendre();window.scrollTo(0,0)});if(vue!=="affiche")return;document.querySelectorAll("[data-affiche]").forEach(b=>b.addEventListener("click",()=>{afficheAt=b.dataset.affiche;rendre()}));
+  const r=$("#afficheRetour");if(r)r.addEventListener("click",()=>{vue="prof";rendre()})}
+
+/* duos : autant que possible une fille et un garçon */
+function sousGroupes(g,aid){const B=BESOIN[aid],m=g.membres||[],N=m.length;if(!N)return [];
+  if(B.type==="equipes"){const n=N>=4?(B.n||2):1;return repartirEn(g.seance,m,taillesEgales(N,n))}
+  const F=shuffle(m.filter(e=>sexe(g.seance,e)==="f")),M=shuffle(m.filter(e=>sexe(g.seance,e)==="m")),X=shuffle(m.filter(e=>sexe(g.seance,e)==="x"));
+  const duos=[];while(F.length&&M.length)duos.push([F.pop(),M.pop()]);
+  const reste=shuffle([...F,...M,...X]);for(let i=0;i+1<reste.length;i+=2)duos.push([reste[i],reste[i+1]]);
+  if(reste.length%2){const s=reste[reste.length-1];if(duos.length)duos[Math.floor(Math.random()*duos.length)].push(s);else duos.push([s])}
+  return shuffle(duos)}
+
+/* ----- notes et fin d'atelier (ateliers 2 et 5) ----- */
+function noteEtuCalc(g,eid,aid){const sd=subsDe(g.id,aid);if(!sd)return null;const i=sd.equipes.findIndex(e=>e.includes(eid));if(i<0)return null;const tid=g.id+"-"+aid+"-e"+(i+1);
+  if(aid==="a1")return noteA1Equipe(tid);
+  if(aid==="a2"){if(g.id==="TEST")return testE&&testE.a2!=null?testE.a2:null;const parDuel={};resA2(tid).forEach(r=>parDuel[r.duel]=+r.note);const v=Object.values(parDuel);
+    if(!v.length)return null;if(v.length<2&&!atelierPasse(g,"a2"))return null;return Math.round(v.reduce((s,x)=>s+x,0)/v.length*2)/2}
+  if(aid==="a4")return a4Note(g.id==="TEST"?((testE&&testE.a4)||{})[tid]:a4docs[tid]);
+  if(aid==="a3"){if(g.id==="TEST")return testE&&testE.a3&&testE.a3[tid]!=null?testE.a3[tid]:null;const n=notesA3.find(x=>x.id===tid);return n?+n.note:null}
+  if(aid==="a5"){if(g.id==="TEST")return testE&&testE.a5&&testE.a5[tid]!=null?testE.a5[tid]:null;const n=notesA5.find(x=>x.id===tid);return n?+n.note:null}
+  return null}
+function groupeAFini(g,aid){if(!atelierActif(aid))return false;const sd=subsDe(g.id,aid);if(!sd)return false;
+  return sd.equipes.every((m,i)=>{const tid=g.id+"-"+aid+"-e"+(i+1);
+    if(aid==="a1"){const a=a1docs[tid]||{};return !!a.maquette&&!evals.some(e=>e.evaluateur===tid&&e.statut!=="envoyee")}
+    if(aid==="a2")return new Set(resA2(tid).map(r=>r.duel)).size>=2;
+    if(aid==="a3")return notesA3.some(x=>x.id===tid);
+    if(aid==="a4")return !!(a4docs[tid]||{}).fini;
+    if(aid==="a5")return notesA5.some(x=>x.id===tid);
+    return false})}
+/* notes du Défi foie gardées sur ce téléphone par la page de l'atelier : envoyées ici aussi (double sécurité) */
+function syncA5(){let l=[];try{l=JSON.parse(localStorage.getItem("a5envoi")||"[]")}catch(e){}if(!l.length)return;
+  l.forEach(x=>{if(!x||!x.id)return;if(String(x.id).startsWith("TEST")){if(testE){testE.a5=testE.a5||{};testE.a5[x.id]=x.note}return}
+    const ex=notesA5.find(n=>n.id===x.id);if(ex&&+ex.note===+x.note)return;const doc={note:x.note,a:x.a,b:x.b,c:x.c,correcteur:x.correcteur||"",maj:x.t||Date.now()};
+    if(ex)Object.assign(ex,doc);else notesA5.push(Object.assign({id:x.id},doc));ecrire("notes_a5",x.id,doc)})}
+setInterval(syncA5,10000);window.addEventListener("visibilitychange",()=>{if(!document.hidden)syncA5()});
+
+/* ----- composition d'un atelier : affichée (plus rien à former à la main) ----- */
+function vRepartition(){const g=monGroupe(),aid=repart&&repart.aid;if(!g||!aid){vue="hub";return vHub()}
+  const sd=subsDe(g.id,aid);if(!sd){creerSousGroupes(g).then(()=>rendre());return `<div class="center"><p>Préparation des équipes…</p></div>`}
+  const B=BESOIN[aid],a=ATELIERS.find(x=>x.id===aid),me=g.id==="TEST"?TEST_MEMBRES[0]:moiE&&moiE.eid,nm=x=>g.id==="TEST"?x:nomCourt(g.seance,x);
+  return `<div class="bar a1bar"><span class="tag" style="background:${g.couleur};color:#fff">ATELIER ${a.n}</span><b style="font-size:18px">${esc(titreAt(a))}</b><span class="sp"></span><button class="btn ghost sm" id="retourHub">Retour</button></div>
+   <div class="a1form" style="max-width:820px;margin:14px auto"><div class="card"><h3 style="margin-top:0">${B.type==="duos"?"Les binômes":"Les équipes"} (tirés au sort)</h3>
+    <div class="eqgrid">${sd.equipes.map((e,i)=>`<div class="eqcol"><span class="eqtitre">${B.type==="duos"?"Binôme":"Équipe"} ${i+1}</span>${e.map(x=>`<span class="eqm ${x===me?"sel":""}">${esc(nm(x))}${x===me?" (vous)":""}</span>`).join("")}</div>`).join("")}</div>
+    <div class="row" style="margin-top:14px;justify-content:flex-end"><button class="btn pen gros" data-at="${aid}">Ouvrir l'atelier</button></div></div></div>`}
 /* Démarrage (et reprise d'un duel en cours si la page est rechargée) */
 function start(){
   rendre(); initDb();
