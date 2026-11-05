@@ -1189,7 +1189,7 @@ function dureePhase(){const a=T1(),b=T2();if(vue==="m1")return a;const debM2=jeu
 function modale(titre,texte,okTxt,ok,detail,nonTxt){document.querySelectorAll(".modale").forEach(x=>x.remove());
   const m=document.createElement("div");m.className="modale";m.setAttribute("role","dialog");m.setAttribute("aria-modal","true");
   m.innerHTML=`<div class="mbox"><h2>${esc(titre)}</h2><p>${texte}</p>${detail?`<div class="once">${esc(detail)}</div>`:""}<div class="row" style="justify-content:flex-end;margin-top:18px"><button class="btn ghost" id="mnon">${esc(nonTxt||"Non, je continue")}</button><button class="btn pen" id="moui">${esc(okTxt)}</button></div></div>`;
-  document.body.appendChild(m);m.querySelector("#mnon").addEventListener("click",()=>m.remove());m.querySelector("#moui").addEventListener("click",()=>{m.remove();ok()});
+  document.body.appendChild(m);m.querySelector("#mnon").addEventListener("click",()=>m.remove());m.querySelector("#moui").addEventListener("click",()=>{try{ok()}finally{m.remove()}});
   m.addEventListener("click",e=>{if(e.target===m)m.remove()});m.querySelector("#moui").focus()}
 function demanderFinM1(){const TR=enTrous(), rest=TR?0:jeu.err.filter(e=>!e.t).length, sansRep=jeu.err.filter(e=>e.t&&e.rep<0).length;
   if(TR){modale("Clôturer la manche 1 ?","Passer à la manche 2 <b>clôture définitivement la manche 1</b> : vous ne pourrez plus revenir sur la planche ni compléter d'autres cases. Le temps gagné s'ajoute à votre manche 2.","Oui, je clôture la manche 1",()=>{jeu.finM1=Date.now();ouvert=null;sauver();majVue()},
