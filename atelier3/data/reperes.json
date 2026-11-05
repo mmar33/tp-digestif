@@ -1,0 +1,68 @@
+{
+ "chien": [],
+ "_exclus": {
+  "chien_seg": []
+ },
+ "vache_rumen": [
+  {
+   "nom": "Sac dorsal du rumen",
+   "membre": "Estomac",
+   "tol": "moyenne",
+   "p": [
+    14.08966,
+    3.31062,
+    -24.21801
+   ]
+  },
+  {
+   "nom": "Sac ventral du rumen",
+   "membre": "Estomac",
+   "tol": "moyenne",
+   "p": [
+    13.02579,
+    -0.83716,
+    -23.23324
+   ]
+  },
+  {
+   "nom": "Réseau",
+   "membre": "Estomac",
+   "tol": "moyenne",
+   "p": [
+    15.76212,
+    1.43753,
+    -17.7374
+   ]
+  },
+  {
+   "nom": "Feuillet",
+   "membre": "Estomac",
+   "tol": "moyenne",
+   "p": [
+    12.71413,
+    -0.62312,
+    -15.17489
+   ]
+  },
+  {
+   "nom": "Caillette",
+   "membre": "Estomac",
+   "tol": "moyenne",
+   "p": [
+    13.09771,
+    -3.22773,
+    -19.91369
+   ]
+  },
+  {
+   "nom": "Duodénum",
+   "membre": "Estomac",
+   "tol": "moyenne",
+   "p": [
+    11.66396,
+    -2.24348,
+    -24.27485
+   ]
+  }
+ ]
+}

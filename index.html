@@ -5,7 +5,7 @@
 <script src="firebase-config.js"></script><script src="vendor/firebase-app-compat.js"></script><script src="vendor/firebase-firestore-compat.js"></script><script src="vendor/qrcode.js"></script><script src="adapter.js"></script>
 <title>TP système digestif</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@75..100,400..800&family=Bricolage+Grotesque:opsz,wght@12..96,600..800&family=IBM+Plex+Mono:wght@500;600&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@75..100,400..800&family=Bricolage+Grotesque:opsz,wght@12..96,600..800&family=IBM+Plex+Mono:wght@500;600&family=Barlow+Condensed:wght@600;700&family=Source+Sans+3:wght@400;600;700&display=swap">
 <style>
 /* Mise en page : planche du Barone à gauche, carnet de réponses à droite ; tableau de score en haut ; empilé sur téléphone */
 :root{
@@ -463,8 +463,8 @@ input.petit{width:80px;padding:6px;border-radius:8px;border:1.5px solid var(--ru
 .a4imgs{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:10px;margin-top:10px}.a4imgs img{width:100%;border-radius:12px;cursor:zoom-in;display:block}
 .a4q{margin:16px 0 4px}.a4q h3{margin:0 0 8px}.a4q h3 small{font-weight:500;opacity:.65}
 .chkb.bon{border-color:#2f7a4a;background:#e2f1e6}.chkb.faux{border-color:#c9a3a0;background:#f8eeed;opacity:.8}.chkb.manque{border-style:dashed;border-color:#2f7a4a}.chkb:disabled{cursor:default;color:inherit}
-.a4corr{margin:8px 0 0;padding:8px 12px;border-radius:10px;background:#fff6dd;border-left:4px solid #e0a800}
-.a4bareme{display:flex;gap:10px;align-items:flex-start;padding:12px 14px;border-radius:12px;background:#e2f1e6;margin:12px 0}.a4bareme .ric{width:22px;height:22px;flex:none;color:#2f7a4a}
+.a4corr{margin:8px 0 0;padding:8px 12px;border-radius:10px;background:var(--warn-soft);color:var(--ink);border-left:4px solid #e0a800}
+.a4bareme{display:flex;gap:10px;align-items:flex-start;padding:12px 14px;border-radius:12px;background:var(--ok-soft);color:var(--ink);margin:12px 0}.a4bareme .ric{width:22px;height:22px;flex:none;color:var(--ok)}
 .a4dossier{border-top:6px solid #7a1f1f}
 .a4prog{display:flex;gap:6px;margin:0 0 12px}.a4prog i{flex:1;height:8px;border-radius:5px;background:var(--rule)}.a4prog i.ok{background:#2f7a4a}.a4prog i.cur{background:var(--team,#d0661f)}
 .a4carte{margin:12px auto 16px;max-width:420px;padding:22px 20px;border-radius:18px;background:linear-gradient(135deg,#7a1f1f,#b5462e);color:#fff;text-align:center;box-shadow:0 10px 30px rgba(0,0,0,.2);animation:a4flip .7s ease}
@@ -555,6 +555,107 @@ html[data-format="tel"] .home,html[data-format="tel"] .game,html[data-format="te
 .secoursin{display:flex;gap:14px;align-items:center;flex-wrap:wrap}.secoursin svg{width:150px;height:150px;flex:none}.secoursin code{font-size:15px;word-break:break-all;background:var(--sheet);padding:8px 10px;border-radius:8px;flex:1;min-width:180px}
 .cellnote{font:inherit;border:none;background:none;cursor:pointer;padding:2px 6px;border-radius:6px}.cellnote:hover{background:var(--sheet)}.cellnote sup{font-size:10px;font-weight:800;margin-left:2px}.cellnote.repli{color:#9a6b00}.cellnote.secours{color:#1f5d8c}.cellnote.manuelle{color:#b3261e}
 
+/* ===== Atelier 3 : cartes au format des planches imprimables (Morgane Robles) ===== */
+.c7,.c7m{--cd:"Barlow Condensed","Arial Narrow",Arial,sans-serif;--cb:"Source Sans 3","Segoe UI",system-ui,sans-serif}
+.c7{width:min(320px,86vw);aspect-ratio:230/330;border-radius:12px;border:1px solid #b9b9b9;background:#fff;color:#1d1d1b;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 10px 30px rgba(0,0,0,.3);text-align:left;font-family:var(--cb)}
+.c7h{background:var(--fc);color:var(--ft);padding:12px 16px 10px;flex:none}
+.c7h b{display:block;font-family:var(--cd);font-weight:700;font-size:28px;letter-spacing:.07em;text-transform:uppercase;line-height:1;font-stretch:normal}
+.c7h small{display:block;font-size:13px;margin-top:2px}
+.c7b{padding:14px 16px 16px;display:flex;flex-direction:column;flex:1;min-height:0}
+.c7b h4{margin:0 0 8px;font-family:var(--cd);font-weight:700;font-size:26px;line-height:1.05;color:var(--fk);filter:none;font-stretch:normal}
+.c7b ul{margin:0 0 12px;padding-left:18px;display:grid;gap:6px;font-size:15px;line-height:1.35}
+.c7s{margin-top:auto;background:#F1F1EF;border-radius:8px;padding:10px 12px;font-size:14px;line-height:1.35}
+.c7s b{color:var(--fk);filter:none}
+.famflip .ff{width:min(320px,86vw);height:auto;aspect-ratio:230/330}
+.famflip .c7{width:100%;height:100%}
+.c7m{background:#fff;color:#1d1d1b;border-color:#b9b9b9;font-family:var(--cb)}
+.c7m .c7mh{display:block;background:var(--fc);color:var(--ft);font-family:var(--cd);font-weight:700;font-size:13px;letter-spacing:.07em;text-transform:uppercase;padding:6px 7px 5px;line-height:1.05}
+.c7m .c7mt{display:block;font-family:var(--cd);font-weight:700;font-size:16px;line-height:1.05;color:var(--fk);padding:7px 7px 0}
+.c7m .c7mi{display:block;margin-top:auto;padding:0 7px 6px;font-size:11px;color:#62675f;font-family:var(--cb)}
+.c7m .c7ml{display:block;margin:6px 7px 0;height:3px;border-radius:2px;background:var(--fc);opacity:.35}
+.famtitres{display:flex;flex-wrap:wrap;gap:4px;justify-content:center;margin-top:4px}
+.famtitres span{font-size:12px;font-weight:700;padding:2px 8px;border-radius:999px;background:var(--fc);color:var(--ft)}
+.famtitre{display:inline-block;margin-top:6px;font-family:"Barlow Condensed",Arial,sans-serif;font-weight:700;font-size:22px;letter-spacing:.03em}
+#v3d{position:fixed;inset:0;z-index:120;background:var(--paper);display:flex;flex-direction:column;visibility:hidden;pointer-events:none}
+#v3d.on{visibility:visible;pointer-events:auto}
+#v3d .v3dbar{display:flex;align-items:center;gap:10px;padding:8px 110px 8px max(16px,env(safe-area-inset-left,0px));min-height:56px;border-bottom:1px solid var(--rule);background:var(--sheet)}
+#v3d .v3dbar b{font-family:var(--display);font-size:18px}
+#v3d iframe{flex:1;width:100%;border:0;background:var(--paper)}
+#v3d .v3dload{position:absolute;inset:52px 0 0;display:none;place-items:center;text-align:center;padding:16px;color:var(--muted)}
+#v3d.charge .v3dload{display:grid}
+.famzoomnav .btn.ghost{background:transparent}
+.c7dos{color:#1d1d1b}
+.famval .v3dinfo{max-width:460px;margin:8px auto 0}
+/* Mode sombre : fonds clairs codés en dur remplacés par les couleurs du thème */
+@media (prefers-color-scheme:dark){
+:root:not([data-theme="light"]) .chkb.on,:root:not([data-theme="light"]) .chkb.bon{background:var(--ok-soft)}
+:root:not([data-theme="light"]) .chkb.faux{background:var(--pen-soft)}
+:root:not([data-theme="light"]) .chip{background:var(--rule)}
+:root:not([data-theme="light"]) .chip.encours{background:var(--warn-soft);color:var(--warn)}
+:root:not([data-theme="light"]) .chip.fait{background:var(--ok-soft);color:var(--ok)}
+:root:not([data-theme="light"]) .alerte,:root:not([data-theme="light"]) .seg.courb{background:var(--warn-soft)}
+:root:not([data-theme="light"]) .eqm.sel,:root:not([data-theme="light"]) .barone.moi.urgent{background:var(--pen-soft)}
+:root:not([data-theme="light"]) .duo.moi,:root:not([data-theme="light"]) .famj.moi{background:var(--ok-soft)}
+:root:not([data-theme="light"]) .barone.autre,:root:not([data-theme="light"]) .famfin{background:var(--sheet)}
+:root:not([data-theme="light"]) .affg{background:var(--sheet)}
+:root:not([data-theme="light"]) .a4attente{background:var(--warn-soft);color:var(--ink)}
+:root:not([data-theme="light"]) .a4attente.ok{background:var(--ok-soft)}
+:root:not([data-theme="light"]) .famregles,:root:not([data-theme="light"]) .famj,:root:not([data-theme="light"]) .fammain,:root:not([data-theme="light"]) .famval,:root:not([data-theme="light"]) .famjournal,:root:not([data-theme="light"]) .famfeuillein{background:var(--sheet);color:var(--ink)}
+:root:not([data-theme="light"]) .famduos span.on{background:var(--ok-soft)}
+:root:not([data-theme="light"]) .fampodium>div.gagne{background:var(--warn-soft)}
+:root:not([data-theme="light"]) .surete.ok{background:var(--ok-soft);color:var(--ok)}
+:root:not([data-theme="light"]) .surete.attente{background:var(--warn-soft);color:var(--warn)}
+}
+:root[data-theme="dark"] .chkb.on,:root[data-theme="dark"] .chkb.bon{background:var(--ok-soft)}
+:root[data-theme="dark"] .chkb.faux{background:var(--pen-soft)}
+:root[data-theme="dark"] .chip{background:var(--rule)}
+:root[data-theme="dark"] .chip.encours{background:var(--warn-soft);color:var(--warn)}
+:root[data-theme="dark"] .chip.fait{background:var(--ok-soft);color:var(--ok)}
+:root[data-theme="dark"] .alerte,:root[data-theme="dark"] .seg.courb{background:var(--warn-soft)}
+:root[data-theme="dark"] .eqm.sel,:root[data-theme="dark"] .barone.moi.urgent{background:var(--pen-soft)}
+:root[data-theme="dark"] .duo.moi,:root[data-theme="dark"] .famj.moi{background:var(--ok-soft)}
+:root[data-theme="dark"] .barone.autre,:root[data-theme="dark"] .famfin{background:var(--sheet)}
+:root[data-theme="dark"] .affg{background:var(--sheet)}
+:root[data-theme="dark"] .a4attente{background:var(--warn-soft);color:var(--ink)}
+:root[data-theme="dark"] .a4attente.ok{background:var(--ok-soft)}
+:root[data-theme="dark"] .famregles,:root[data-theme="dark"] .famj,:root[data-theme="dark"] .fammain,:root[data-theme="dark"] .famval,:root[data-theme="dark"] .famjournal,:root[data-theme="dark"] .famfeuillein{background:var(--sheet);color:var(--ink)}
+:root[data-theme="dark"] .famduos span.on{background:var(--ok-soft)}
+:root[data-theme="dark"] .fampodium>div.gagne{background:var(--warn-soft)}
+:root[data-theme="dark"] .surete.ok{background:var(--ok-soft);color:var(--ok)}
+:root[data-theme="dark"] .surete.attente{background:var(--warn-soft);color:var(--warn)}
+/* ===== Atelier 6 : Pilote du rumen ===== */
+.a6svg{width:100%;height:auto;display:block;color:var(--ink);margin-top:8px}
+.a6leg{display:flex;flex-wrap:wrap;gap:6px 14px;margin:2px 0 10px}.a6leg span{display:inline-flex;align-items:center;gap:6px}.a6leg i{display:inline-block;width:16px;height:4px;border-radius:2px}
+.a6tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px;margin:6px 0 10px}
+.a6t{border:1.5px solid var(--rule);border-left:5px solid var(--c,var(--rule));border-radius:10px;padding:8px 10px;display:flex;flex-direction:column;gap:2px;background:var(--sheet)}
+.a6t span{font-size:12px;letter-spacing:.04em;text-transform:uppercase;color:var(--muted);font-weight:600}.a6t b{font-size:20px;font-family:var(--display)}.a6t small{font-size:13px;color:var(--c,var(--muted));font-weight:600}
+.a6t b small{font-family:var(--body);font-size:12px;margin-left:4px}.a6t b small.up{color:#2f7a4a}.a6t b small.dn{color:#c0262d}
+.a6agv{display:flex;border-radius:8px;overflow:hidden;font-size:12px;font-weight:700;color:#fff;margin-bottom:10px}.a6agv i{font-style:normal;padding:6px 6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.a6ira summary{cursor:pointer;font-weight:650}.a6ira ul{list-style:none;padding:0;margin:8px 0;display:grid;gap:4px}.a6ira .d{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:8px}
+.a6obj{list-style:none;padding:0;margin:0;display:grid;gap:6px}.a6obj li{display:flex;gap:8px;align-items:flex-start;padding:6px 10px;border-radius:8px;background:var(--paper)}.a6obj li.ok{background:var(--ok-soft);color:var(--ok)}.a6obj li.ko{background:var(--pen-soft)}.a6obj .ric{width:18px;height:18px;flex:none}
+.a6pourquoi{margin-top:10px;padding:10px 12px;border-radius:10px;background:var(--blue-soft)}.a6pourquoi ul{margin:6px 0 0;padding-left:18px;display:grid;gap:4px}
+.a6ration h4{margin:14px 0 6px;font-size:15px}.a6ration h4 small{font-weight:500;color:var(--muted)}
+.a6lab{display:block;font-weight:600;margin-bottom:6px}.a6ration input[type=range]{width:100%;accent-color:var(--team,#1f5d8c);min-height:36px}
+.a6bilan h3{margin:0 0 10px}
+.a6refaire{width:100%;margin-top:12px}
+
+/* ===== Mon profil ===== */
+.pfchip{margin-top:10px;display:inline-flex;align-items:center;gap:8px;border:2px solid rgba(255,255,255,.7);background:rgba(255,255,255,.14);color:#fff;border-radius:999px;padding:6px 14px 6px 8px;font-weight:700}
+.pfchip span{font-size:24px;line-height:1}
+.pfav{font-size:64px;line-height:1;width:96px;height:96px;border-radius:50%;border:3px solid rgba(255,255,255,.8);background:rgba(255,255,255,.15);display:grid;place-items:center;cursor:pointer}
+.pfniv{font-size:15px}.pfniv i{display:block;height:8px;border-radius:5px;background:rgba(255,255,255,.25);margin-top:6px;max-width:360px}.pfniv em{display:block;height:100%;border-radius:5px;background:#fff}
+.pfpick{background:var(--sheet);border:1.5px solid var(--rule);border-radius:16px;padding:12px}.pfpick div{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+.pfa{font-size:30px;width:52px;height:52px;border-radius:12px;border:2px solid var(--rule);background:var(--paper)}.pfa.sel{border-color:var(--team,#1f5d8c);background:var(--blue-soft)}
+.pfat{padding:10px 0;border-top:1px solid var(--rule)}.pfath{display:flex;justify-content:space-between;gap:10px;align-items:center}
+.pfbar{height:8px;border-radius:5px;background:var(--rule);margin:6px 0 4px;overflow:hidden}.pfbar i{display:block;height:100%;background:var(--team,#2f7a4a)}
+.pfat small{color:var(--muted)}
+.pffinale{display:flex;justify-content:space-between;align-items:baseline;padding:10px 14px;border-radius:12px;background:var(--ok-soft);margin:8px 0}.pffinale b{font-size:30px;font-family:var(--display)}.pffinale small{font-size:16px;opacity:.6}
+.pfbh{margin:14px 0 6px;font-size:15px}
+.pfbadges{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}
+.pfb{border:1.5px dashed var(--rule);border-radius:12px;padding:10px;display:flex;flex-direction:column;gap:2px;opacity:.6}
+.pfb.ok{border-style:solid;border-color:var(--team,#2f7a4a);opacity:1;background:var(--sheet)}
+.pfb .pfi{font-size:28px;line-height:1.1}.pfb b{font-size:14px}.pfb small{font-size:12px;color:var(--muted)}
+@media (max-width:560px){.pfhead{grid-template-columns:auto 1fr}.pfhead .prog{grid-column:1/-1}.pfav{width:72px;height:72px;font-size:46px}}
 .affgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:14px}
 .affg{background:#fff;border-radius:16px;padding:14px 16px;border-top:8px solid var(--c);box-shadow:0 4px 16px rgba(0,0,0,.06)}.affg h3{display:flex;align-items:center;gap:8px;margin:0 0 8px;color:var(--c);font-size:22px}
 .affg ul{margin:0;padding-left:18px;columns:2;font-size:16px}.affg p{margin:6px 0;font-size:15px}
@@ -1197,11 +1298,11 @@ function planche(pl,tout){
 function rendre(){
   try{if(typeof reabonner==="function")reabonner()}catch(e){}
   const app=$("#app");
-  app.innerHTML = vue==="hub"?vHub(): vue==="inscr"?vInscription(): vue==="a1"?vA1(): vue==="a3"?vA3(): vue==="a4"?vA4(): vue==="fam"?vFam(): vue==="a5"?vA5(): vue==="affiche"?vAffiche(): vue==="rejoindre"?vRejoindre(): vue==="repartition"?vRepartition(): vue==="accueil"?vAccueil(): vue==="salle"?vSalle(): vue==="decompte"?vDecompte(): (vue==="m1"||vue==="demo")?vM1(): vue==="m2"?vM2(): vue==="attente"?vAttente(): vue==="fin"?vFin(): vProf();
+  app.innerHTML = vue==="hub"?vHub(): vue==="inscr"?vInscription(): vue==="a1"?vA1(): vue==="a3"?vA3(): vue==="a4"?vA4(): vue==="a6"?vA6(): vue==="profil"?vProfil(): vue==="fam"?vFam(): vue==="a5"?vA5(): vue==="affiche"?vAffiche(): vue==="rejoindre"?vRejoindre(): vue==="repartition"?vRepartition(): vue==="accueil"?vAccueil(): vue==="salle"?vSalle(): vue==="decompte"?vDecompte(): (vue==="m1"||vue==="demo")?vM1(): vue==="m2"?vM2(): vue==="attente"?vAttente(): vue==="fin"?vFin(): vProf();
   document.body.dataset.team=(duel&&moi&&["salle","decompte","m1","m2","attente","fin"].includes(vue))?moi:""; document.body.dataset.vue=vue;
   appliquerCouleurs();
-  const gC=monGroupe(); if(gC&&["hub","a1","a3","a4","fam","repartition","accueil","inscr"].includes(vue))document.body.style.setProperty("--team",gC.couleur); else if(vue==="inscr"&&insc&&insc.couleur)document.body.style.setProperty("--team",insc.couleur); else document.body.style.removeProperty("--team");
-  brancher(); brancherPortail(); brancherV2(); brancherA4(); brancherFam(); brancherSurete(); brancherA5(); brancherAffiche(); majBandeaux();
+  const gC=monGroupe(); if(gC&&["hub","profil","a1","a3","a4","a6","fam","repartition","accueil","inscr"].includes(vue))document.body.style.setProperty("--team",gC.couleur); else if(vue==="inscr"&&insc&&insc.couleur)document.body.style.setProperty("--team",insc.couleur); else document.body.style.removeProperty("--team");
+  brancher(); brancherPortail(); brancherV2(); brancherA4(); brancherA6(); brancherProfil(); brancherFam(); brancherSurete(); brancherA5(); brancherAffiche(); majBandeaux();
 }
 function vAccueil(){
   const etat=dbEtat==="absent"||dbEtat==="erreur"?`<div class="banner demo">Pas de connexion au serveur pour l'instant : vérifiez le réseau.</div>`:"";
@@ -1515,13 +1616,14 @@ function initPortail(){
   db.collection("secours").onSnapshot(s=>{secoursDocs={};s.docs.forEach(d=>secoursDocs[d.id]=d.data());rendrePortail()},()=>{});
   db.collection("notes_manuelles").onSnapshot(s=>{notesManu={};s.docs.forEach(d=>notesManu[d.id]=d.data());rendrePortail()},()=>{});
   db.collection("a4").onSnapshot(s=>{a4docs={};s.docs.forEach(d=>a4docs[d.id]=d.data());if(testE&&testE.a4)Object.assign(a4docs,testE.a4);rendrePortail()},()=>{});
+  db.collection("a6").onSnapshot(s=>{a6docs={};s.docs.forEach(d=>a6docs[d.id]=d.data());if(testE&&testE.a6)Object.assign(a6docs,testE.a6);rendrePortail()},()=>{});
   db.collection("subs").onSnapshot(s=>{subsDocs={};s.docs.forEach(d=>subsDocs[d.id]=d.data());rendrePortail()},()=>{});
   db.collection("notes_a3").onSnapshot(s=>{notesA3=s.docs.map(d=>Object.assign({id:d.id},d.data()));rendrePortail()},()=>{});
   db.collection("config").doc("ateliers").onSnapshot(s=>{if(s.exists)cfgAt=Object.assign({actifs:{a1:true,a2:true},titres:{}},s.data());rendrePortail()},()=>{});
   db.collection("duels").where("statut","==","en_cours").onSnapshot(s=>{duelsEnCours=s.docs.map(x=>Object.assign({id:x.id},x.data()));if(vue==="prof")rendre()},()=>{});
   viderFile();
 }
-function rendrePortail(){if(["hub","inscr","a1","a3","a4","a5","affiche","repartition","prof","accueil"].includes(vue)&&!document.querySelector(".modale")&&!(vue==="a1"&&a1Form)&&!(vue==="inscr")&&!(vue==="rejoindre")&&!(vue==="prof"&&grpEdit))rendre()}
+function rendrePortail(){if(["hub","profil","inscr","a1","a3","a4","a5","a6","affiche","repartition","prof","accueil"].includes(vue)&&!document.querySelector(".modale")&&!(vue==="a1"&&a1Form)&&!(vue==="inscr")&&!(vue==="rejoindre")&&!(vue==="prof"&&grpEdit))rendre()}
 
 /* ----- état des ateliers d'un groupe ----- */
 function noteA1(gid){if(gid==="TEST"){const e=evals.find(x=>x.evaluateur==="TEST"&&x.statut==="envoyee");return e?+e.total:null}const a=a1docs[gid];if(a&&a.noteProf!=null&&a.noteProf!=="")return +a.noteProf;
@@ -1848,6 +1950,7 @@ function groupeAFini(g,aid){if(!atelierActif(aid))return false;const sd=subsDe(g
     if(aid==="a2")return resultats.some(r=>r.groupe===tid)||(sd.equipes.length<2&&false);
     if(aid==="a3")return notesA3.some(x=>x.id===tid);
     if(aid==="a4")return !!(a4docs[tid]||{}).fini;
+    if(aid==="a6")return !!(a6docs[tid]||{}).fini;
     return false})}
 
 /* ----- qui suis-je, quel groupe ----- */
@@ -1917,6 +2020,7 @@ function noteEtuCalc(g,eid,aid){const sd=subsDe(g.id,aid);if(!sd)return null;con
   if(aid==="a1")return noteA1Equipe(tid);
   if(aid==="a2"){if(g.id==="TEST")return testE&&testE.a2!=null?testE.a2:null;const r=resultats.find(x=>x.groupe===tid);return r?+r.note:null}
   if(aid==="a4")return a4Note(g.id==="TEST"?((testE&&testE.a4)||{})[tid]:a4docs[tid]);
+  if(aid==="a6")return a6NoteGroupe(g);
   if(aid==="a3"){if(g.id==="TEST")return testE&&testE.a3&&testE.a3[tid]!=null?testE.a3[tid]:null;const n=notesA3.find(x=>x.id===tid);return n?+n.note:null}
   return null}
 function noteEtudiant(g,eid){const out={};ATELIERS_APP().forEach(a=>out[a.id]=noteEtu(g,eid,a.id));const v=Object.values(out);const ok=v.length&&v.every(x=>x!=null);
@@ -1969,7 +2073,8 @@ function vHub(){
   if(b.complet){const k="feu_"+g.id+"_"+me;if(test?!testE.feu:!LS.get(k,false)){if(test)testE.feu=true;else LS.set(k,true);setTimeout(()=>{feter("Bravo !","Tous vos ateliers sont validés");feuArtifice();bip([523,659,784,1047,1319])},500)}}
   const bandTest=test?`<div class="testban">${ico("main")}<span><b>Mode test encadrant</b> Ateliers tous ouverts, sans minuteur. Rien n'est enregistré ni compté.</span><button class="btn sm" id="quitterTest">Quitter le test</button></div>`:"";
   const tete=`<div class="grhead">${mascSVG(g.mascotte,96)}<div><span class="eyebrow">${esc(s.nom)} · vous : ${esc(test?me:etu(g.seance,me))}</span><h1>${esc(g.nom)} <span>· les ${esc(g.mascotte)}</span></h1>
-    <div class="membres">${(g.membres||[]).map(m=>`<span>${esc(test?m:nomCourt(g.seance,m))}</span>`).join("")}</div></div>
+    <div class="membres">${(g.membres||[]).map(m=>`<span>${esc(test?m:nomCourt(g.seance,m))}</span>`).join("")}</div>
+    <button class="pfchip" id="ouvrirProfil"><span>${pfAvatar()}</span>Mon profil, mes notes et mes badges</button></div>
     <div class="prog"><b>${b.faits}<small>/${b.dispo.length}</small></b><span>ateliers notés validés</span><i><em style="width:${b.dispo.length?b.faits/b.dispo.length*100:0}%"></em></i></div></div>`;
   const pendEq=ATELIERS_APP().some(a=>a.id==="a1")&&(()=>{const t=monEquipe(g,"a1");return t&&evals.find(e=>e.evaluateur===t.id&&e.statut!=="envoyee")})();
   let centre="";
@@ -2029,7 +2134,8 @@ function ouvrirAtelier(aid){const g=monGroupe();if(!g)return;
   if(aid==="a1"){ctxEquipe=t;vue="a1";a1Form=null;a1Photo=null;if(!(a1docs[t.id]||{}).debut){a1docs[t.id]=Object.assign({},a1docs[t.id],{debut:Date.now()});ecrire("a1",t.id,{debut:Date.now()},"set")}rendre();window.scrollTo(0,0);return}
   if(aid==="a2"){if(etatAt(g,"a2").st==="fait"){toast("Duel déjà joué");return}lancerDuelEquipes(g);return}
   if(aid==="a3"){vue="a3";rendre();window.scrollTo(0,0)}
-  if(aid==="a4"){a4Etape=null;a4Sel={};vue="a4";rendre();window.scrollTo(0,0)}}
+  if(aid==="a4"){a4Etape=null;a4Sel={};vue="a4";rendre();window.scrollTo(0,0)}
+  if(aid==="a6"){a6Etape=null;a6Brouillon={};a6Pred={};a6Quiz={};vue="a6";rendre();window.scrollTo(0,0)}}
 
 /* ----- atelier 1 : évaluer une maquette de la rotation précédente ----- */
 async function attribuerEval(t){
@@ -2080,21 +2186,21 @@ setInterval(async()=>{if(!verrouDuel||!db)return;if(!duel||!["salle","decompte",
 
 /* ----- atelier 3 : 7 familles en duos ----- */
 function duosA3(g){const sd=subsDe(g.id,"a3");if(!sd)return [];return sd.equipes.map((m,i)=>({id:g.id+"-a3-e"+(i+1),membres:m,nom:m.map(x=>g.id==="TEST"?x:((seances[g.seance]||{etudiants:[]}).etudiants.find(e=>e.id===x)||{p:x}).p).join(" & ")}))}
-function lienA3(g,duoId){const duos=duosA3(g).map(d=>({id:d.id,nom:d.nom}));return "atelier3/index.html?duos="+encodeURIComponent(JSON.stringify(duos))+(duoId?"&duo="+encodeURIComponent(duoId):"")}
+function lienA3(g,duoId){const duos=duosA3(g).map(d=>({id:d.id,nom:d.nom}));return "atelier3/index.html?duos="+encodeURIComponent(JSON.stringify(duos))+(duoId?"&duo="+encodeURIComponent(duoId):"")+"&eval="+evalDureeMin(g)}
 function vA3(){const g=monGroupe();if(!g){vue="hub";return vHub()}const duos=duosA3(g),t=monEquipe(g,"a3");
   return `<div class="bar a1bar"><span class="tag" style="background:${g.couleur};color:#fff">ATELIER 3</span><b style="font-size:18px">Le jeu des 7 familles</b><span class="sp"></span><button class="btn ghost sm" id="retourHub">Retour aux ateliers</button></div>
    <div class="a1form" style="max-width:860px;margin:14px auto">
-    <div class="card brief"><span class="eyebrow">Avant de commencer · environ 30 minutes</span><h2 style="margin:4px 0 10px">Ce qui vous attend</h2>
+    <div class="card brief"><span class="eyebrow">Avant de commencer · ${dureeRotMin(g)} minutes en tout, sans enseignant</span><h2 style="margin:4px 0 10px">Ce qui vous attend</h2>
      <div class="briefetapes">
-      <div><b>1</b><span><b>Les duos</b> sont formés (voir la liste ci-dessous). Chaque duo joue comme un seul joueur, sur un de ses téléphones.</span></div>
-      <div><b>2</b><span><b>Le jeu des 7 familles</b> (environ 15 min, <span class="vert">non noté</span>). Six espèces (chien, chat, cheval, vache, porc, lapin) et une famille « Vaisseaux et péritoine », six cartes chacune.</span></div>
-      <div><b>3</b><span><b>L'évaluation de votre duo</b> (<span class="rouge">notée sur 20</span>) : repérer des structures sur des modèles 3D puis répondre à un petit quiz.</span></div></div>
+      <div><b>1</b><span><b>Les duos</b> sont formés (liste ci-dessous). Chaque duo joue sur <b>un seul</b> de ses téléphones, le même pour le jeu et l'évaluation.</span></div>
+      <div><b>2</b><span><b>Le jeu des 7 familles</b> (${famDureeMin(g)} min, <span class="vert">non noté</span>). Six espèces (chien, chat, cheval, vache, porc, lapin) et la famille « Vaisseaux et péritoine », six cartes chacune. Les familles se valident sur les modèles 3D, directement dans le téléphone.</span></div>
+      <div><b>3</b><span><b>L'évaluation de votre duo</b> (${evalDureeMin(g)} min, <span class="rouge">notée sur 20</span>) : repérer des structures sur les modèles 3D (/10) puis un quiz QCM et vrai/faux (/10). Une seule fois, chronométrée dès la première épreuve commencée. La note s'enregistre toute seule.</span></div></div>
      <details class="briefregles" open><summary>Les règles du jeu en 30 secondes</summary><ul>
       <li>À votre tour, demandez à un autre duo une carte d'une famille que vous avez déjà en main, <b>avec un critère</b> (« le cæcum du cheval, celui à 4 bandes charnues »). L'application vous propose 3 critères : un seul est juste.</li>
-      <li><span class="rouge">Critère faux</span> : vous passez votre tour. <span class="vert">Le duo a la carte</span> : il vous la donne, vous lisez son « Le saviez-vous ? » à voix haute et vous rejouez. Sinon : « Pioche ! ».</li>
-      <li><b>Famille complète</b> : posez-la, puis montrez <b>2 structures</b> de cette espèce sur les pièces de la table, sans les toucher. Les autres duos valident.</li>
-      <li>Le duo qui a posé le plus de familles gagne.</li></ul></details>
-     <p class="note" style="margin:8px 0 0">Ce qu'on attend de vous : jouer franc jeu, lire les cartes à voix haute et vous en servir pour réviser. L'évaluation porte sur les mêmes notions.</p></div>
+      <li><span class="rouge">Critère faux</span> : vous passez votre tour. <span class="vert">Le duo a la carte</span> : elle arrive dans votre main, vous lisez son « Le saviez-vous ? » à voix haute et vous rejouez. Sinon : « Pioche ! ».</li>
+      <li><b>Famille complète</b> : posez-la. Votre téléphone ouvre le modèle 3D de l'espèce : touchez les <b>2 structures</b> demandées. Deux bonnes réponses : la famille est à vous, avec son titre (« Maître du rumen », « Seigneur du cæcum »…). Sinon, les 6 cartes retournent dans la pioche. La famille Vaisseaux et péritoine se valide sur le schéma 3D de la vascularisation.</li>
+      <li>Le duo qui a posé le plus de familles gagne. Le jeu ne compte pas dans la note : un duo qui n'a posé aucune famille n'est pas pénalisé.</li></ul></details>
+     <p class="note" style="margin:8px 0 0">Dans l'évaluation, touchez votre avatar en haut de l'écran pour voir votre profil, vos badges et l'album des cartes gagnées.</p></div>
     <div class="card"><h3>Les duos</h3><p class="note" style="margin-top:0">L'évaluation se fait sur le téléphone d'un des deux membres du duo.</p>
      <div class="duolist">${duos.map((d,k)=>{const n=g.id==="TEST"?((testE.a3||{})[d.id]):(notesA3.find(x=>x.id===d.id)||{}).note;const moiD=t&&t.id===d.id;return `<div class="duo ${moiD?"moi":""}"><span class="dn">${k+1}</span><b>${esc(d.nom)}${moiD?" (vous)":""}</b>${n!=null?`<span class="chip fait">${ico("coche")} évaluation faite</span>`:moiD||g.id==="TEST"?`<button class="btn sm pen" data-a3duo="${d.id}">Notre évaluation</button>`:`<span class="note">sur son téléphone</span>`}</div>`}).join("")}</div></div>
     <div class="card famcarte"><div class="famstack petit">${famDosHTML("","--r:-8deg")}${famDosHTML("","--r:5deg")}</div><div><h3>1. Le jeu des 7 familles (non noté)</h3><p class="note" style="margin-top:0">Chaque duo joue sur un de ses téléphones : les cartes arrivent dans votre main.</p><button class="btn pen gros" id="famOuvrir">Jouer aux 7 familles</button></div></div>
@@ -2113,7 +2219,7 @@ let dernierePhase=null;
 setInterval(()=>{if(!db)return;const sid=(moiE&&moiE.sid)||(vue==="prof"&&profSeance)||seanceSel;if(sid){assurerFormation(sid);assurerAvance(sid)}
   syncA3();
   if(moiE&&monGid!=="TEST"){const p=phaseSeance(moiE.sid),cle=p.phase+(p.r!=null?p.r:"");
-    if(dernierePhase!==null&&dernierePhase!==cle&&["hub","a1","a3","a4","fam","repartition"].includes(vue)){bip([523,659,784,1047]);navigator.vibrate&&navigator.vibrate([400,150,400]);
+    if(dernierePhase!==null&&dernierePhase!==cle&&["hub","a1","a3","a4","a6","fam","repartition"].includes(vue)){bip([523,659,784,1047]);navigator.vibrate&&navigator.vibrate([400,150,400]);
       majMonGid();const g=monGroupe();if(p.phase==="rot"&&g){const a=atelierDe(g.k,p.r);feter("Changement d'atelier",`Rotation ${p.r+1} sur ${NB_ROT} : atelier ${a.n} · ${titreAt(a)}`)}else if(p.phase==="prepa")feter("Vos groupes sont formés !","Découvrez votre groupe de 10");else if(p.phase==="fin")feter("Fin des ateliers","Bravo à tous !");
       if(!(vue==="a1"&&a1Form)){ctxEquipe=null;vue="hub"}rendre()}
     dernierePhase=cle;const el=document.getElementById("cptRot");if(el)el.textContent=fmt(p.reste||0);
@@ -2149,7 +2255,7 @@ function carteSeances(){const sid=profSeance||seanceSel||seanceParDefaut(), s=se
   const h=s?new Date(debutSeance(s)).toTimeString().slice(0,5):"08:10";
   return (s?`<div class="card"><h3>Horaires · ${esc(s.nom)}</h3><p class="note" style="margin-top:0">À régler une fois avant le TP. À l'heure de formation, les petits groupes (1 à 5 personnes) sont assemblés en groupes de ~10 ; les ateliers démarrent quand tous les groupes sont prêts, et chaque rotation change quand tous les groupes sont prêts ou au bout de la durée prévue.</p>
     <div class="settings"><label for="nsDebut">Formation des groupes à<input id="nsDebut" type="time" value="${h}" style="padding:8px;border:1.5px solid var(--rule);border-radius:8px"></label>
-    <label for="nsDuree">Durée max. d'une rotation (min)<input id="nsDuree" type="number" min="5" max="60" value="${(s.dureeRot||10)}"></label></div>
+    <label for="nsDuree">Durée max. d'une rotation (min)<input id="nsDuree" type="number" min="5" max="60" value="${(s.dureeRot||30)}"></label></div>
     <div class="row" style="margin-top:10px"><button class="btn pen" id="nsHoraire">Enregistrer</button><button class="btn ghost" id="nsMaintenant">Répétition : former les groupes dans 1 minute</button></div></div>`:"")+carteSeancesBase()}
 function vRejoindre(){vue="hub";return vHub()}
 
@@ -2177,7 +2283,7 @@ function brancherV2(){
   on("#famOuvrir","click",ouvrirFamilles);
   all("[data-a3duo]",b=>{location.href=lienA3(monGroupe(),b.dataset.a3duo)});
   on("#nsMaintenant","click",async()=>{const sid=profSeance;const d=new Date(Date.now()+60e3);const iso=new Date(d.getTime()-d.getTimezoneOffset()*60e3).toISOString().slice(0,19);seances[sid].debut=iso;await ecrire("seances",sid,{debut:iso},"update");toast("Les groupes seront formés dans 1 minute");rendre()});
-  on("#nsHoraire","click",async()=>{const sid=profSeance;const h=$("#nsDebut").value,dr=+$("#nsDuree").value||10;if(!h){toast("Indiquez l'heure");return}const iso=seances[sid].date+"T"+h;seances[sid].debut=iso;seances[sid].dureeRot=dr;await ecrire("seances",sid,{debut:iso,dureeRot:dr},"update");toast("Horaires enregistrés");rendre()});
+  on("#nsHoraire","click",async()=>{const sid=profSeance;const h=$("#nsDebut").value,dr=+$("#nsDuree").value||30;if(!h){toast("Indiquez l'heure");return}const iso=seances[sid].date+"T"+h;seances[sid].debut=iso;seances[sid].dureeRot=dr;await ecrire("seances",sid,{debut:iso,dureeRot:dr},"update");toast("Horaires enregistrés");rendre()});
   document.querySelectorAll("#retourHub").forEach(b=>b.addEventListener("click",()=>{ctxEquipe=null;repart=null}));
 }
 /* =========================================================
@@ -2285,6 +2391,234 @@ function brancherA4(){setTimeout(a4MajAttente,0);const on=(s,ev,f)=>{const el=$(
   document.querySelectorAll("#retourHub").forEach(b=>b.addEventListener("click",()=>{a4Etape=null}));
 }
 
+
+/* =========================================================
+   ATELIER 6 : Pilote du rumen (physiologie du rumen, Morgane Robles)
+   2 équipes de 5 · 3 missions (12 pts) + prédictions (4 pts) + quiz (4 pts) = /20 par équipe
+   Note du groupe = moyenne des 2 équipes. Modèle : livre INRA 2018 (chap. 3, 14, 15) et articles cités dans les consignes.
+   ========================================================= */
+ATELIERS[5]={id:"a6",n:6,titre:"Pilote du rumen",sous:"Réglez la ration d'un troupeau et gardez le rumen en bonne santé : pH, AGV, méthane et lait",par:"Morgane Robles",ic:"etoile"};
+if(!AVEC_CONTENU.includes("a6"))AVEC_CONTENU.push("a6");
+BESOIN.a6={type:"equipes",n:2,titre:"2 équipes de 5"};
+let a6docs={}, a6Etape=null, a6Brouillon={}, a6Pred={}, a6Quiz={};
+/* ===== Pilote du rumen : modèle pédagogique (valeurs validées, livre INRA 2018 + articles) =====
+   Vache laitière de 650 kg ingérant 22 kg de MS (niveau d'ingestion 3,4 % du poids vif). */
+const A6_FOURRAGES={
+  foin:{nom:"Foin long",ndf:600,long:1.0,p2:0.90,amidon:0},
+  herbe:{nom:"Ensilage d'herbe haché",ndf:550,long:0.9,p2:0.75,amidon:0},
+  mais:{nom:"Ensilage de maïs haché",ndf:420,long:0.85,p2:0.65,amidon:300},
+  broye:{nom:"Fourrage broyé fin",ndf:600,long:0.4,p2:0.25,amidon:0}};
+const A6_CEREALES={mais:{nom:"Maïs (amidon lent)",deg:0.60,ndf:150},ble:{nom:"Blé ou orge (amidon rapide)",deg:0.85,ndf:180}};
+const A6_DISTRIB={d2:{nom:"2 repas de concentré",amp:1.0,repas:[6,16]},d4:{nom:"4 repas de concentré",amp:0.6,repas:[6,11,16,21]},rc:{nom:"Ration complète mélangée",amp:0.5,repas:[8,17]}};
+const MSI=22, PV=650;
+const clamp=(x,a,b)=>Math.max(a,Math.min(b,x));
+function a6Crit(v,seuils,croissant){/* note IRA d'un critère : 0 pas de risque, 1 faible, 2 fort */
+  const [a,b]=seuils; if(croissant)return v<=a?0:v<=b?1:2; return v>=b?0:v>=a?1:2}
+function a6Simuler(r){
+  const P=r.conc/100, F=A6_FOURRAGES[r.fourrage], C=A6_CEREALES[r.cereale], D=A6_DISTRIB[r.distrib];
+  const NDFfo=(1-P)*F.ndf*F.long;                         /* NDF du fourrage long, g/kg MS */
+  const NDF=(1-P)*F.ndf+P*C.ndf;                          /* NDF total, g/kg MS */
+  const AmiD=P*600*C.deg+(1-P)*F.amidon*0.75;            /* amidon dégradé dans le rumen, g/kg MS */
+  const P2=100*((1-P)*F.p2+P*0.05);                       /* particules > 2 mm, % MS */
+  const BE=220+(r.tampon?108:0);                          /* bilan électrolytique, mEq/kg MS (200 g de bicarbonate = +108) */
+  /* pH moyen : équations INRA 15.3 (NDF du fourrage long) et 15.4 (amidon dégradable), combinées autour de 6,4 */
+  const pHfo=5.64+0.0025*NDFfo-0.0000017*NDFfo*NDFfo, pHam=6.40-0.001*AmiD;
+  let pHm=6.4+(pHfo-6.4)+0.7*(pHam-6.4)+(r.tampon?0.07:0);
+  pHm=clamp(pHm,5.3,6.8);
+  /* indice de risque d'acidose (figure 15.5) */
+  const crits=[
+    {nom:"Concentré",v:r.conc,u:"% MS",n:a6Crit(r.conc,[40,50],true)},
+    {nom:"Amidon dégradable",v:AmiD,u:"g/kg MS",n:a6Crit(AmiD,[200,250],true)},
+    {nom:"Particules > 2 mm",v:P2,u:"% MS",n:a6Crit(P2,[45,50],false)},
+    {nom:"NDF du fourrage long",v:NDFfo,u:"g/kg MS",n:a6Crit(NDFfo,[250,300],false)},
+    {nom:"NDF total",v:NDF,u:"g/kg MS",n:a6Crit(NDF,[300,350],false)},
+    {nom:"Bilan électrolytique",v:BE,u:"mEq/kg MS",n:a6Crit(BE,[200,250],false)}];
+  const IRA=crits.reduce((s,c)=>s+c.n,0)/crits.length;
+  /* courbe sur 24 h : creux 3 à 4 h après chaque repas, plus profond avec peu de repas et beaucoup de concentré */
+  const A=(0.25+0.9*P)*D.amp, h=[];
+  const creux=t=>{const x=t/3.5;return x<=0?0:x*Math.exp(1-x)};
+  for(let t=0;t<24;t+=0.5){let d=0;D.repas.forEach(m=>{d+=creux(((t-m)+24)%24)});h.push(d)}
+  const moy=h.reduce((s,x)=>s+x,0)/h.length, pk=Math.max(...h)-moy;
+  const courbe=h.map(x=>clamp(pHm-A*(x-moy)/(pk||1)*0.85,4.9,7.1));
+  const hSous58=courbe.filter(x=>x<5.8).length*0.5, pHmin=Math.min(...courbe);
+  /* AGV (figure 15.3) et AGV totaux (Sauvant et al. 1999) */
+  const ace=70.78-11.12*Math.exp(-1.08*(pHm-6)), pro=15.73+6.37*Math.exp(-1.85*(pHm-6)), but=Math.max(8,100-ace-pro-4);
+  const agv=clamp((7.20-pHm)/0.0091,70,160);
+  /* rumination et salive (Beauchemin 2018 ; INRA § 15.2) */
+  const ingest=4.5, rum=clamp(3+0.016*NDFfo,2.5,10.5);
+  const salive=(ingest+rum)*60*0.206+(24-ingest-rum)*60*0.133;
+  /* méthane : équations INRA 14.1 et 14.2 */
+  const NI=MSI/PV*100, MOD=650+150*P;
+  const ch4mod=45.42-6.66*NI+0.75*NI*NI+19.65*P-35.0*P*P-2.69*NI*P;
+  const ch4=MSI*0.001*MOD*ch4mod;
+  /* lait : énergie apportée par le concentré, pénalité d'acidose (Plaizier 2008), effets du tampon (Meschy 2004) et du fractionnement */
+  const sara=pHm<6.0;
+  let lait=26+16*P+(r.tampon?0.5:0)-(sara?2.7:0);
+  let tb=2.6+0.45*(ace/pro)-(sara?0.3:0)+((P>0.5&&r.distrib!=="d2")?0.3:0);
+  return {pHm,IRA,crits,courbe,hSous58,pHmin,ace,pro,but,agv,rum,salive,ch4,lait,tb,sara,NDFfo,AmiD,P2,NDF,BE};
+}
+const a6EchelleINRA=p=>p>=6.5?{t:"Optimal",c:"#2f7a4a"}:p>=6.25?{t:"Acidose légère",c:"#7aa33a"}:p>6.0?{t:"Interactions digestives",c:"#e3a43c"}:{t:"Acidose latente (subaiguë)",c:"#c0262d"};
+const a6EchelleIRA=x=>x<0.67?{t:"Pas de risque",c:"#2f7a4a"}:x<=1.33?{t:"Risque faible",c:"#e3a43c"}:{t:"Risque élevé",c:"#c0262d"};
+
+const A6_MISSIONS=[
+ {id:"m1",titre:"Le taux butyreux s'effondre",
+  recit:"L'élevage des Tilleuls nourrit ses vaches avec beaucoup d'ensilage de maïs et 65 % de blé, distribué en 2 gros repas. Le lait est là, mais le taux butyreux chute, les bouses sont molles et quelques vaches boitent. Le vétérinaire soupçonne une acidose subaiguë.",
+  depart:{conc:65,fourrage:"mais",cereale:"ble",distrib:"d2",tampon:false}, verrou:{},
+  cle:{k:"tb",nom:"le taux butyreux",seuil:0.05,u:" %"},
+  obj:[{t:"Sortir de l'acidose latente : pH moyen au-dessus de 6,0 (échelle INRA)",ok:s=>s.pHm>6.0},{t:"Taux butyreux d'au moins 3,6 %",ok:s=>s.tb>=3.6},{t:"Garder au moins 32 kg de lait par jour",ok:s=>s.lait>=32}]},
+ {id:"m2",titre:"Le pic de lactation",
+  recit:"À la ferme du Moulin, les vaches viennent de vêler. Elles reçoivent du foin long et seulement 30 % de concentré : elles maigrissent et produisent 31 kg de lait. Il faut plus d'énergie, sans abîmer le rumen. L'éleveur n'a que du foin comme fourrage.",
+  depart:{conc:30,fourrage:"foin",cereale:"mais",distrib:"d2",tampon:false}, verrou:{fourrage:"foin"},
+  cle:{k:"lait",nom:"la production de lait",seuil:0.3,u:" kg"},
+  obj:[{t:"Au moins 35 kg de lait par jour",ok:s=>s.lait>=35},{t:"pH moyen au-dessus de 6,0",ok:s=>s.pHm>6.0},{t:"Indice de risque d'acidose pas « élevé »",ok:s=>s.IRA<=1.34},{t:"Pas plus de 2 h par jour sous pH 5,8 après les repas",ok:s=>s.hSous58<=2}]},
+ {id:"m3",titre:"Moins de méthane",
+  recit:"La coopérative demande à l'élevage des Prés de réduire de 10 % le méthane émis par ses vaches. Le troupeau mange de l'ensilage d'herbe (le seul fourrage disponible) et 25 % de concentré. Attention : la laiterie paie le taux butyreux.",
+  depart:{conc:25,fourrage:"herbe",cereale:"mais",distrib:"d2",tampon:false}, verrou:{fourrage:"herbe"},
+  cle:{k:"ch4",nom:"le méthane émis",seuil:5,u:" g/j"},
+  obj:[{t:"Méthane au plus 435 g par vache et par jour (−10 %)",ok:s=>s.ch4<=435},{t:"pH moyen au-dessus de 6,0",ok:s=>s.pHm>6.0},{t:"Taux butyreux d'au moins 4,0 %",ok:s=>s.tb>=4.0}]}];
+const A6_QUIZ=[
+ {id:"q1",t:"Quand la part de concentré augmente, quel acide gras volatil prend une plus grande place dans le rumen ?",o:["L'acétate","Le propionate","Le butyrate"],b:1,e:"L'amidon fermente surtout en propionate ; l'acétate vient plutôt des fibres."},
+ {id:"q2",t:"Sur l'échelle INRA, en dessous de quel pH moyen parle-t-on d'acidose latente (subaiguë) ?",o:["6,5","6,0","5,0"],b:1,e:"6,5 et plus : optimal ; 6,25 à 6,5 : acidose légère ; 6,0 à 6,25 : interactions digestives ; 6,0 ou moins : acidose latente."},
+ {id:"q3",t:"Pourquoi les fibres longues protègent-elles le pH du rumen ?",o:["Elles contiennent du bicarbonate","Elles font mastiquer et ruminer, donc saliver","Elles fermentent plus vite que l'amidon"],b:1,e:"Chaque minute de mastication apporte 200 à 250 mL de salive riche en bicarbonate."},
+ {id:"q4",t:"Quelle céréale est la moins acidogène ?",o:["Le blé","L'orge","Le maïs"],b:2,e:"L'amidon du maïs se dégrade lentement dans le rumen ; celui du blé et de l'orge très vite."},
+ {id:"q5",t:"Vrai ou faux : distribuer le concentré en plus de repas fait nettement monter le pH moyen.",o:["Vrai","Faux"],b:1,e:"Faux : le pH moyen change peu, mais les creux après les repas sont moins profonds et le taux butyreux remonte."},
+ {id:"q6",t:"Quel signe fait suspecter une acidose subaiguë dans un troupeau laitier ?",o:["Une hausse du taux butyreux","Une baisse du taux butyreux et des boiteries","Une hausse de la rumination"],b:1,e:"Baisse du taux butyreux, ingestion irrégulière, bouses molles, boiteries et abcès du foie."},
+ {id:"q7",t:"Vrai ou faux : par kg de matière organique digérée, une ration riche en concentré produit moins de méthane.",o:["Vrai","Faux"],b:0,e:"Vrai : le propionate capte de l'hydrogène qui ne sert plus à fabriquer du méthane."},
+ {id:"q8",t:"Le bicarbonate de sodium ajouté à la ration (5 à 20 g/kg MS) fait monter le pH du rumen d'environ…",o:["0,07 unité","0,5 unité","1 unité"],b:0,e:"Méta-analyse de Meschy et al. (2004) : +0,07 en moyenne, avec un peu plus de lait et d'ingestion."}];
+const A6_PRED=[["monte","monter"],["baisse","baisser"],["stable","rester à peu près stable"]];
+const a6Doc=tid=>a6docs[tid]||{};
+function a6Ecrire(tid,patch){const d=Object.assign({},a6docs[tid],patch,{maj:Date.now()});a6docs[tid]=d;if(String(tid).startsWith("TEST")){testE.a6=testE.a6||{};testE.a6[tid]=d;return}ecrire("a6",tid,d,"set")}
+const a6M=(d,id)=>((d.m||{})[id])||{essais:[]};
+const a6Ok=(mi,s)=>mi.obj.every(o=>o.ok(s));
+function a6PtsMission(m){if(!m)return 0;if(m.ok)return Math.max(1,5-(m.essais||[]).length);return 0}
+function a6Preds(d){let n=0,j=0;A6_MISSIONS.forEach(mi=>(a6M(d,mi.id).essais||[]).forEach(e=>{if(e.pred){n++;if(e.predOk)j++}}));return {n,j}}
+function a6PtsPred(d){const p=a6Preds(d);return p.n?Math.round(4*p.j/p.n*4)/4:0}
+function a6PtsQuiz(d){const q=d.quiz||{};return A6_QUIZ.reduce((s,x)=>s+(q[x.id]===x.b?0.5:0),0)}
+function a6Note(d,force){if(!d||(!d.fini&&!force))return null;const n=A6_MISSIONS.reduce((s,mi)=>s+a6PtsMission(a6M(d,mi.id)),0)+a6PtsPred(d)+a6PtsQuiz(d);return Math.min(20,Math.round(n*2)/2)}
+function a6NoteGroupe(g,force){const sd=subsDe(g.id,"a6");if(!sd)return null;
+  const notes=sd.equipes.map((m,i)=>{const tid=g.id+"-a6-e"+(i+1);const d=g.id==="TEST"?((testE&&testE.a6)||{})[tid]:a6docs[tid];return a6Note(d,force&&d&&(d.vuIntro||d.m))});
+  if(g.id==="TEST"){const v=notes.filter(x=>x!=null);return v.length?Math.round(v.reduce((s,x)=>s+x,0)/v.length*10)/10:null}
+  if(notes.some(x=>x==null))return null;return Math.round(notes.reduce((s,x)=>s+x,0)/notes.length*10)/10}
+const a6f=(x,n)=>(+x).toFixed(n==null?1:n).replace(".",",");
+function a6Expliquer(r,s,prec){const t=[];
+  if(s.NDFfo>=250)t.push("Assez de fibres longues : les vaches ruminent "+a6f(s.rum)+" h par jour et leur salive ("+Math.round(s.salive)+" L/j) tamponne le rumen.");
+  if(s.NDFfo<200)t.push("Peu de fibres longues ("+Math.round(s.NDFfo)+" g/kg MS de NDF de fourrage long, il en faut au moins 200) : moins de rumination, donc moins de salive tampon.");
+  if(s.AmiD>250)t.push("Beaucoup d'amidon dégradé dans le rumen ("+Math.round(s.AmiD)+" g/kg MS) : les AGV s'accumulent et le pH baisse.");
+  if(r.cereale==="mais")t.push("Le maïs apporte un amidon lent : il acidifie moins le rumen que le blé ou l'orge.");
+  if(r.fourrage==="mais")t.push("L'ensilage de maïs contient lui aussi de l'amidon : il compte dans la charge acidogène.");
+  if(r.distrib==="d2"&&r.conc>=45)t.push("Deux gros repas de concentré : le pH plonge 3 à 4 h après chaque repas.");
+  if(r.distrib!=="d2"&&r.conc>50)t.push("Le concentré fractionné adoucit les creux de pH et soutient le taux butyreux.");
+  if(r.tampon)t.push("Le bicarbonate remonte le pH moyen d'environ 0,07 et améliore le bilan électrolytique.");
+  if(s.ace/s.pro<2.2)t.push("Rapport acétate/propionate bas ("+a6f(s.ace/s.pro)+") : la mamelle manque d'acétate pour fabriquer la matière grasse du lait.");
+  if(prec&&s.ch4<prec.ch4-5)t.push("Plus de concentré : plus de propionate, qui capte l'hydrogène, donc moins de méthane.");
+  return t.slice(0,5)}
+function a6Courbe(s,prec,D){const W=420,H=230,x=t=>40+t/24*(W-52),y=p=>14+(7.0-p)/(7.0-5.0)*(H-48);
+  const pts=c=>c.map((p,i)=>`${x(i*0.5).toFixed(1)},${y(p).toFixed(1)}`).join(" ");
+  let g=`<svg viewBox="0 0 ${W} ${H}" class="a6svg" role="img" aria-label="pH du rumen sur 24 heures">`;
+  g+=`<rect x="${x(0)}" y="${y(5.8)}" width="${x(24)-x(0)}" height="${y(5.0)-y(5.8)}" fill="#c0262d" opacity=".08"/>`;
+  [5.0,5.5,6.0,6.5,7.0].forEach(p=>{g+=`<line x1="${x(0)}" x2="${x(24)}" y1="${y(p)}" y2="${y(p)}" stroke="currentColor" opacity=".12"/><text x="${x(0)-6}" y="${y(p)+4}" text-anchor="end" font-size="15" fill="currentColor" opacity=".65">${a6f(p)}</text>`});
+  g+=`<line x1="${x(0)}" x2="${x(24)}" y1="${y(5.8)}" y2="${y(5.8)}" stroke="#c0262d" stroke-dasharray="5 4"/><text x="${x(24)}" y="${y(5.8)-6}" text-anchor="end" font-size="14" fill="#c0262d">pH 5,8</text>`;
+  [0,6,12,18,24].forEach(t=>{g+=`<text x="${x(t)}" y="${H-8}" text-anchor="middle" font-size="15" fill="currentColor" opacity=".65">${t} h</text>`});
+  (D.repas||[]).forEach(m=>{g+=`<path d="M${x(m)-7},${H-30} l7,-10 l7,10z" fill="#e0a800"/>`});
+  if(prec)g+=`<polyline points="${pts(prec.courbe)}" fill="none" stroke="currentColor" stroke-width="2" opacity=".25"/>`;
+  g+=`<line x1="${x(0)}" x2="${x(24)}" y1="${y(s.pHm)}" y2="${y(s.pHm)}" stroke="var(--team,#1f5d8c)" stroke-dasharray="2 4"/>`;
+  g+=`<polyline points="${pts(s.courbe)}" fill="none" stroke="var(--team,#1f5d8c)" stroke-width="3" stroke-linejoin="round"/></svg>`;
+  return g+`<p class="note a6leg"><span><i style="background:var(--team,#1f5d8c)"></i>cette simulation</span>${prec?`<span><i style="background:currentColor;opacity:.3"></i>simulation précédente</span>`:""}<span><i style="background:#e0a800"></i>repas de concentré</span><span>pointillés : pH moyen</span></p>`}
+function a6Resultats(s,prec,mi,r){const E=a6EchelleINRA(s.pHm),I=a6EchelleIRA(s.IRA);
+  const dlt=(k,n,u)=>{if(!prec)return "";const d=s[k]-prec[k];if(Math.abs(d)<(k==="pHm"?0.01:k==="ch4"?1:0.05))return "";return ` <small class="${d>0?"up":"dn"}">${d>0?"+":"−"}${a6f(Math.abs(d),n)}${u||""}</small>`};
+  const tuile=(lab,val,sous,coul)=>`<div class="a6t"${coul?` style="--c:${coul}"`:""}><span>${lab}</span><b>${val}</b>${sous?`<small>${sous}</small>`:""}</div>`;
+  return `<div class="a6tiles">
+    ${tuile("pH moyen",a6f(s.pHm,2)+dlt("pHm",2),E.t,E.c)}
+    ${tuile("Risque d'acidose (IRA)",a6f(s.IRA,2),I.t,I.c)}
+    ${tuile("Sous pH 5,8",a6f(s.hSous58,1).replace(",0","")+" h/j","minimum "+a6f(s.pHmin,2))}
+    ${tuile("Lait",a6f(s.lait)+" kg/j"+dlt("lait",1," kg"),"par vache")}
+    ${tuile("Taux butyreux",a6f(s.tb,2)+" %"+dlt("tb",2," pt"),s.tb<3.5?"bas":"")}
+    ${tuile("Méthane",Math.round(s.ch4)+" g/j"+dlt("ch4",0," g"),"par vache")}
+    ${tuile("Rumination",a6f(s.rum)+" h/j","salive "+Math.round(s.salive)+" L/j")}
+    ${tuile("AGV totaux",Math.round(s.agv)+" mmol/L","acétate/propionate "+a6f(s.ace/s.pro))}</div>
+   <div class="a6agv" aria-label="Profil des AGV"><i style="width:${s.ace}%;background:#2f7a4a">Acétate ${Math.round(s.ace)} %</i><i style="width:${s.pro}%;background:#d0661f">Propionate ${Math.round(s.pro)} %</i><i style="width:${s.but}%;background:#6b3fa0">But. ${Math.round(s.but)}</i></div>
+   <details class="a6ira"><summary>Détail de l'indice de risque d'acidose (INRA)</summary><ul>${s.crits.map(c=>`<li><span class="d" style="background:${["#2f7a4a","#e3a43c","#c0262d"][c.n]}"></span>${esc(c.nom)} : <b>${Math.round(c.v)} ${c.u}</b> · ${["pas de risque","risque faible","risque fort"][c.n]}</li>`).join("")}</ul><p class="note">IRA = moyenne des notes (0, 1 ou 2) des critères. Sauvant et Peyraud 2010, livre INRA 2018 p. 255.</p></details>`}
+function a6Ration(mi,r,verrou,dis){const ch=(k,opts)=>`<div class="chk">${Object.entries(opts).map(([id,o])=>{const lock=verrou[k]&&verrou[k]!==id;return `<button class="chkb ${r[k]===id?"on":""}" ${lock||dis?"disabled":`data-a6r="${k}|${id}"`}>${r[k]===id?ico("coche"):""}${esc(o.nom)}</button>`}).join("")}</div>`;
+  return `<div class="a6ration">
+    <label class="a6lab" for="a6conc">Concentré dans la ration : <b id="a6concv">${r.conc} %</b> de la MS</label><input type="range" id="a6conc" min="20" max="70" step="5" value="${r.conc}" ${dis?"disabled":""}>
+    <h4>Fourrage${verrou.fourrage?" <small>(imposé dans cette mission)</small>":""}</h4>${ch("fourrage",A6_FOURRAGES)}
+    <h4>Céréale du concentré</h4>${ch("cereale",A6_CEREALES)}
+    <h4>Distribution</h4>${ch("distrib",A6_DISTRIB)}
+    <h4>Tampon</h4><div class="chk"><button class="chkb ${r.tampon?"on":""}" ${dis?"disabled":'data-a6r="tampon|1"'}>${r.tampon?ico("coche"):""}Bicarbonate de sodium, 200 g/vache/j</button><button class="chkb ${!r.tampon?"on":""}" ${dis?"disabled":'data-a6r="tampon|0"'}>${!r.tampon?ico("coche"):""}Sans tampon</button></div></div>`}
+function vA6(){const g=monGroupe();if(!g){vue="hub";return vHub()}const t=monEquipe(g,"a6");if(!t){vue="hub";return vHub()}
+  const d=a6Doc(t.id), etapes=["intro",...A6_MISSIONS.map(m=>m.id),"quiz","fin"];
+  let e=a6Etape;if(!e||!etapes.includes(e)){e=d.fini?"fin":!d.vuIntro?"intro":(A6_MISSIONS.find(mi=>{const m=a6M(d,mi.id);return !m.ok&&!m.abandon})||{}).id||"quiz"}
+  a6Etape=e;
+  const k=etapes.indexOf(e), barre=`<div class="a4prog">${etapes.slice(1,-1).map((x,i)=>`<i class="${i<k-1?"ok":i===k-1?"cur":""}"></i>`).join("")}</div>`;
+  const tete=`<div class="bar a1bar"><span class="tag" style="background:${g.couleur};color:#fff">ATELIER 6</span><b style="font-size:18px">Pilote du rumen</b><span class="sp"></span><button class="btn ghost sm" id="retourHub">Retour aux ateliers</button></div>`;
+  let c="";
+  if(e==="intro")c=`<div class="card a6intro"><span class="eyebrow">Atelier 6 · 30 minutes · sans enseignant</span><h2 style="margin:6px 0 10px">Pilote du rumen</h2>
+    <p>Votre équipe devient la conseillère en alimentation de trois élevages laitiers. Pour chacun, vous réglez la ration (part de concentré, fourrage, céréale, nombre de repas, tampon), vous lancez la simulation et vous lisez ce qui se passe dans le rumen : pH sur 24 h, risque d'acidose, acides gras volatils, rumination, méthane, lait.</p>
+    <div class="briefetapes" style="margin:12px 0">
+      <div><b>1</b><span><b>Trois missions</b> (environ 7 min chacune). Chaque mission a ses objectifs : atteignez-les tous. Réussie au 1<sup>er</sup> essai : 4 points ; au 2<sup>e</sup> : 3 ; au 3<sup>e</sup> : 2 ; ensuite : 1. Après 3 essais ratés, vous pouvez passer (0 point) et voir une solution.</span></div>
+      <div><b>2</b><span><b>Une prédiction avant chaque simulation</b> : l'indicateur clé de la mission va-t-il monter, baisser ou rester stable ? 4 points selon la part de prédictions justes.</span></div>
+      <div><b>3</b><span><b>Le quiz final</b> (environ 5 min) : 8 questions, 4 points.</span></div></div>
+    <div class="a4bareme">${ico("coche")}<span><b>Notation sur 20 par équipe</b> : missions 12 points, prédictions 4 points, quiz 4 points. Les deux équipes du groupe ont les mêmes missions ; <b>la note du groupe est la moyenne des deux équipes</b>, et elle s'enregistre toute seule.</span></div>
+    <p><b>Repères</b> : sur l'échelle INRA, un pH moyen de 6,0 ou moins signe une <b>acidose latente (subaiguë)</b>. L'indice de risque d'acidose (IRA) note six critères de la ration de 0 à 2 : en dessous de 0,67 pas de risque, au-delà de 1,33 risque élevé.</p>
+    <p class="note">Une seule équipe, plusieurs téléphones : les essais sont partagés. Discutez avant chaque simulation, c'est là que se joue la prédiction. Le simulateur est un modèle pédagogique construit à partir des équations du livre INRA <i>Alimentation des ruminants</i> (2018) et d'essais publiés : il reproduit les tendances, pas une vache réelle.</p>
+    <button class="btn pen gros" id="a6go">Commencer la mission 1</button></div>`;
+  else if(A6_MISSIONS.some(m=>m.id===e)){const mi=A6_MISSIONS.find(m=>m.id===e),m=a6M(d,mi.id),es=m.essais||[],der=es[es.length-1],fini=m.ok||m.abandon;
+    const r=a6Brouillon[mi.id]||(der?Object.assign({},der.r):Object.assign({},mi.depart));a6Brouillon[mi.id]=r;
+    const sDep=a6Simuler(mi.depart), sDer=der?a6Simuler(der.r):sDep, precDer=es.length>1?a6Simuler(es[es.length-2].r):sDep;
+    const objs=`<ul class="a6obj">${mi.obj.map(o=>{const ok=der?o.ok(sDer):null;return `<li class="${ok==null?"":ok?"ok":"ko"}">${ok==null?"○":ok?ico("coche"):"✕"} ${esc(o.t)}</li>`}).join("")}</ul>`;
+    const pred=a6Pred[mi.id];
+    c=`<div class="card"><span class="eyebrow">Mission ${A6_MISSIONS.indexOf(mi)+1} sur 3 · ${es.length} essai${es.length>1?"s":""}</span><h2 style="margin:6px 0 8px">${esc(mi.titre)}</h2><p>${esc(mi.recit)}</p>
+      <h3 style="margin:12px 0 4px">Objectifs</h3>${objs}</div>
+     <div class="card" id="a6res"><span class="eyebrow">${der?"Résultat de votre dernier essai":"Situation de départ"}</span>${a6Courbe(sDer,der?precDer:null,A6_DISTRIB[(der?der.r:mi.depart).distrib])}${a6Resultats(sDer,der?precDer:null,mi,der?der.r:mi.depart)}
+      ${der&&der.pred?`<p class="a4corr">Votre prédiction : ${esc(mi.cle.nom)} allait « ${esc(A6_PRED.find(p=>p[0]===der.pred)[1])} ». ${der.predOk?"<b>Juste.</b>":"<b>Pas tout à fait.</b>"} Il est passé de ${a6f(precDer[mi.cle.k],mi.cle.k==="ch4"?0:2)} à ${a6f(sDer[mi.cle.k],mi.cle.k==="ch4"?0:2)}${mi.cle.u}.</p>`:""}
+      ${der?`<div class="a6pourquoi"><b>Pourquoi ?</b><ul>${a6Expliquer(der.r,sDer,precDer).map(x=>`<li>${esc(x)}</li>`).join("")}</ul></div>`:""}
+      ${!fini?`<button class="btn pen gros a6refaire" id="a6versRation">${der?"Pas encore réussi : modifier la ration et refaire un essai":"Régler la ration et lancer le premier essai"}</button>`:""}</div>
+     ${fini?`<div class="card a6bilan">${m.ok?`<h3>Mission réussie en ${es.length} essai${es.length>1?"s":""} : ${a6PtsMission(m)}/4 points</h3>`:`<h3>Mission passée : 0/4 point</h3><p>Une solution : ${esc(a6Solution(mi))}.</p>`}<button class="btn pen gros" id="a6suite">${A6_MISSIONS.indexOf(mi)<2?"Mission suivante":"Passer au quiz"}</button></div>`
+      :`<div class="card" id="a6rationCard"><span class="eyebrow">Votre ration · essai ${es.length+1}</span>${der?`<p class="note" style="margin:4px 0 8px">Modifiez un ou plusieurs réglages, choisissez votre prédiction, puis relancez.</p>`:""}${a6Ration(mi,r,mi.verrou,false)}
+       <h3 style="margin:14px 0 6px" id="a6predH">Votre prédiction : avec cette ration, ${esc(mi.cle.nom)} va…</h3><div class="chk">${A6_PRED.map(([id,lab])=>`<button class="chkb ${pred===id?"on":""}" data-a6p="${id}">${pred===id?ico("coche"):""}${lab}</button>`).join("")}</div>
+       <p class="note">Par rapport à ${der?"votre dernier essai":"la situation de départ"}.</p>
+       <button class="btn pen gros" id="a6lancer">Lancer la simulation</button>${pred?"":`<p class="note" style="margin-top:6px">Choisissez d'abord votre prédiction.</p>`}
+       ${es.length>=3?`<p style="margin-top:10px"><button class="link" id="a6abandon">Passer cette mission (0 point) et voir une solution</button></p>`:""}</div>`}`}
+  else if(e==="quiz"){const q=d.quiz||{},fait=d.quizFini;
+    c=`<div class="card"><span class="eyebrow">Quiz final · 8 questions · 4 points</span><h2 style="margin:6px 0 10px">Ce que le rumen vous a appris</h2>
+     ${A6_QUIZ.map((x,i)=>{const sel=fait?q[x.id]:a6Quiz[x.id];return `<div class="a4q"><h3>${i+1}. ${esc(x.t)}</h3><div class="chk">${x.o.map((o,j)=>{const on=sel===j,bon=j===x.b;const cl=fait?(bon&&on?"on bon":on?"faux":bon?"manque":""):on?"on":"";return `<button class="chkb ${cl}" ${fait?"disabled":`data-a6q="${x.id}|${j}"`}>${on||fait&&bon?ico("coche"):""}${esc(o)}</button>`}).join("")}</div>${fait?`<p class="a4corr"><b>${q[x.id]===x.b?"0,5":"0"}/0,5</b> · ${esc(x.e)}</p>`:""}</div>`}).join("")}
+     ${fait?`<button class="btn pen gros" id="a6finir">Voir notre note</button>`:`<button class="btn pen gros" id="a6quizOk">Valider le quiz</button>`}</div>`}
+  else{const n=a6Note(d),ng=a6NoteGroupe(g),p=a6Preds(d);
+    c=`<div class="card a4fin"><span class="eyebrow">Atelier terminé</span><h2 style="margin:6px 0">Vos trois élevages sont entre de bonnes mains</h2>
+     <p>Ce qu'il faut retenir : le pH du rumen dépend de l'équilibre entre l'acidité produite (AGV, surtout avec l'amidon rapide) et le tampon apporté par la salive (fibres longues, rumination). Le concentré nourrit la vache et réduit le méthane, mais au-delà d'environ 50 % de la ration il faut des fibres longues, une céréale lente, des repas fractionnés ou un tampon pour éviter l'acidose.</p>
+     <div class="fnote">${fr(n)}<small>/20</small></div>
+     <div class="fdet">${A6_MISSIONS.map((mi,i)=>`<span>Mission ${i+1} · <b>${a6PtsMission(a6M(d,mi.id))}/4</b></span>`).join("")}<span>Prédictions ${p.j}/${p.n} · <b>${fr(a6PtsPred(d))}/4</b></span><span>Quiz · <b>${fr(a6PtsQuiz(d))}/4</b></span></div>
+     <p><b>Note du groupe</b> (moyenne des 2 équipes) : ${ng!=null?`<b>${fr(ng)}/20</b>`:"en attente de l'autre équipe"}.</p>
+     <button class="btn pen gros" id="retourHub2">Retour aux ateliers</button></div>`}
+  return `${tete}<div class="a1form a4 a6" style="max-width:860px;margin:14px auto">${e!=="intro"&&e!=="fin"?barre:""}${c}</div>`}
+function a6Solution(mi){const sol={m1:"foin long, 50 % de concentré à base de maïs, en ration complète",m2:"foin long, 55 % de concentré à base de maïs, en 4 repas ou en ration complète, avec bicarbonate",m3:"ensilage d'herbe, 55 % de concentré à base de maïs, en 4 repas ou en ration complète, avec bicarbonate"};return sol[mi.id]}
+function brancherA6(){const on=(s,ev,f)=>{const el=$(s);if(el)el.addEventListener(ev,f)};const g=monGroupe();if(vue!=="a6"||!g)return;const t=monEquipe(g,"a6");if(!t)return;
+  const re=()=>{const y=window.scrollY;rendre();window.scrollTo(0,y)}, go=e=>{a6Etape=e;rendre();window.scrollTo(0,0)};
+  on("#a6go","click",()=>{a6Ecrire(t.id,{vuIntro:true});go("m1")});
+  const mi=A6_MISSIONS.find(m=>m.id===a6Etape);
+  if(mi){const r=a6Brouillon[mi.id];
+    on("#a6conc","input",ev=>{r.conc=+ev.target.value;const v=$("#a6concv");if(v)v.textContent=r.conc+" %"});
+    document.querySelectorAll("[data-a6r]").forEach(b=>b.addEventListener("click",()=>{const [k,v]=b.dataset.a6r.split("|");r[k]=k==="tampon"?v==="1":v;re()}));
+    document.querySelectorAll("[data-a6p]").forEach(b=>b.addEventListener("click",()=>{a6Pred[mi.id]=b.dataset.a6p;re()}));
+    on("#a6versRation","click",()=>{const el=$("#a6rationCard");if(el)el.scrollIntoView({behavior:"smooth",block:"start"})});
+    on("#a6lancer","click",()=>{const d=a6Doc(t.id),m=a6M(d,mi.id),es=(m.essais||[]).slice(),pred=a6Pred[mi.id];if(!pred){toast("Choisissez d'abord votre prédiction");const h=$("#a6predH");if(h)h.scrollIntoView({behavior:"smooth",block:"center"});return}
+      const prec=es.length?a6Simuler(es[es.length-1].r):a6Simuler(mi.depart), s=a6Simuler(r), dv=s[mi.cle.k]-prec[mi.cle.k];
+      const reel=Math.abs(dv)<mi.cle.seuil?"stable":dv>0?"monte":"baisse";
+      es.push({r:Object.assign({},r),pred,predOk:pred===reel,t:Date.now()});
+      const ok=a6Ok(mi,s), mm=Object.assign({},m,{essais:es,ok});
+      a6Ecrire(t.id,{m:Object.assign({},d.m||{},{[mi.id]:mm})});a6Pred[mi.id]=null;
+      if(ok){bip([523,659,784,1047]);setTimeout(confettis,150)}else bip(pred===reel?[523,659]:[392,330]);rendre();const rs=$("#a6res");if(rs)rs.scrollIntoView({block:"start"});else window.scrollTo(0,0)});
+    on("#a6abandon","click",()=>modale("Passer cette mission ?","Vous aurez 0 point pour cette mission, et une solution s'affichera.","Passer",()=>{const d=a6Doc(t.id),m=a6M(d,mi.id);a6Ecrire(t.id,{m:Object.assign({},d.m||{},{[mi.id]:Object.assign({},m,{abandon:true})})});re()},"","Continuer"));
+    on("#a6suite","click",()=>{const i=A6_MISSIONS.indexOf(mi);go(i<2?A6_MISSIONS[i+1].id:"quiz")})}
+  document.querySelectorAll("[data-a6q]").forEach(b=>b.addEventListener("click",()=>{const [q,j]=b.dataset.a6q.split("|");a6Quiz[q]=+j;re()}));
+  on("#a6quizOk","click",()=>{const vides=A6_QUIZ.filter(x=>a6Quiz[x.id]==null).length;
+    const ok=()=>{a6Ecrire(t.id,{quiz:Object.assign({},a6Quiz),quizFini:true});bip([523,659,784]);re()};
+    if(vides)modale("Valider quand même ?",`${vides} question${vides>1?"s":""} sans réponse.`,"Valider",ok,"","Je réponds");else ok()});
+  on("#a6finir","click",()=>{const d=a6Doc(t.id);const fin=Object.assign({},d,{fini:true});a6Ecrire(t.id,{fini:true,note:a6Note(fin)});go("fin");setTimeout(()=>{confettis();bip([523,659,784,1047])},200)});
+  on("#retourHub2","click",()=>{a6Etape=null;vue="hub";rendre();window.scrollTo(0,0)});
+  document.querySelectorAll("#retourHub").forEach(b=>b.addEventListener("click",()=>{a6Etape=null}));
+}
+
 /* ----- temps minimum par étape (atelier d'environ 25 min) ----- */
 let a4T=LS.get("a4T",{}), a4Obs={};
 function a4Minuteur(tid,cle,sec,txt){if(String(tid).startsWith("TEST"))sec=5;const k=tid+"|"+cle;if(!a4T[k]){a4T[k]=Date.now();LS.set("a4T",a4T)}const fin=a4T[k]+sec*1000;
@@ -2350,18 +2684,30 @@ const FAMILLES=[
 FAMILLES.forEach(f=>{f.membres=f.membres||FAM_MEMBRES});
 const CARTES7={};FAMILLES.forEach(f=>f.cartes.forEach((c,i)=>{const id=f.id+"-"+i;CARTES7[id]={id,f:f.id,i,membre:f.membres[i],puces:c[0],savez:c[1]}}));
 const famDe=id=>FAMILLES.find(f=>f.id===id);
+/* Couleurs des planches imprimables : bandeau (c), texte du bandeau (t), titre de carte (k) */
+const PAL7={chien:{c:"#2D5F8E",t:"#fff",k:"#2D5F8E"},chat:{c:"#5E4396",t:"#fff",k:"#5E4396"},cheval:{c:"#8A4B2C",t:"#fff",k:"#8A4B2C"},vache:{c:"#2E6B3A",t:"#fff",k:"#2E6B3A"},
+  porc:{c:"#C24A7B",t:"#fff",k:"#A8336A"},lapin:{c:"#E0A43A",t:"#2B1D05",k:"#8A5A0A"},vaisseaux:{c:"#8FD3CF",t:"#0F3B39",k:"#1C6B67"}};
+const famStyle=f=>{const p=PAL7[f.id]||{c:f.c,t:"#fff",k:f.c};return `--fc:${p.c};--ft:${p.t};--fk:${p.k};--fh:${p.k}`};
+/* Titres gagnés en validant une famille sur le modèle 3D */
+const TITRE7={chien:"Fin limier",chat:"Œil de chat",cheval:"Seigneur du cæcum",vache:"Maître du rumen",porc:"Roi du côlon spiral",lapin:"As du sacculus",vaisseaux:"Gardien de la veine porte"};
+const titresHTML=fs=>fs&&fs.length?`<span class="famtitres">${fs.map(f=>`<span style="${famStyle(famDe(f))}">${esc(TITRE7[f]||famDe(f).nom)}</span>`).join("")}</span>`:"";
+
 /* =========================================================
    ATELIER 3 : le jeu des 7 familles sur téléphone (un téléphone par duo, parties synchronisées)
    ========================================================= */
 let famEtat=null, famId=null, famMoi=null, famUnsub=[], famVote=null, famVuEvt=-1, famDemande=null, famZoom=null, famPres={}, famBotT=null, famTick=null;
 const FAM_TEST_DUOS=["Duo 2","Duo 3","Duo 4","Duo 5"];
-const famDuree=g=>(((seances[g&&g.seance]||{}).famDuree)||15)*60e3;
+const dureeRotMin=g=>Math.max(5,+((seances[g&&g.seance]||{}).dureeRot)||30);
+const famDureeMin=g=>+((seances[g&&g.seance]||{}).famDuree)||Math.max(3,Math.round(dureeRotMin(g)/2));
+const evalDureeMin=g=>Math.max(3,dureeRotMin(g)-famDureeMin(g)-Math.round(dureeRotMin(g)*0.1));
+const famDuree=g=>famDureeMin(g)*60e3;
 function famCarteHTML(id,cls){const c=CARTES7[id],f=famDe(c.f);
-  return `<div class="c7 ${cls||""}" style="--fc:${f.c};--fh:${f.fonce?"#23807a":f.c};--ft:${f.fonce?"#123":"#fff"}" data-c7="${id}"><div class="c7h"><b>${esc(f.nom.toUpperCase())}</b><small>${esc(f.sous)}</small></div>
+  return `<div class="c7 ${cls||""}" style="${famStyle(f)}" data-c7="${id}"><div class="c7h"><b>${esc(f.nom)}</b><small>${esc(f.sous)}</small></div>
    <div class="c7b"><h4>${esc(c.membre)}</h4><ul>${c.puces.map(p=>`<li>${esc(p)}</li>`).join("")}</ul><div class="c7s"><b>Le saviez-vous ?</b> ${esc(c.savez)}</div></div></div>`}
 function famMiniHTML(id,cls,style){const c=CARTES7[id],f=famDe(c.f);
-  return `<button class="c7m ${cls||""}" style="--fc:${f.c};--fh:${f.fonce?"#23807a":f.c};--ft:${f.fonce?"#123":"#fff"};${style||""}" data-c7z="${id}"><span class="c7mh">${esc(f.nom)}</span><span class="c7mt">${esc(c.membre)}</span><span class="c7mi">${f.membres.indexOf(c.membre)+1}/6</span></button>`}
-const famDosHTML=(cls,style)=>`<div class="c7dos ${cls||""}" style="${style||""}"><i></i><b>7</b><span>FAMILLES</span><i></i></div>`;
+  return `<button class="c7m ${cls||""}" style="${famStyle(f)};${style||""}" data-c7z="${id}"><span class="c7mh">${esc(f.nom)}</span><span class="c7mt">${esc(c.membre)}</span><span class="c7ml"></span><span class="c7mi">${f.membres.indexOf(c.membre)+1}/6</span></button>`}
+const famDosHTML0=(cls,style)=>`<div class="c7dos ${cls||""}" style="${style||""}"><i></i><b>7</b><span>FAMILLES</span><i></i></div>`;
+const famDosHTML=famDosHTML0;
 const famNomDuo=id=>{const d=(famEtat.duos||[]).find(x=>x.id===id);return d?d.nom:"?"};
 
 /* ----- ouverture, création, inscription ----- */
@@ -2381,10 +2727,10 @@ async function ouvrirFamilles(){const g=monGroupe();if(!g)return;const t=monEqui
   famUnsub.push(db.collection("famj").where("jeu","==",famId).onSnapshot(s=>{famPres={};s.docs.forEach(d=>famPres[d.data().duo]=1);if(famEtat&&famEtat.statut==="attente")famMaj()},()=>{}));
   famUnsub.push(db.collection("famvote").doc(famId).onSnapshot(s=>{famVote=s.exists?s.data():null;famAppliquerVote()},()=>{}));
   vue="fam";rendre();window.scrollTo(0,0)}
-function famQuitter(){famUnsub.forEach(u=>u());famUnsub=[];clearTimeout(famBotT);famEtat=null;famId=null;vue="a3";rendre();window.scrollTo(0,0)}
+function famQuitter(){v3dDetruire();famUnsub.forEach(u=>u());famUnsub=[];clearTimeout(famBotT);famEtat=null;famId=null;vue="a3";rendre();window.scrollTo(0,0)}
 async function famEcrire(){if(!famEtat)return;famEtat.maj=Date.now();if(famEtat.test){famMaj();famBots();return}
   const d=JSON.parse(JSON.stringify(famEtat));delete d.id;try{await db.collection("familles").doc(famId).set(d)}catch(e){ecrire("familles",famId,d)}famMaj()}
-function famMaj(){if(vue!=="fam")return;const y=window.scrollY;rendre();window.scrollTo(0,y);famAnimer()}
+function famMaj(){if(famEtat&&famEtat.statut==="en_cours")v3dPrep();if(famEtat&&famEtat.statut==="fin")v3dFermer();if(vue!=="fam")return;const y=window.scrollY;rendre();window.scrollTo(0,y);famAnimer()}
 
 /* ----- règles du jeu ----- */
 const melange=a=>{a=[...a];for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a};
@@ -2416,13 +2762,30 @@ function famDemander(cible,cid,critere){const E=famEtat,me=E.tour,c=CARTES7[cid]
   else{famEvt({type:"pioche",de:cible,a:me,carte:pc,voulue:cid},`${famNomDuo(cible)} n'a pas « ${quoi} » : « Pioche ! »`);famSuivant()}
   famVerifFin();famEcrire()}
 function famPiocherMainVide(){const E=famEtat;if(!E.pioche.length)return;const pc=E.pioche.shift();E.mains[E.tour].push(pc);famEvt({type:"pioche_seule",a:E.tour,carte:pc},`${famNomDuo(E.tour)} avait la main vide : il pioche une carte.`);famEcrire()}
-function famPoser(fid){const E=famEtat;E.enValidation={duo:E.tour,fam:fid,n:(E.evt.n||0)+1};famEvt({type:"validation",a:E.tour,fam:fid},`${famNomDuo(E.tour)} pose la famille ${famDe(fid).nom} : validation par le groupe.`);
-  if(!E.test)db.collection("famvote").doc(famId).delete().catch(()=>{});famEcrire()}
+function famPoser(fid){const E=famEtat;E.enValidation={duo:E.tour,fam:fid,n:(E.evt.n||0)+1};famEvt({type:"validation",a:E.tour,fam:fid},`${famNomDuo(E.tour)} pose la famille ${famDe(fid).nom} : validation sur le modèle 3D.`);
+  if(!E.test)db.collection("famvote").doc(famId).delete().catch(()=>{});famEcrire();if(E.tour===famMoi)v3dOuvrir(fid,E.enValidation.n)}
+/* Calque plein écran avec l'application 3D (atelier3/index.html?embed=1), préchargé pendant la partie */
+let v3d=null;
+function v3dPrep(){if(v3d||!famMoi)return;const g=monGroupe();const nom=(famEtat&&famEtat.duos||[]).find(d=>d.id===famMoi);
+  const el=document.createElement("div");el.id="v3d";el.className="charge";
+  el.innerHTML=`<div class="v3dbar"><span class="tag" style="background:#1d1d1b;color:#fff">VALIDATION</span><b id="v3dTitre">Modèle 3D</b></div><div class="v3dload"><p>Chargement des modèles 3D…</p></div>`;
+  const f=document.createElement("iframe");f.title="Validation de la famille sur le modèle 3D";f.allow="fullscreen";
+  f.src="atelier3/index.html?embed=1&duo="+encodeURIComponent(famMoi)+"&duos="+encodeURIComponent(JSON.stringify([{id:famMoi,nom:nom?nom.nom:"Votre duo"}]));
+  el.appendChild(f);document.body.appendChild(el);v3d={el,f,pret:false,attente:null}}
+function v3dOuvrir(fam,n){v3dPrep();if(!v3d)return;v3d.attente={fam,n};const t=document.getElementById("v3dTitre");if(t)t.textContent="Famille "+famDe(fam).nom+" : 2 structures à toucher";
+  v3d.el.classList.add("on");if(v3d.pret)v3dEnvoyer()}
+function v3dEnvoyer(){if(!v3d||!v3d.attente)return;try{v3d.f.contentWindow.postMessage({tp3:"valider",fam:v3d.attente.fam,n:v3d.attente.n},"*");v3d.f.contentWindow.postMessage({tp3:"afficher"},"*")}catch(e){}}
+function v3dFermer(){if(v3d){v3d.el.classList.remove("on");v3d.attente=null}}
+function v3dDetruire(){if(v3d){v3d.el.remove();v3d=null}}
+window.addEventListener("message",ev=>{if(!v3d||ev.source!==v3d.f.contentWindow)return;const d=ev.data||{};
+  if(d.tp3==="pret"){v3d.pret=true;v3d.el.classList.remove("charge");v3dEnvoyer();return}
+  if(d.tp3==="resultat"){const E=famEtat;v3dFermer();if(!E||!E.enValidation||E.enValidation.duo!==famMoi||E.enValidation.fam!==d.fam)return;
+    famVote={n:E.enValidation.n,ok:!!d.ok,par:famMoi,t:Date.now()};famAppliquerVote()}});
 function famAppliquerVote(){const E=famEtat;if(!E||!E.enValidation||!famVote||famVote.n!==E.enValidation.n)return;if(E.tour!==famMoi&&!E.test)return;
   const {duo,fam}=E.enValidation;E.enValidation=null;const f=famDe(fam);
-  if(famVote.ok){E.mains[duo]=E.mains[duo].filter(c=>CARTES7[c].f!==fam);E.poses[duo].push(fam);famEvt({type:"validee",a:duo,fam},`Famille ${f.nom} validée pour ${famNomDuo(duo)} !`);
+  if(famVote.ok){E.mains[duo]=E.mains[duo].filter(c=>CARTES7[c].f!==fam);E.poses[duo].push(fam);famEvt({type:"validee",a:duo,fam},`Famille ${f.nom} validée sur le modèle 3D : ${famNomDuo(duo)} devient « ${TITRE7[fam]||f.nom} » !`);
     if(!famVerifFin()&&!E.mains[duo].length&&!E.pioche.length)famSuivant()}
-  else{const cs=E.mains[duo].filter(c=>CARTES7[c].f===fam);E.mains[duo]=E.mains[duo].filter(c=>CARTES7[c].f!==fam);E.pioche=melange([...E.pioche,...cs]);famEvt({type:"refusee",a:duo,fam},`Famille ${f.nom} non validée : elle retourne dans la pioche.`);famSuivant()}
+  else{const cs=E.mains[duo].filter(c=>CARTES7[c].f===fam);E.mains[duo]=E.mains[duo].filter(c=>CARTES7[c].f!==fam);E.pioche=melange([...E.pioche,...cs]);famEvt({type:"refusee",a:duo,fam},`Famille ${f.nom} non validée sur le modèle 3D : ses cartes retournent dans la pioche.`);famSuivant()}
   famVote=null;famEcrire()}
 function famVoter(ok){const E=famEtat;if(!E.enValidation)return;const v={n:E.enValidation.n,ok,par:famMoi,t:Date.now()};
   if(E.test){famVote=v;famAppliquerVote();return}db.collection("famvote").doc(famId).set(v).catch(()=>{})}
@@ -2431,7 +2794,7 @@ async function famPasserTour(){const E=famEtat;let L={acquired:true};try{L=await
 
 /* ----- duos fictifs (mode test encadrant) ----- */
 function famBots(){clearTimeout(famBotT);const E=famEtat;if(!E||!E.test||E.statut!=="en_cours")return;
-  if(E.enValidation){if(E.enValidation.duo!==famMoi)return;famBotT=setTimeout(()=>{famVote={n:E.enValidation.n,ok:Math.random()<.85};famAppliquerVote()},2500);return}
+  if(E.enValidation)return;
   if(E.tour===famMoi)return;
   famBotT=setTimeout(()=>{if(famVerifFin()){famEcrire();return}const me=E.tour,m=E.mains[me];
     const comp=famCompletes(m);if(comp.length){famPoser(comp[0]);setTimeout(()=>{famVote={n:E.enValidation&&E.enValidation.n,ok:true};famAppliquerVote()},2200);return}
@@ -2451,7 +2814,7 @@ function vFam(){const E=famEtat;if(!E)return `<div class="center"><p>Chargement 
      <ol><li>Chaque duo reçoit <b>6 cartes</b> sur son téléphone. Le reste forme la pioche.</li>
       <li>À votre tour, demandez à un autre duo une carte d'une famille que vous avez en main, <b>avec un critère de reconnaissance</b>. Critère faux : vous passez votre tour.</li>
       <li>Le duo a la carte : elle arrive dans votre main, vous lisez son « Le saviez-vous ? » à voix haute et vous rejouez. Sinon : « <b>Pioche !</b> ».</li>
-      <li>Famille complète : posez-la et <b>montrez 2 structures</b> de cette espèce sur les pièces de la table, sans les toucher. Les autres duos valident.</li></ol>
+      <li>Famille complète : posez-la. Votre téléphone ouvre le <b>modèle 3D</b> de l'espèce : touchez les 2 structures demandées. Deux bonnes réponses : la famille est à vous, avec son titre. Sinon, les 6 cartes retournent dans la pioche.</li></ol>
      <p class="note">Ce jeu n'est pas noté : c'est l'évaluation qui suit qui compte. Partie de ${Math.round(E.duree/60e3)} minutes.</p>
      <h3>Duos connectés (${n}/${E.duos.length})</h3><div class="famduos">${E.duos.map(d=>`<span class="${famPres[d.id]?"on":""}">${famPres[d.id]?ico("coche"):""}${esc(d.nom)}${d.id===famMoi?" (vous)":""}</span>`).join("")}</div>
      <p class="note">Chaque duo ouvre le jeu sur un de ses téléphones. Quand tout le monde est là :</p>
@@ -2462,12 +2825,12 @@ function vFam(){const E=famEtat;if(!E)return `<div class="center"><p>Chargement 
   let centre="";
   if(E.statut==="fin"){const sc=E.ordre.map(id=>[id,(E.poses[id]||[]).length]).sort((a,b)=>b[1]-a[1]);const max=sc[0][1];
     centre=`<div class="famfin"><h2>${max?"Bravo "+esc(sc.filter(x=>x[1]===max).map(x=>x[0]===moi?"à vous":famNomDuo(x[0])).join(" et ")):"Partie terminée"} !</h2>
-      <div class="fampodium">${sc.map(([id,n],k)=>`<div class="${n===max&&max?"gagne":""}"><b>${k+1}</b><span>${esc(id===moi?"Vous":famNomDuo(id))}</span><em>${n} famille${n>1?"s":""}</em><span class="famjp">${(E.poses[id]||[]).map(f=>`<i style="background:${famDe(f).c}"></i>`).join("")}</span></div>`).join("")}</div>
-      <p>Place maintenant à l'évaluation de votre duo (notée sur 20).</p><button class="btn pen gros" id="famEval">Passer à l'évaluation</button></div>`}
+      <div class="fampodium">${sc.map(([id,n],k)=>`<div class="${n===max&&max?"gagne":""}"><b>${k+1}</b><span>${esc(id===moi?"Vous":famNomDuo(id))}</span><em>${n} famille${n>1?"s":""}</em><span class="famjp">${(E.poses[id]||[]).map(f=>`<i style="background:${famDe(f).c}"></i>`).join("")}</span>${titresHTML(E.poses[id])}</div>`).join("")}</div>
+      <p>Aucune famille posée ? Aucun effet sur la note. Place maintenant à l'évaluation de votre duo (notée sur 20), sur ce même téléphone.</p><button class="btn pen gros" id="famEval">Passer à l'évaluation</button></div>`}
   else if(E.enValidation){const v=E.enValidation,f=famDe(v.fam),c=v.duo===moi;
     centre=`<div class="famval" style="--fc:${f.c}"><span class="eyebrow">Validation</span><h2>Famille ${esc(f.nom)}</h2><div class="famfan petit">${f.cartes.map((_,i)=>famMiniHTML(f.id+"-"+i,"",`--k:${i-2.5}`)).join("")}</div>
-      <p>${c?"À vous :":esc(famNomDuo(v.duo))+" doit"} <b>montrer 2 structures ${f.id==="vaisseaux"?"sur un plastiné ou un schéma":"de cette espèce sur les pièces de la table, sans les toucher"}</b>.</p>
-      ${c?`<p class="note">Les autres duos valident sur leur téléphone.</p>`:`<div class="row" style="justify-content:center"><button class="btn pen gros" id="famOui">Validé !</button><button class="btn ghost gros" id="famNon">Pas validé</button></div>`}</div>`}
+      <p class="v3dinfo">${c?"À vous : touchez les <b>2 structures</b> demandées sur le modèle 3D "+(f.id==="vaisseaux"?"de la vascularisation":"de cette espèce")+". Deux bonnes réponses : la famille et le titre « "+esc(TITRE7[f.id]||"")+" » sont à vous.":esc(famNomDuo(v.duo))+" valide sa famille sur le modèle 3D. Révisez vos cartes en attendant."}</p>
+      ${c?`<button class="btn pen gros" id="famV3d">Ouvrir le modèle 3D</button>`:""}</div>`}
   else{const msg=E.journal&&E.journal[0]||"";
     centre=`<div class="famcentre"><div class="fampioche">${E.pioche.length?famDosHTML("","--r:-3deg")+famDosHTML("","--r:2deg"):"<span class='famvide'>Pioche vide</span>"}<em>${E.pioche.length}</em></div>
       <div class="famevt" id="famEvt">${msg?`<p>${lu(msg)}</p>`:""}${["donne","pioche_bonne"].includes(ev.type)&&ev.a!==moi?`<div class="famsav" style="--fc:${famDe(CARTES7[ev.carte].f).c}"><b>Le saviez-vous ?</b> ${esc(CARTES7[ev.carte].savez)}</div>`:""}${ev.type==="critere"?`<div class="famsav" style="--fc:#c0392b"><b>Le bon critère</b> pour ${esc(famDe(CARTES7[ev.carte].f).nom)} · ${esc(CARTES7[ev.carte].membre.toLowerCase())} : ${esc(CARTES7[ev.carte].puces.join(" · "))}</div>`:""}</div>
@@ -2502,14 +2865,14 @@ function famAnimer(){const E=famEtat;if(!E||!E.evt)return;const ev=E.evt;if(famV
   else if((ev.type==="pioche"||ev.type==="pioche_bonne"||ev.type==="pioche_seule")&&ev.a===famMoi){h=`${ev.type!=="pioche_seule"?`<div class="famstamp">Pioche !</div>`:""}<div class="famflip"><div class="ff">${famDosHTML()}${famCarteHTML(ev.carte)}</div></div><p>${ev.type==="pioche_bonne"?"C'est justement la carte demandée : rejouez !":"Voici la carte piochée."}</p>`;son=ev.type==="pioche_bonne"?[523,659,784,1047]:[440,523]}
   else if(ev.type==="pioche"&&ev.de===famMoi){h=`<div class="famstamp">Pioche !</div><p>Vous n'aviez pas cette carte.</p>`}
   else if(ev.type==="critere"&&ev.de===famMoi){h=`<div class="famstamp perdu">Critère faux</div><p>Votre tour est passé. Le bon critère s'affiche sur l'écran.</p>`;son=[330,262]}
-  else if(ev.type==="validee"){h=`<div class="famstamp vert" style="--fc:${famDe(ev.fam).c}">Famille ${esc(famDe(ev.fam).nom)} !</div><p>${ev.a===famMoi?"Bravo, elle est à vous.":esc(famNomDuo(ev.a))+" l'a validée."}</p>`;son=[523,659,784,1047];if(ev.a===famMoi)setTimeout(confettis,200)}
+  else if(ev.type==="validee"){h=`<div class="famstamp vert" style="--fc:${famDe(ev.fam).c}">Famille ${esc(famDe(ev.fam).nom)} !</div><p>${ev.a===famMoi?"Bravo, elle est à vous. Nouveau titre :":esc(famNomDuo(ev.a))+" l'a validée sur le modèle 3D et devient :"}<br><span class="famtitre">« ${esc(TITRE7[ev.fam]||"")} »</span></p>`;son=[523,659,784,1047];if(ev.a===famMoi)setTimeout(confettis,200)}
   else if(ev.type==="debut"){h=`<div class="famstamp vert">C'est parti !</div><p>${E.tour===famMoi?"Vous commencez.":esc(famNomDuo(E.tour))+" commence."}</p>`}
   else if(ev.type==="fin"){h=`<div class="famstamp vert">Fin de la partie</div>`;setTimeout(feuArtifice,300)}
   else if(E.tour===famMoi&&E.statut==="en_cours"&&!E.enValidation){h=`<div class="famstamp vert">À vous !</div>`;son=[660,880]}
   if(!h)return;if(son)bip(son);navigator.vibrate&&navigator.vibrate(120);
   ov.innerHTML=`<div class="famoverin">${h}<span class="note">Touchez pour continuer</span></div>`;ov.onclick=()=>ov.remove();document.body.appendChild(ov);setTimeout(()=>{if(ov.isConnected&&!ov.querySelector(".famflip"))ov.remove()},2600)}
 function brancherFam(){if(vue!=="fam")return;const on=(s,ev,f)=>{const el=$(s);if(el)el.addEventListener(ev,f)};const re=()=>{const y=window.scrollY;rendre();window.scrollTo(0,y)};
-  on("#famQuitter","click",famQuitter);on("#famEval","click",()=>{famQuitter()});
+  on("#famQuitter","click",famQuitter);on("#famEval","click",()=>{const g=monGroupe(),moi=famMoi;famQuitter();if(g&&moi)location.href=lienA3(g,moi)});
   on("#famGo","click",async()=>{if(famEtat.test){famCommencer();return}let L={acquired:true};try{L=await db.collection("config").doc("famgo-"+famId).acquire({holder:DEVICE,ttlMs:8000})}catch(e){}
     try{const s=await db.collection("familles").doc(famId).get();if(s.exists&&s.data().statut!=="attente")return}catch(e){}if(L.acquired)famCommencer()});
   document.querySelectorAll("[data-c7z]").forEach(b=>b.addEventListener("click",()=>{famZoom=b.dataset.c7z;re()}));
@@ -2525,14 +2888,115 @@ function brancherFam(){if(vue!=="fam")return;const on=(s,ev,f)=>{const el=$(s);i
   document.querySelectorAll("[data-fdk]").forEach(b=>b.addEventListener("click",()=>{const D=famDemande;famDemande=null;famDemander(D.cible,D.c,D.crit[+b.dataset.fdk])}));
   on("#famPiocheSeule","click",famPiocherMainVide);
   document.querySelectorAll("[data-famposer]").forEach(b=>b.addEventListener("click",()=>famPoser(b.dataset.famposer)));
-  on("#famOui","click",()=>famVoter(true));on("#famNon","click",()=>famVoter(false));
+  on("#famV3d","click",()=>{const v=famEtat&&famEtat.enValidation;if(v&&v.duo===famMoi)v3dOuvrir(v.fam,v.n)});
   on("#famPasse","click",famPasserTour);
   on("#famRegles","click",()=>{const ov=document.createElement("div");ov.className="famover";ov.innerHTML=`<div class="famoverin" style="text-align:left;background:#fff;color:#222;border-radius:18px;padding:18px"><h2 style="margin:0">Rappel des règles</h2><ol style="padding-left:20px;display:grid;gap:8px;margin:0">
     <li>À votre tour, demandez une carte d'une famille que vous avez déjà, <b>avec le bon critère</b>.</li><li>Critère faux : tour passé. Le duo a la carte : vous la recevez, lisez son « Le saviez-vous ? » à voix haute et rejouez. Sinon : « Pioche ! ».</li>
-    <li>Famille complète : posez-la et montrez <b>2 structures</b> sur les pièces de la table, sans les toucher. Les autres duos valident.</li><li>Main vide : piochez une carte. Le duo qui a posé le plus de familles gagne.</li></ol><button class="btn pen">Compris</button></div>`;ov.onclick=()=>ov.remove();document.body.appendChild(ov)});
+    <li>Famille complète : posez-la, puis touchez les <b>2 structures</b> demandées sur le modèle 3D. Réussi : la famille et son titre sont à vous. Raté : les cartes retournent dans la pioche.</li><li>Main vide : piochez une carte. Le duo qui a posé le plus de familles gagne.</li></ol><button class="btn pen">Compris</button></div>`;ov.onclick=()=>ov.remove();document.body.appendChild(ov)});
 }
 setInterval(()=>{if(vue!=="fam"||!famEtat||famEtat.statut!=="en_cours")return;const el=$("#famChrono");const r=famEtat.duree-(Date.now()-famEtat.debut);if(el)el.textContent=fmt(Math.max(0,r));
-  if(r<=0&&(famEtat.tour===famMoi||famEtat.test)){famFin();famEcrire()}},1000);
+  if(r<=0&&!famEtat.enValidation&&(famEtat.tour===famMoi||famEtat.test)){famFin();famEcrire()}},1000);
+
+
+/* =========================================================
+   MON PROFIL : avatar, niveau, notes et réussite par atelier, badges des 6 ateliers
+   Les badges sont calculés à partir des résultats déjà enregistrés par chaque atelier (aucun atelier n'est modifié).
+   ========================================================= */
+const PF_AVATARS=["🐶","🐱","🐴","🐮","🐷","🐰","🦊","🦉","🐢","🦔","🐑","🐐","🦙","🦌","🐓","🦆"];
+const PF_NIVEAUX=[[0,"Externe"],[100,"Stagiaire"],[250,"Interne"],[450,"Anatomiste"],[700,"Maître anatomiste"],[1000,"Légende de l'anatomie"]];
+let pfProfil=null, pfFam=null, pfFamCle="";
+const pfCle=()=>monGid==="TEST"?"TEST":(moiE?moiE.sid+"~"+moiE.eid:"");
+function pfAvatar(){const p=pfProfil||LS.get("monAvatar_"+pfCle(),null);return (p&&p.avatar)||(typeof p==="string"?p:"")||"🙂"}
+function pfChoisir(av){const k=pfCle();if(!k)return;pfProfil={avatar:av,maj:Date.now()};LS.set("monAvatar_"+k,pfProfil);if(k!=="TEST"&&db)ecrireBase("profils",k.replace(/[\/]/g,"_"),pfProfil,"set")}
+function pfTid(g,aid,eid){const sd=subsDe(g.id,aid);if(!sd)return null;const i=sd.equipes.findIndex(e=>e.includes(eid));return i<0?null:g.id+"-"+aid+"-e"+(i+1)}
+function pfChargerFamilles(g){if(!g||!db||g.id==="TEST")return;if(pfFamCle===g.id)return;pfFamCle=g.id;
+  db.collection("familles").where("groupe","==",g.id).get().then(s=>{pfFam=s.docs.map(d=>d.data());if(vue==="profil")rendre()}).catch(()=>{})}
+function pfTitresJeu(g,eid){const tid=pfTid(g,"a3",eid);if(!tid)return [];const parties=(famEtat&&famEtat.test)?[famEtat]:(pfFam||[]);
+  const t=new Set();parties.forEach(p=>((p.poses||{})[tid]||[]).forEach(f=>t.add(f)));return [...t]}
+function pfContexte(g){const test=g.id==="TEST",eid=test?TEST_MEMBRES[0]:moiE&&moiE.eid,T=aid=>pfTid(g,aid,eid);
+  const a1=a1docs[T("a1")]||{}, a2=test?(testE&&testE.a2!=null?{note:testE.a2}:null):resultats.find(r=>r.groupe===T("a2"))||null;
+  const a3=test?(testE&&testE.a3&&testE.a3[T("a3")]!=null?{note:testE.a3[T("a3")]}:notesA3.find(x=>x.id===T("a3"))):notesA3.find(x=>x.id===T("a3"));
+  const a5=test?(testE&&testE.a5&&testE.a5[T("a5")]!=null?{note:testE.a5[T("a5")]}:null):(typeof notesA5!=="undefined"?notesA5.find(x=>x.id===T("a5")):null)||null;
+  const a4=(test?((testE&&testE.a4)||{}):a4docs)[T("a4")]||{}, a6=(test?((testE&&testE.a6)||{}):a6docs)[T("a6")]||{};
+  const n={};ATELIERS.forEach(a=>{const e=atelierActif(a.id)?etatAt(g,a.id):{st:"off"};n[a.id]=e.st==="fait"&&e.note!=null?e.note:null});
+  return {g,eid,T,a1,a2,a3,a4,a5,a6,n,titres:pfTitresJeu(g,eid),b:bilan(g)}}
+const PF_BADGES=[
+ {id:"g_un",at:"",ic:"🌱",nom:"Premier atelier",desc:"Valider un premier atelier",ok:c=>Object.values(c.n).some(x=>x!=null)},
+ {id:"g_tour",at:"",ic:"🧭",nom:"Tour complet",desc:"Valider tous les ateliers du TP",ok:c=>c.b.complet},
+ {id:"g_tb",at:"",ic:"🎓",nom:"Mention très bien",desc:"Note finale du TP d'au moins 16/20",ok:c=>c.b.complet&&c.b.finale>=16},
+ {id:"a1_sculpt",at:"a1",ic:"🖐️",nom:"Sculpteur de côlon",desc:"Déposer la maquette du côlon",ok:c=>!!c.a1.maquette},
+ {id:"a1_juge",at:"a1",ic:"⚖️",nom:"Juge impartial",desc:"Évaluer la maquette d'un autre groupe",ok:c=>evals.some(e=>e.evaluateur===c.T("a1")&&e.statut==="envoyee")},
+ {id:"a1_or",at:"a1",ic:"🥇",nom:"Côlon d'or",desc:"Au moins 16/20 à l'atelier 1",ok:c=>c.n.a1!=null&&c.n.a1>=16},
+ {id:"a2_duel",at:"a2",ic:"⚔️",nom:"Duelliste",desc:"Jouer le Duel du Barone",ok:c=>!!c.a2},
+ {id:"a2_vic",at:"a2",ic:"🏆",nom:"Vainqueur du Barone",desc:"Gagner le duel",ok:c=>!!c.a2&&c.a2.resultat==="victoire"},
+ {id:"a2_oeil",at:"a2",ic:"🔎",nom:"Œil du Barone",desc:"Au moins 16/20 à l'atelier 2",ok:c=>c.n.a2!=null&&c.n.a2>=16},
+ {id:"a3_fam",at:"a3",ic:"🃏",nom:"Première famille",desc:"Valider une famille sur le modèle 3D",ok:c=>c.titres.length>0},
+ {id:"a3_rep",at:"a3",ic:"🎯",nom:"Repéreur hors pair",desc:"Repérage sans faute à l'évaluation",ok:c=>!!(c.a3&&c.a3.reperage&&c.a3.reperage.total&&c.a3.reperage.score===c.a3.reperage.total)},
+ {id:"a3_quiz",at:"a3",ic:"🧠",nom:"Quiz parfait",desc:"Toutes les questions justes au quiz de l'atelier 3",ok:c=>!!(c.a3&&c.a3.quiz&&c.a3.quiz.total&&c.a3.quiz.score===c.a3.quiz.total)},
+ ...Object.entries(TITRE7).map(([f,t])=>({id:"a3_t_"+f,at:"a3",ic:"👑",nom:t,desc:"Valider la famille "+famDe(f).nom+" au jeu",ok:c=>c.titres.includes(f)})),
+ {id:"a4_enq",at:"a4",ic:"🕵️",nom:"Enquêteur",desc:"Boucler l'enquête aux Acacias",ok:c=>!!c.a4.fini},
+ {id:"a4_flair",at:"a4",ic:"🧪",nom:"Flair de pathologiste",desc:"Trouver la cause de la mort des chiens",ok:c=>!!c.a4.fini&&c.a4.concl===A4_CONCL[0]},
+ {id:"a4_lynx",at:"a4",ic:"👁️",nom:"Œil de lynx",desc:"Au moins 11/12 sur les pièces à conviction",ok:c=>!!c.a4.fini&&A4_PIECES.reduce((s,p)=>s+a4PtsPiece(p,c.a4[p.id]),0)>=11},
+ {id:"a5_foies",at:"a5",ic:"💪",nom:"Même pas les foies",desc:"Aller au bout du Défi foie",ok:c=>!!c.a5},
+ {id:"a5_puzzle",at:"a5",ic:"🧩",nom:"Puzzle-maître du foie",desc:"4/4 aux deux puzzles",ok:c=>!!c.a5&&+c.a5.a===4&&+c.a5.b===4},
+ {id:"a5_lobe",at:"a5",ic:"🔍",nom:"Lobe de génie",desc:"Au moins 10/12 au Défi foie",ok:c=>!!c.a5&&+c.a5.c>=10},
+ {id:"a5_or",at:"a5",ic:"🥇",nom:"Foie de champion",desc:"Au moins 16/20 à l'atelier 5",ok:c=>c.n.a5!=null&&c.n.a5>=16},
+ {id:"a5_juste",at:"a5",ic:"✍️",nom:"Correcteur de confiance",desc:"Corriger la fiche d'un autre binôme",ok:c=>{const t=c.T("a5");if(!t||typeof notesA5==="undefined")return false;const d=duosA5(c.g).find(x=>x.id===t);if(!d)return false;
+   return notesA5.some(x=>String(x.id).startsWith(c.g.id+"-a5-")&&x.id!==t&&new RegExp("(^|\\D)"+d.num+"(\\D|$)").test(String(x.correcteur||"")))}},
+ {id:"a6_pilote",at:"a6",ic:"🐄",nom:"Pilote du rumen",desc:"Terminer l'atelier 6",ok:c=>!!c.a6.fini},
+ {id:"a6_acid",at:"a6",ic:"🧯",nom:"Anti-acidose",desc:"Sortir les Tilleuls de l'acidose (mission 1)",ok:c=>!!a6M(c.a6,"m1").ok},
+ {id:"a6_lait",at:"a6",ic:"🥛",nom:"Pic de lactation maîtrisé",desc:"Réussir la mission 2",ok:c=>!!a6M(c.a6,"m2").ok},
+ {id:"a6_eco",at:"a6",ic:"🌍",nom:"Éco-ruminant",desc:"Réduire le méthane de 10 % (mission 3)",ok:c=>!!a6M(c.a6,"m3").ok},
+ {id:"a6_sans",at:"a6",ic:"⭐",nom:"Sans faute",desc:"Réussir les 3 missions du premier coup",ok:c=>A6_MISSIONS.every(mi=>{const m=a6M(c.a6,mi.id);return m.ok&&(m.essais||[]).length===1})},
+ {id:"a6_devin",at:"a6",ic:"🔮",nom:"Devin du rumen",desc:"Au moins 80 % de prédictions justes (3 au minimum)",ok:c=>{const p=a6Preds(c.a6);return p.n>=3&&p.j/p.n>=0.8}},
+ {id:"a6_irma",at:"a6",ic:"🧿",nom:"Madame Irma",desc:"Toutes les prédictions justes (4 au minimum)",ok:c=>{const p=a6Preds(c.a6);return p.n>=4&&p.j===p.n}},
+ {id:"a6_zen",at:"a6",ic:"🧘",nom:"Zen comme un rumen",desc:"Au moins 3 essais, et jamais d'acidose latente",ok:c=>{const s=pfSims(c.a6);return s.length>=3&&s.every(x=>x.pHm>6.0)}},
+ {id:"a6_pyro",at:"a6",ic:"🔥",nom:"Pompier pyromane",desc:"Faire plonger le pH moyen sous 5,6 pendant un essai",ok:c=>pfSims(c.a6).some(x=>x.pHm<5.6)},
+ {id:"a6_bicar",at:"a6",ic:"🧂",nom:"Accro au bicarbonate",desc:"Ajouter du bicarbonate dans au moins 3 essais",ok:c=>pfEssais(c.a6).filter(e=>e.r&&e.r.tampon).length>=3},
+ {id:"a6_bave",at:"a6",ic:"🤤",nom:"Champion de la bave",desc:"Faire saliver la vache d'au moins 250 L par jour",ok:c=>pfSims(c.a6).some(x=>x.salive>=250)},
+ {id:"a6_rots",at:"a6",ic:"💨",nom:"Rots sous contrôle",desc:"Descendre sous 420 g de méthane par jour sans acidose",ok:c=>pfSims(c.a6).some(x=>x.ch4<=420&&x.pHm>6.0)},
+ {id:"a6_creme",at:"a6",ic:"🧈",nom:"Crème de la crème",desc:"Atteindre un taux butyreux d'au moins 4,2 %",ok:c=>pfSims(c.a6).some(x=>x.tb>=4.2)},
+ {id:"a6_tetu",at:"a6",ic:"🐂",nom:"Têtu comme un bœuf",desc:"Réussir une mission après au moins 4 essais",ok:c=>A6_MISSIONS.some(mi=>{const m=a6M(c.a6,mi.id);return m.ok&&(m.essais||[]).length>=4})},
+ {id:"a6_chef",at:"a6",ic:"👨‍🍳",nom:"Chef étoilé de la ration",desc:"Réussir les 3 missions en 5 essais au total, ou moins",ok:c=>A6_MISSIONS.every(mi=>a6M(c.a6,mi.id).ok)&&pfEssais(c.a6).length<=5},
+ {id:"a6_panse",at:"a6",ic:"🎓",nom:"Panse de génie",desc:"8 sur 8 au quiz du Pilote du rumen",ok:c=>!!c.a6.quizFini&&A6_QUIZ.every(x=>(c.a6.quiz||{})[x.id]===x.b)}];
+function pfEssais(d){return A6_MISSIONS.flatMap(mi=>a6M(d||{},mi.id).essais||[])}
+function pfSims(d){return pfEssais(d).filter(e=>e.r).map(e=>a6Simuler(e.r))}
+function pfDetail(c,aid){
+  if(aid==="a1"){const a=c.a1;return a.maquette?(evals.some(e=>e.evaluateur===c.T("a1")&&e.statut==="envoyee")?"Maquette déposée et évaluation faite":"Maquette déposée"):""}
+  if(aid==="a2"&&c.a2&&c.a2.total!=null)return `Duel : ${c.a2.resultat||""}, ${c.a2.total} point${c.a2.total>1?"s":""} sur ${c.a2.max}`;
+  if(aid==="a3"&&c.a3){const r=c.a3.reperage,q=c.a3.quiz;return [r?`Repérage ${r.score}/${r.total}`:"",q?`quiz ${q.score}/${q.total}`:"",c.titres.length?`${c.titres.length} famille${c.titres.length>1?"s":""} au jeu`:""].filter(Boolean).join(" · ")}
+  if(aid==="a4"&&c.a4.vuIntro)return `Pièces : ${fr(A4_PIECES.reduce((s,p)=>s+a4PtsPiece(p,c.a4[p.id]),0))}/12`+(c.a4.concl?` · conclusion : ${c.a4.concl.toLowerCase()}`:"");
+  if(aid==="a5"&&c.a5&&c.a5.a!=null)return `Puzzle 1 : ${fr(+c.a5.a)}/4 · puzzle 2 : ${fr(+c.a5.b)}/4 · Défi foie : ${fr(+c.a5.c)}/12`;
+  if(aid==="a6"&&c.a6.vuIntro){const ok=A6_MISSIONS.filter(mi=>a6M(c.a6,mi.id).ok).length,p=a6Preds(c.a6);return `Missions réussies ${ok}/3`+(p.n?` · prédictions justes ${p.j}/${p.n}`:"")+(c.a6.quizFini?` · quiz ${A6_QUIZ.filter(x=>(c.a6.quiz||{})[x.id]===x.b).length}/8`:"")}
+  return ""}
+function pfNiveau(xp){let i=0;PF_NIVEAUX.forEach((n,k)=>{if(xp>=n[0])i=k});const cur=PF_NIVEAUX[i],nxt=PF_NIVEAUX[i+1];return {nom:cur[1],suiv:nxt?nxt[1]:null,pct:nxt?Math.round((xp-cur[0])/(nxt[0]-cur[0])*100):100,reste:nxt?nxt[0]-xp:0}}
+function vProfil(){const g=monGroupe();if(!g){vue="hub";return vHub()}pfChargerFamilles(g);
+  const c=pfContexte(g),dispo=ATELIERS.filter(a=>atelierActif(a.id)),ids=dispo.map(a=>a.id);
+  const badges=PF_BADGES.filter(b=>!b.at||ids.includes(b.at)),gagnes=badges.filter(b=>{try{return b.ok(c)}catch(e){return false}});
+  const xp=Math.round(Object.values(c.n).reduce((s,x)=>s+(x||0)*5,0)+gagnes.length*25),N=pfNiveau(xp),moi=g.id==="TEST"?c.eid:etu(g.seance,c.eid);
+  const faits=dispo.filter(a=>c.n[a.id]!=null),taux=faits.length?Math.round(faits.reduce((s,a)=>s+c.n[a.id],0)/faits.length/20*100):null;
+  const lignes=dispo.map(a=>{const n=c.n[a.id],d=pfDetail(c,a.id),e=etatAt(g,a.id);
+    return `<div class="pfat"><div class="pfath"><b>Atelier ${a.n} · ${esc(titreAt(a))}</b><span class="chip ${e.st}">${n!=null?fr(n)+"/20":e.st==="encours"?"En cours":"À faire"}</span></div>
+      <div class="pfbar" aria-label="Réussite"><i style="width:${n!=null?n/20*100:0}%"></i></div><small>${n!=null?`Réussite ${Math.round(n/20*100)} %`:"Pas encore noté"}${d?" · "+esc(d):""}</small></div>`}).join("");
+  const parAt=[["","Tout le TP"],...dispo.map(a=>[a.id,"Atelier "+a.n+" · "+titreAt(a)])].map(([aid,lab])=>{const bs=badges.filter(b=>b.at===aid);if(!bs.length)return "";
+    return `<h4 class="pfbh">${esc(lab)}</h4><div class="pfbadges">${bs.map(b=>{const ok=gagnes.includes(b);return `<div class="pfb ${ok?"ok":""}" title="${esc(b.desc)}"><span class="pfi">${ok?b.ic:"🔒"}</span><b>${esc(b.nom)}</b><small>${esc(b.desc)}</small></div>`}).join("")}</div>`}).join("");
+  return `${enteteApp()}<div class="hub pf">
+   <div class="grhead pfhead"><button class="pfav" id="pfAvBtn" aria-label="Changer d'avatar">${pfAvatar()}</button><div><span class="eyebrow">Mon profil · ${esc(g.nom)}</span><h1>${esc(moi)}</h1>
+     <div class="pfniv"><b>${esc(N.nom)}</b> · ${xp} XP${N.suiv?` · encore ${N.reste} XP pour « ${esc(N.suiv)} »`:""}<i><em style="width:${N.pct}%"></em></i></div></div>
+     <div class="prog"><b>${gagnes.length}<small>/${badges.length}</small></b><span>badges</span></div></div>
+   <div class="pfpick" id="pfPick" hidden><span class="eyebrow">Choisissez votre avatar</span><div>${PF_AVATARS.map(a=>`<button class="pfa ${a===pfAvatar()?"sel":""}" data-pfav="${a}">${a}</button>`).join("")}</div></div>
+   <div class="card"><div class="row" style="justify-content:space-between;align-items:baseline"><h3 style="margin:0">Mes notes</h3>${taux!=null?`<span class="note">Taux de réussite moyen : <b>${taux} %</b></span>`:""}</div>
+     ${c.b.complet?`<div class="pffinale">Note finale du TP <b>${fr(c.b.finale)}<small>/20</small></b></div>`:`<p class="note" style="margin:4px 0 8px">Chaque note s'affiche dès que l'atelier est validé ; la note finale apparaît quand tous les ateliers le sont.</p>`}
+     ${lignes}</div>
+   <div class="card"><h3 style="margin:0 0 4px">Mes badges</h3><p class="note" style="margin:0 0 6px">Les badges et l'expérience ne comptent pas dans la note. 5 XP par point obtenu, 25 XP par badge.</p>${parAt}</div>
+   <div class="row"><button class="btn ghost" id="pfRetour">Retour aux ateliers</button></div></div>`}
+function brancherProfil(){const on=(s,ev,f)=>{const el=$(s);if(el)el.addEventListener(ev,f)};
+  on("#ouvrirProfil","click",()=>{vue="profil";rendre();window.scrollTo(0,0)});
+  if(vue!=="profil")return;
+  on("#pfAvBtn","click",()=>{const p=$("#pfPick");if(p)p.hidden=!p.hidden});
+  document.querySelectorAll("[data-pfav]").forEach(b=>b.addEventListener("click",()=>{pfChoisir(b.dataset.pfav);bip([523,659]);rendre()}));
+  on("#pfRetour","click",()=>{vue="hub";rendre();window.scrollTo(0,0)})}
+
 /* =========================================================
    Format tablette / téléphone (bouton en haut à droite)
    ========================================================= */
@@ -2557,7 +3021,7 @@ appliquerFormat();
    5. Code de secours (texte + QR) par étudiant, importable par les encadrants
    6. Note manuelle des encadrants en dernier recours
    ========================================================= */
-const COLS_NOTES=["resultats","a1eval","notes_a3","a4","a1"];
+const COLS_NOTES=["resultats","a1eval","notes_a3","notes_a5","a4","a6","a1"];
 let journalNotes=LS.get("journalNotes",[]), secoursDocs={}, notesManu={};
 async function ecrire(col,id,data,mode){
   const test=(testE&&String(id).startsWith("TEST"))||String(id).startsWith("TEST");
@@ -2590,6 +3054,7 @@ function noteEtuInfo(g,eid,aid){
   const m=notesManu[g.seance+"~"+eid+"~"+aid];if(m&&m.note!=null&&m.note!=="")return {v:+m.note,src:"manuelle"};
   const v=noteEtuCalc(g,eid,aid);if(v!=null)return {v,src:""};
   const sd=subsDe(g.id,aid),i=sd?sd.equipes.findIndex(e=>e.includes(eid)):-1,tid=i>=0?g.id+"-"+aid+"-e"+(i+1):null;
+  if(tid&&aid==="a6"&&atelierPasse(g,"a6")){const v=a6NoteGroupe(g,true);if(v!=null)return {v,src:"repli"}}
   if(tid&&aid==="a4"&&atelierPasse(g,"a4")){const d=a4docs[tid];if(d&&(A4_PIECES.some(p=>d[p.id])||d.vuIntro))return {v:a4Note(Object.assign({},d,{fini:true})),src:"repli"}}
   if(tid&&aid==="a3"&&atelierPasse(g,"a3")){const pr=a3prog[tid];if(pr){const parts=[pr.reperage,pr.quiz].filter(x=>x&&x.total);if(parts.length)return {v:Math.round(parts.reduce((s,x)=>s+x.score/x.total,0)/parts.length*20*2)/2,src:"repli"}}}
   if(tid&&aid==="a1"&&phaseSeance(g.seance).phase==="fin"&&(a1docs[tid]||{}).maquette){
@@ -2664,6 +3129,7 @@ function reabonner(){if(!db)return;const c=portee();if(c===aboCle)return;aboCle=
     S(db.collection("a1"),coll("a1",d=>{a1docs={};d.forEach(x=>a1docs[x.id]=x.data());if(testE)Object.assign(a1docs,testE.a1)}));
     S(db.collection("a1eval"),coll("a1eval",d=>{evals=d.map(x=>Object.assign({id:x.id},x.data()));if(testE)evals=evals.concat(testE.evals)}));
     S(db.collection("a4"),coll("a4",d=>{a4docs={};d.forEach(x=>a4docs[x.id]=x.data())}));
+    S(db.collection("a6"),coll("a6",d=>{a6docs={};d.forEach(x=>a6docs[x.id]=x.data())}));
     S(db.collection("notes_a3"),coll("notes_a3",d=>{notesA3=d.map(x=>Object.assign({id:x.id},x.data()))}));
     S(db.collection("a3prog"),coll("a3prog",d=>{a3prog={};d.forEach(x=>a3prog[x.id]=x.data())}));
     S(db.collection("notes_a5"),coll("notes_a5",d=>{notesA5=d.map(x=>Object.assign({id:x.id},x.data()))}));
@@ -2679,6 +3145,7 @@ function reabonner(){if(!db)return;const c=portee();if(c===aboCle)return;aboCle=
   const [,sid,gid]=c.split(":");
   S(db.collection("groupes").where("seance","==",sid),coll("groupes",d=>{groupes=d.map(x=>Object.assign({id:x.id},x.data()))}));
   S(db.collection("deroule").doc(sid),s=>{if(s.exists)deroules[sid]=s.data();rendrePortail()});
+  if(moiE)S(db.collection("profils").doc((moiE.sid+"~"+moiE.eid).replace(/[\/]/g,"_")),s=>{if(s.exists){pfProfil=s.data();LS.set("monAvatar_"+pfCle(),pfProfil);rendrePortail()}});
   S(db.collection("a1eval").where("seance","==",sid),coll("a1eval",d=>{evals=d.map(x=>Object.assign({id:x.id},x.data()))}));
   S(db.collection("resultats").where("seance","==",sid),coll("resultats",d=>{resultats=d.map(x=>Object.assign({},x.data()))}));
   if(!gid){S(db.collection("bandes").where("seance","==",sid),coll("bandes",d=>{bandes=d.map(x=>Object.assign({id:x.id},x.data()))}));return}
@@ -2686,6 +3153,7 @@ function reabonner(){if(!db)return;const c=portee();if(c===aboCle)return;aboCle=
   const docs=(col,n,f)=>{for(let i=1;i<=n;i++){const id=gid+"-"+col.a+"-e"+i;S(db.collection(col.c).doc(id),s=>{f(id,s.exists?s.data():null);rendrePortail()})}};
   docs({c:"a1",a:"a1"},3,(id,d)=>{if(d)a1docs[id]=d;else delete a1docs[id]});
   docs({c:"a4",a:"a4"},3,(id,d)=>{if(d)a4docs[id]=d;else delete a4docs[id]});
+  docs({c:"a6",a:"a6"},3,(id,d)=>{if(d)a6docs[id]=d;else delete a6docs[id]});
   docs({c:"notes_a3",a:"a3"},6,(id,d)=>upsert(notesA3,id,d));
   docs({c:"a3prog",a:"a3"},6,(id,d)=>{if(d)a3prog[id]=d;else delete a3prog[id]});
   docs({c:"notes_a5",a:"a5"},6,(id,d)=>upsert(notesA5,id,d));
@@ -2794,7 +3262,8 @@ function ouvrirAtelier(aid){const g=monGroupe();if(!g)return;
   if(aid==="a2"){if(duelsFaits(g,t.id)>=2){toast("Les deux duels sont joués");return}lancerDuelEquipes(g);return}
   if(aid==="a3"){vue="a3";rendre();window.scrollTo(0,0)}
   if(aid==="a4"){a4Etape=null;a4Sel={};vue="a4";rendre();window.scrollTo(0,0)}
-  if(aid==="a5"){vue="a5";rendre();window.scrollTo(0,0)}}
+  if(aid==="a5"){vue="a5";rendre();window.scrollTo(0,0)}
+  if(aid==="a6"){a6Etape=null;a6Brouillon={};a6Pred={};a6Quiz={};vue="a6";rendre();window.scrollTo(0,0)}}
 
 /* ----- atelier 2 : deux duels (manche + revanche), note = moyenne des deux ----- */
 const resA2=tid=>resultats.filter(r=>r.groupe===tid);
@@ -2876,6 +3345,7 @@ function noteEtuCalc(g,eid,aid){const sd=subsDe(g.id,aid);if(!sd)return null;con
     if(!v.length)return null;if(v.length<2&&!atelierPasse(g,"a2"))return null;return Math.round(v.reduce((s,x)=>s+x,0)/v.length*2)/2}
   if(aid==="a4")return a4Note(g.id==="TEST"?((testE&&testE.a4)||{})[tid]:a4docs[tid]);
   if(aid==="a3"){if(g.id==="TEST")return testE&&testE.a3&&testE.a3[tid]!=null?testE.a3[tid]:null;const n=notesA3.find(x=>x.id===tid);return n?+n.note:null}
+  if(aid==="a6")return a6NoteGroupe(g);
   if(aid==="a5"){if(g.id==="TEST")return testE&&testE.a5&&testE.a5[tid]!=null?testE.a5[tid]:null;const n=notesA5.find(x=>x.id===tid);return n?+n.note:null}
   return null}
 function groupeAFini(g,aid){if(!atelierActif(aid))return false;const sd=subsDe(g.id,aid);if(!sd)return false;
@@ -2885,6 +3355,7 @@ function groupeAFini(g,aid){if(!atelierActif(aid))return false;const sd=subsDe(g
     if(aid==="a3")return notesA3.some(x=>x.id===tid);
     if(aid==="a4")return !!(a4docs[tid]||{}).fini;
     if(aid==="a5")return notesA5.some(x=>x.id===tid);
+    if(aid==="a6")return !!(a6docs[tid]||{}).fini;
     return false})}
 /* notes du Défi foie gardées sur ce téléphone par la page de l'atelier : envoyées ici aussi (double sécurité) */
 function syncA5(){let l=[];try{l=JSON.parse(localStorage.getItem("a5envoi")||"[]")}catch(e){}if(!l.length)return;

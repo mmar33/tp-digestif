@@ -1,4 +1,10 @@
-<!doctype html><html><head><script src="../firebase-config.js"></script><script src="../vendor/firebase-app-compat.js"></script><script src="../vendor/firebase-firestore-compat.js"></script><script src="../adapter.js"></script><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<!doctype html>
+<html lang="fr">
+<head><script src="../firebase-config.js"></script><script src="../vendor/firebase-app-compat.js"></script><script src="../vendor/firebase-firestore-compat.js"></script><script src="../adapter.js"></script>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+</head>
+<body>
 <title>Validation 3D des familles</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Source+Sans+3:wght@400;600;700&display=swap">
@@ -181,6 +187,8 @@ h3.sec{margin:6px 0 0;font-family:var(--display);font-size:22px;display:flex;gap
 @media (max-width:820px){.joueur .jn small,.joueur .bar{display:none}.joueur{padding-right:10px}}
 @media (prefers-reduced-motion:reduce){.toast,.flash{animation:none}}
 body[data-mode="jeu"] .joueur{display:none}
+.portail-retour{min-height:40px;padding:6px 12px}
+body[data-embed] header{display:none}
 .chrono{font-weight:700;font-variant-numeric:tabular-nums;padding:6px 12px;border-radius:999px;background:var(--ink);color:var(--surface);font-size:15px}
 .chrono.urgent{background:var(--ko);color:#fff}
 .scores{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}
@@ -207,6 +215,7 @@ body[data-mode="jeu"] .joueur{display:none}
 
 <div class="app">
   <header>
+    <button class="btn secondary portail-retour" id="portail-retour" type="button" hidden>← Ateliers</button>
     <h1>Validation 3D</h1>
     <button class="joueur" id="joueur" type="button" aria-label="Mon carnet de jeu"></button>
     <span class="chrono" id="chrono" hidden></span>
@@ -234,48 +243,6 @@ body[data-mode="jeu"] .joueur{display:none}
     <div class="toasts" id="toasts" aria-live="polite"></div>
   </main>
 </div>
-
-<script>/* Pont avec le portail des ateliers : duos imposés, retour, préremplissage du jeu */
-(function(){
-  var q=new URLSearchParams(location.search), duos=null, moi=q.get("duo")||"";
-  try{duos=JSON.parse(q.get("duos")||"null")}catch(e){}
-  if(duos&&duos.length){try{sessionStorage.setItem("a3duos",JSON.stringify(duos));sessionStorage.setItem("a3moi",moi)}catch(e){}}
-  else{try{duos=JSON.parse(sessionStorage.getItem("a3duos")||"null");moi=moi||sessionStorage.getItem("a3moi")||""}catch(e){}}
-  window.__A3={duos:duos,moi:moi};
-  if(duos){var K="tp-digestif-eval-v1",d;try{d=JSON.parse(localStorage.getItem(K)||"null")}catch(e){}
-    d=d&&d.binomes?d:{binomes:{},courant:""};var av=["🐶","🐱","🐴","🐮","🐷","🐰"];
-    duos.forEach(function(x,i){if(!d.binomes[x.id])d.binomes[x.id]={id:x.id,nom:x.nom,cree:Date.now(),validations:[],quiz:null,famillesManuelles:0,xp:0,avatar:av[i%av.length]}});
-    if(moi&&d.binomes[moi])d.courant=moi;
-    try{localStorage.setItem(K,JSON.stringify(d))}catch(e){}}
-
-  /* envoi direct des notes au serveur, sans attendre le retour sur le portail (téléphone éteint, oubli…) */
-  if(duos){var FILE="a3fileEnvoi",envoyes={};
-    function noteDe(b){if(!b||!b.reperage||!b.reperage.total||!b.quiz||b.quiz.score==null||!b.quiz.total)return null;return Math.round((b.reperage.score/b.reperage.total*10+b.quiz.score/b.quiz.total*10)*10)/10}
-    function file(){try{return JSON.parse(localStorage.getItem(FILE)||"[]")}catch(e){return []}}
-    function poser(l){try{localStorage.setItem(FILE,JSON.stringify(l))}catch(e){}}
-    function preparer(){var d;try{d=JSON.parse(localStorage.getItem(K)||"null")}catch(e){}if(!d||!d.binomes)return;var l=file(),ids=duos.map(function(x){return x.id});
-      Object.keys(d.binomes).forEach(function(id){if(ids.indexOf(id)<0)return;var b=d.binomes[id];
-        var prog={reperage:b.reperage&&b.reperage.total?{score:b.reperage.score,total:b.reperage.total}:null,quiz:b.quiz&&b.quiz.total&&b.quiz.score!=null?{score:b.quiz.score,total:b.quiz.total}:null};
-        var cle=JSON.stringify(prog);if(envoyes[id]===cle||(!prog.reperage&&!prog.quiz))return;envoyes[id]=cle;
-        l=l.filter(function(x){return x.id!==id});l.push({id:id,prog:prog,note:noteDe(b),t:Date.now()})});poser(l)}
-    var dbP=null;function base(){if(!dbP)dbP=(window.claude&&window.claude.use?window.claude.use("db"):Promise.resolve(null)).catch(function(){return null});return dbP}
-    function vider(){var l=file();if(!l.length)return;base().then(function(db){if(!db)return;l.forEach(function(x){
-      var p=[db.collection("a3prog").doc(x.id).set({reperage:x.prog.reperage,quiz:x.prog.quiz,maj:x.t})];
-      if(x.note!=null)p.push(db.collection("notes_a3").doc(x.id).set({note:x.note,reperage:x.prog.reperage,quiz:x.prog.quiz,maj:x.t,direct:1}));
-      Promise.all(p).then(function(){poser(file().filter(function(y){return !(y.id===x.id&&y.t===x.t)}))}).catch(function(){})})})}
-    var orig=Storage.prototype.setItem;Storage.prototype.setItem=function(k,v){orig.apply(this,arguments);if(k===K)setTimeout(function(){preparer();vider()},50)};
-    setInterval(function(){preparer();vider()},15000);window.addEventListener("online",vider);setTimeout(vider,2000)}
-  document.addEventListener("DOMContentLoaded",function(){
-    var b=document.createElement("a");b.href="../index.html";b.textContent="← Retour aux ateliers";
-    b.setAttribute("style","position:fixed;left:10px;bottom:10px;z-index:9999;background:#2f7a4a;color:#fff;padding:10px 14px;border-radius:12px;font:600 15px system-ui,sans-serif;text-decoration:none;box-shadow:0 4px 12px rgba(0,0,0,.25)");
-    document.body.appendChild(b);
-    if(!duos)return;
-    new MutationObserver(function(){var n=document.getElementById("j-n");if(!n||n.dataset.pre)return;n.dataset.pre="1";
-      n.value=String(Math.min(5,Math.max(2,duos.length)));n.dispatchEvent(new Event("change",{bubbles:true}));
-      setTimeout(function(){n.dispatchEvent(new Event("change",{bubbles:true}));duos.slice(0,5).forEach(function(x,i){var el=document.getElementById("j-nom"+(i+1));if(el&&!el.value)el.value=x.nom})},50)})
-      .observe(document.body,{childList:true,subtree:true});
-  });
-})();</script>
 
 <script type="application/json" id="reperes-data">{"chien": [], "_exclus": {"chien_seg": []}, "vache_rumen": [{"nom": "Sac dorsal du rumen", "membre": "Estomac", "tol": "moyenne", "p": [14.08966, 3.31062, -24.21801]}, {"nom": "Sac ventral du rumen", "membre": "Estomac", "tol": "moyenne", "p": [13.02579, -0.83716, -23.23324]}, {"nom": "Réseau", "membre": "Estomac", "tol": "moyenne", "p": [15.76212, 1.43753, -17.7374]}, {"nom": "Feuillet", "membre": "Estomac", "tol": "moyenne", "p": [12.71413, -0.62312, -15.17489]}, {"nom": "Caillette", "membre": "Estomac", "tol": "moyenne", "p": [13.09771, -3.22773, -19.91369]}, {"nom": "Duodénum", "membre": "Estomac", "tol": "moyenne", "p": [11.66396, -2.24348, -24.27485]}]}</script>
 <script type="text/plain" id="modele-chien" data-src="modeles/chien.glb"></script>
@@ -1667,7 +1634,7 @@ function renderPanel(){
       h=`<div class="verdict ${ok?'ok':'ko'}"><strong>${ok?'Famille validée':'Famille non validée'}</strong>
         <span class="meta">${esc(e.nom)} · ${t}</span>
         <span class="meta">${q.res.filter(Boolean).length} bonne(s) réponse(s) sur 2</span></div>
-      <p>${S.jeuValidation?(ok?'Bravo ! Revenez au jeu pour poser la famille.':'Dommage : les cartes retournent dans la pioche.'):(ok?'Famille validée.':'Famille non validée.')}</p>
+      <p>${S.jeuValidation?(ok?(S.jeuValidation.portail?`Bravo ! La famille est à vous, avec le titre « ${esc(TITRE_FAMILLE[S.jeuValidation.f]||'')} ».`:'Bravo ! Revenez au jeu pour poser la famille.'):'Dommage : les 6 cartes retournent dans la pioche.'):(ok?'Famille validée.':'Famille non validée.')}</p>
 
       ${q.nouvelle?`<p class="gain">🎉 Les 6 cartes ${esc(FAMILLES[q.nouvelle].nom)} rejoignent votre album !</p><div class="gains">${CARTES.map((c,i)=>c.f===q.nouvelle?`<button class="acarte" data-carte="${i}">${carteHTML(c,true)}</button>`:'').join('')}</div>`:''}
       ${S.jeuValidation?'<button class="btn" id="retour-jeu">Retour au jeu</button>':'<button class="btn" id="again">Nouvelle validation</button>'}`;
@@ -1701,6 +1668,7 @@ function renderPanel(){
   }
   if(S.mode==='quiz')h=renderQuiz();
   if(S.mode==='consignes')h=renderConsignes();
+  if(S.mode==='attente')h=`<div class="eyebrow">Validation sur modèle 3D</div><h2>Retour au jeu…</h2><p class="muted">Le résultat a été envoyé au jeu des 7 familles.</p>`;
   if(S.mode==='profil')h=renderProfil();
   if(S.mode==='jeu')h=renderJeu();
   if(S.mode==='notes')h=renderNotes();
@@ -1712,7 +1680,7 @@ function bindPanel(){
   $('go')?.addEventListener('click',startQuiz);
   $('next')?.addEventListener('click',()=>{surligner(null);S.quiz.i++;S.quiz.answered=false;S.quiz.marks=[];if(S.quiz.i>=2&&!S.jeuValidation)evValidationFin(S.quiz);drawPins();renderPanel();});
   panel.querySelectorAll('.gains [data-carte]').forEach(x=>x.addEventListener('click',()=>ouvrirCarte(Number(x.dataset.carte))));
-  $('retour-jeu')?.addEventListener('click',()=>{const ok=S.quiz&&S.quiz.res.every(Boolean);surligner(null);S.quiz=null;drawPins();finValidationJeu(ok);});
+  $('retour-jeu')?.addEventListener('click',()=>{const ok=S.quiz&&S.quiz.res.every(Boolean);if(S.jeuValidation&&S.jeuValidation.portail&&S.quiz)evValidationFin(S.quiz);surligner(null);S.quiz=null;drawPins();finValidationJeu(ok);});
   $('again')?.addEventListener('click',()=>{surligner(null);S.quiz=null;drawPins();renderPanel();});
   $('showall')?.addEventListener('change',ev=>{S.showAll=ev.target.checked;drawPins();});
   $('r-cancel')?.addEventListener('click',()=>{S.brouillon=null;drawPins();renderPanel();});
@@ -1847,6 +1815,10 @@ const BANQUE=[
    Les résultats de chaque binôme sont gardés sur l'appareil (les étudiants n'ont pas de compte) ;
    la fiche affiche un code de résultat que l'enseignante peut importer dans son carnet de notes. */
 const CLE_EVAL='tp-digestif-eval-v1',CLE_CARNET='tp-digestif-carnet-v1';
+/* Lancement depuis le portail des ateliers : ?duos=[{id,nom}]&duo=<id>&eval=<min> ; ?embed=1 = validation 3D des familles dans le jeu du portail */
+const PORTAIL=(()=>{try{const q=new URLSearchParams(location.search);let duos=null;try{duos=JSON.parse(q.get('duos')||'null');}catch(e){}
+  const embed=q.get('embed')==='1';if(!Array.isArray(duos)&&!embed)return null;
+  return {duos:Array.isArray(duos)?duos.filter(d=>d&&d.id).map(d=>({id:String(d.id),nom:String(d.nom||d.id)})):[],duo:q.get('duo')||'',embed,eval:Math.max(0,+q.get('eval')||0)};}catch(e){return null;}})();
 const NOTES_DEF={poids:{reperage:10,quiz:10},nbReperage:6,nbQuestions:12,dureeJeu:15,dureeEval:12,montrerNote:true};
 const E={binomes:{},courant:'',nouveau:false};
 /* Moodle (SCORM 1.2) : si la page est ouverte comme activité SCORM, l'étudiant est identifié par son compte
@@ -1878,8 +1850,11 @@ if(LMS){const fin=()=>{if(lmsFini)return;lmsSauver();lmsFini=true;try{LMS.LMSFin
 const N={acces:false,pinErr:'',msg:'',carnet:{},db:null,importMsg:''};
 const lsGet=k=>{try{return JSON.parse(localStorage.getItem(k)||'null');}catch(e){return null;}};
 const lsSet=(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v));return true;}catch(e){return false;}};
-function cfg(){const c=(S.reperes&&S.reperes._notes)||{};const p={...NOTES_DEF.poids,...(c.poids||{})};delete p.jeu;return {...NOTES_DEF,...c,poids:p};}
+function cfg(){const c=(S.reperes&&S.reperes._notes)||{};const p={...NOTES_DEF.poids,...(c.poids||{})};delete p.jeu;const r={...NOTES_DEF,...c,poids:p};if(PORTAIL&&PORTAIL.eval)r.dureeEval=PORTAIL.eval;return r;}
 function chargerEval(){if(LMS){lmsCharger();return;}const d=lsGet(CLE_EVAL);if(d&&d.binomes){E.binomes=d.binomes;E.courant=d.courant||'';}
+  if(PORTAIL){const ids=PORTAIL.duos.map(x=>x.id);if(PORTAIL.duo&&!ids.includes(PORTAIL.duo)){PORTAIL.duos.push({id:PORTAIL.duo,nom:'Votre duo'});ids.push(PORTAIL.duo);}
+    PORTAIL.duos.forEach(x=>{const b=E.binomes[x.id];if(b){if(x.nom&&x.nom!=='Votre duo')b.nom=x.nom;}else E.binomes[x.id]={id:x.id,nom:x.nom,cree:Date.now(),validations:[],quiz:null,famillesManuelles:0,xp:0,avatar:AVATARS[Math.floor(Math.random()*AVATARS.length)]};});
+    E.courant=PORTAIL.duo||(ids.includes(E.courant)?E.courant:'');E.nouveau=false;sauverEval();}
   const c=lsGet(CLE_CARNET);if(c&&typeof c==='object')N.carnet=c;}
 function sauverEval(){if(LMS){lmsSauver();return;}lsSet(CLE_EVAL,{binomes:E.binomes,courant:E.courant});}
 const bin=()=>E.binomes[E.courant]||null;
@@ -1911,6 +1886,8 @@ function enregistrerValidation(q){const b=bin();if(!b||q.saved)return;q.saved=tr
 /* Sélecteur de binôme (Valider, Quiz) */
 function binomeUI(){
   if(LMS)return `<p class="moi">Connecté(e) : <b>${esc(bin()?bin().nom:'')}</b></p>`;
+  if(PORTAIL&&PORTAIL.duo)return `<p class="moi">Votre duo : <b>${esc(bin()?bin().nom:'')}</b></p>`;
+  if(PORTAIL){const pids=PORTAIL.duos.map(x=>x.id);return `<label for="bin-sel">Votre duo<select id="bin-sel"><option value="">Choisir votre duo…</option>${pids.map(i=>`<option value="${esc(i)}" ${i===E.courant?'selected':''}>${esc(E.binomes[i].nom)}</option>`).join('')}</select></label>`;}
   const ids=Object.keys(E.binomes).sort((a,b)=>E.binomes[a].nom.localeCompare(E.binomes[b].nom,'fr'));
   if(E.nouveau||!ids.length)return `<label for="bin-nom">Nouveau binôme<input type="text" id="bin-nom" autocomplete="off" placeholder="Ex. Léa Martin et Hugo Petit"></label>
     <div class="row"><button class="btn" id="bin-add">Enregistrer le binôme</button>${ids.length?'<button class="btn secondary" id="bin-annul">Annuler</button>':''}</div>`;
@@ -2237,9 +2214,16 @@ function demander(f,ci,cible,choix){const e=eq(),autre=P.equipes[cible],c=CARTES
   else{P.msg={type:'info',txt:`« Pioche ! » Vous piochez « ${CARTES[p].t} » (${FAMILLES[CARTES[p].f].nom}).`,carte:p};P.phase='resultat';journal(`${e.av} ${e.nom} pioche`);
     const ff=CARTES[p].f;if(complete(e,ff)&&!P.equipes.some(x=>x.familles.includes(ff))){P.phase='complete';P.dem={f:ff};}}
   sauverPartie();}
+function lancerValidationPortail(f,n){if(!VUE_FAMILLE[f])return;if(S.jeuValidation&&S.jeuValidation.portail&&S.jeuValidation.f===f&&S.jeuValidation.n===n)return;
+  S.jeuValidation={portail:true,f,n};setMode('valider');S.espece=VUE_FAMILLE[f];renderSpecies();
+  loadEspece(S.espece).then(()=>{if(S.jeuValidation&&S.jeuValidation.f===f){startQuiz();requestAnimationFrame(resize);}});}
+window.addEventListener('message',ev=>{if(!PORTAIL||!PORTAIL.embed||ev.source!==parent)return;const d=ev.data||{};
+  if(d.tp3==='valider')lancerValidationPortail(d.fam,d.n);if(d.tp3==='afficher')requestAnimationFrame(resize);});
 function lancerValidationJeu(){const f=P.dem.f;S.jeuValidation={equipe:P.tour,f};P.phase='validation';sauverPartie();
   setMode('valider');S.espece=VUE_FAMILLE[f];renderSpecies();loadEspece(S.espece).then(()=>{if(S.jeuValidation)startQuiz();});document.body.dataset.jeuval='1';}
-function finValidationJeu(ok){const jv=S.jeuValidation;S.jeuValidation=null;delete document.body.dataset.jeuval;if(!P||!jv)return;const e=P.equipes[jv.equipe],ids=membresFamille(jv.f);
+function finValidationJeu(ok){const jv=S.jeuValidation;S.jeuValidation=null;
+  if(jv&&jv.portail){sauverEval();majJoueur();S.mode='attente';renderPanel();try{parent.postMessage({tp3:'resultat',fam:jv.f,ok:!!ok,n:jv.n},'*');}catch(e){}return;}
+  delete document.body.dataset.jeuval;if(!P||!jv)return;const e=P.equipes[jv.equipe],ids=membresFamille(jv.f);
   if(ok){e.familles.push(jv.f);e.main=e.main.filter(i=>!ids.includes(i));journal(`${e.av} ${e.nom} pose la famille ${FAMILLES[jv.f].nom} !`);
     P.msg={type:'ok',txt:`Famille ${FAMILLES[jv.f].nom} validée : ${e.nom} gagne le titre « ${TITRE_FAMILLE[jv.f]} » !`};
     toast(FAMILLES[jv.f]?BADGES.find(b=>b.id==='f_'+(jv.f==='vaisseaux'?'vx':jv.f)).ic:'🏅',TITRE_FAMILLE[jv.f],`${e.av} ${e.nom}`);}
@@ -2319,9 +2303,10 @@ setInterval(majChrono,1000);
 /* ---------- Consignes ---------- */
 function renderConsignes(){const c=cfg(),P=c.poids;
   const ident=LMS?'Chaque étudiant ouvre l’activité avec son propre compte Moodle : la note est enregistrée à son nom.'
+    :PORTAIL?'Votre duo est reconnu automatiquement par le portail des ateliers : la note s’enregistre toute seule dans le portail, aucun enseignant n’a besoin de la saisir.'
     :'Choisissez ou créez votre binôme en haut de l’écran Évaluation avant de commencer.';
   return `<div class="cons"><div><div class="eyebrow">À lire avant de commencer</div><h2>Consignes du TP</h2></div>
-  <section><h3><span class="n">1</span>Jeu des 7 familles <span class="tag-ng">non noté · ${c.dureeJeu} min</span></h3>
+  ${PORTAIL?'':`<section><h3><span class="n">1</span>Jeu des 7 familles <span class="tag-ng">non noté · ${c.dureeJeu} min</span></h3>
     <ul>
       <li>Une tablette par table, 2 à 5 binômes. Onglet <b>Jeu</b> : entrez les noms, l’application distribue 6 cartes à chacun et lance le minuteur.</li>
       <li>À son tour, le binôme prend la tablette (les autres ne regardent pas), choisit une famille qu’il a en main, la carte qui lui manque et le binôme à qui il la demande.</li>
@@ -2331,26 +2316,26 @@ function renderConsignes(){const c=cfg(),P=c.poids;
       <li>Fin : 7 familles posées ou fin du minuteur. Le binôme qui a posé le plus de familles gagne. <b>Le jeu ne compte pas dans la note.</b></li>
     </ul>
     <button class="lien" data-aller="jeu">Aller au jeu</button>
-  </section>
+  </section>`}
   <section><h3><span class="n">★</span>Votre profil et vos statistiques</h3>
     <ul>
       <li>Touchez <b>votre avatar en haut de l’écran</b> pour ouvrir votre profil : choix de l’avatar, niveau et points d’expérience, badges gagnés et à débloquer, album des cartes collectionnées et résultats de l’évaluation.</li>
-      <li>${LMS?'Votre profil est lié à votre compte Moodle.':'Sur un appareil partagé, choisissez d’abord votre binôme (bouton « Choisir mon équipe »).'} L’expérience se gagne en identifiant des structures, en validant des familles et pendant l’évaluation.</li>
+      <li>${LMS?'Votre profil est lié à votre compte Moodle.':PORTAIL?'Votre profil est celui de votre duo : il garde les familles validées pendant le jeu.':'Sur un appareil partagé, choisissez d’abord votre binôme (bouton « Choisir mon équipe »).'} L’expérience se gagne en identifiant des structures, en validant des familles et pendant l’évaluation.</li>
       <li>Niveaux : Externe, Stagiaire, Interne, Anatomiste, Maître anatomiste, Légende de l’anatomie. Les badges et l’expérience ne comptent pas dans la note.</li>
     </ul>
     <button class="lien" data-aller="profil">Ouvrir mon profil</button>
   </section>
-  <section><h3><span class="n">2</span>S’entraîner</h3>
+  <section><h3><span class="n">${PORTAIL?1:2}</span>S’entraîner</h3>
     <ul><li>Touchez n’importe quelle zone d’un modèle pour savoir quelle structure s’y trouve. Rien n’est noté : profitez-en avant l’évaluation.</li>
       <li>Tournez le modèle en le faisant glisser, zoomez en pinçant ou avec la molette, masquez les calques qui gênent. Pour le cheval et le porc, « Entrer dans l’estomac » montre la muqueuse.</li></ul>
     <button class="lien" data-aller="explorer">Aller à l’onglet S’entraîner</button>
   </section>
-  <section><h3><span class="n">3</span>Évaluation finale <span class="tag-ng">notée sur ${f1(P.reperage+P.quiz)} · ${c.dureeEval} min</span></h3>
+  <section><h3><span class="n">${PORTAIL?2:3}</span>Évaluation finale <span class="tag-ng">notée sur ${f1(P.reperage+P.quiz)} · ${c.dureeEval} min</span></h3>
     <ul>
       <li>${ident}</li>
       <li><b>Repérage sur les modèles :</b> ${c.nbReperage} structures à toucher, réparties sur les espèces. Le modèle s’ouvre tout seul. Tournez-le, masquez des calques ou entrez dans l’estomac si besoin, puis touchez la structure <b>une seule fois</b>. La bonne réponse s’affiche en vert en cas d’erreur.</li>
       <li><b>Quiz :</b> ${c.nbQuestions} questions QCM et vrai/faux tirées au hasard dans le cours. Une seule réponse par question ; la correction et une explication s’affichent aussitôt.</li>
-      <li>Chacun sur son appareil, en même temps. Minuteur de ${c.dureeEval} minutes dès la première épreuve commencée : à la fin du temps, tout est enregistré, les questions sans réponse comptent zéro.</li>
+      <li>${PORTAIL?'Sur le téléphone du duo, juste après le jeu.':'Chacun sur son appareil, en même temps.'} Minuteur de ${c.dureeEval} minutes dès la première épreuve commencée : à la fin du temps, tout est enregistré, les questions sans réponse comptent zéro.</li>
       <li>Chaque épreuve ne peut être faite <b>qu’une fois</b>. Vous pouvez faire le repérage ou le quiz dans l’ordre que vous voulez. Si vous fermez la page, vous reprenez où vous en étiez.</li>
       <li>Les épreuves sont identiques pour tous les binômes et ne dépendent pas du jeu.</li>
     </ul>
@@ -2393,7 +2378,10 @@ document.getElementById('tab-notes').onclick=()=>setMode('notes');
 /* ---------- Démarrage ---------- */
 function loop(){requestAnimationFrame(loop);controls.update();sun.position.copy(camera.position);renderer.render(scene,camera);updateLabels();}
 async function boot(){
-  chargerEval();chargerPartie();S.mode='consignes';if(P&&P.phase==='validation'){P.phase='complete';sauverPartie();}
+  chargerEval();if(!PORTAIL)chargerPartie();S.mode=PORTAIL&&PORTAIL.embed?'attente':'consignes';
+  if(PORTAIL){document.getElementById('tab-jeu').hidden=true;document.body.dataset.portail='1';
+    if(PORTAIL.embed)document.body.dataset.jeuval=document.body.dataset.embed='1';
+    else{const r=document.getElementById('portail-retour');r.hidden=false;r.onclick=()=>{try{if(document.referrer&&new URL(document.referrer).origin===location.origin&&history.length>1){history.back();return;}}catch(e){}location.href='../';};}}if(P&&P.phase==='validation'){P.phase='complete';sauverPartie();}
   for(const [id,mm] of [['tab-consignes','consignes'],['tab-jeu','jeu'],['tab-quiz','quiz']])document.getElementById(id).setAttribute('aria-selected',String(mm===S.mode));
   if(bin())S.binome=bin().nom;document.body.dataset.mode=S.mode;
   resize();loop();renderSpecies();renderPanel();
@@ -2401,7 +2389,8 @@ async function boot(){
   try{const r=await fetch('data/reperes.json',{cache:'no-store',credentials:'include'});if(r.ok){const d=await r.json();if(d&&typeof d==='object')S.reperes=d;}}catch(e){}
   try{const d=sessionStorage.getItem('reperes-brouillon');if(d){S.reperes=JSON.parse(d);S.dirty=true;S.saveMsg='Brouillon non enregistré récupéré.';}}catch(e){}
   renderPanel();loadEspece(S.espece);
-  if(window.claude&&window.claude.use){
+  if(PORTAIL&&PORTAIL.embed){try{parent.postMessage({tp3:'pret'},'*');}catch(e){}}
+  if(!PORTAIL&&window.claude&&window.claude.use){
     window.claude.use('user').then(async u=>{
       const can=u?await u.canEdit():false;S.canEdit=!!can;
       document.getElementById('tab-prof').hidden=!can;document.getElementById('tab-notes').hidden=!can;
@@ -2413,4 +2402,30 @@ async function boot(){
 boot();
 </script>
 
-</body></html>
+<script>/* Envoi direct des notes de l'atelier 3 au serveur (repris de la version du portail de l'équipe) */
+(function(){
+  var q=new URLSearchParams(location.search), duos=null;
+  if(q.get("embed")==="1")return;
+  try{duos=JSON.parse(q.get("duos")||"null")}catch(e){}
+  if(!duos||!duos.length)return;
+  var K="tp-digestif-eval-v1";
+  /* envoi direct des notes au serveur, sans attendre le retour sur le portail (téléphone éteint, oubli…) */
+  if(duos){var FILE="a3fileEnvoi",envoyes={};
+    function noteDe(b){if(!b||!b.reperage||!b.reperage.total||!b.quiz||b.quiz.score==null||!b.quiz.total)return null;return Math.round((b.reperage.score/b.reperage.total*10+b.quiz.score/b.quiz.total*10)*10)/10}
+    function file(){try{return JSON.parse(localStorage.getItem(FILE)||"[]")}catch(e){return []}}
+    function poser(l){try{localStorage.setItem(FILE,JSON.stringify(l))}catch(e){}}
+    function preparer(){var d;try{d=JSON.parse(localStorage.getItem(K)||"null")}catch(e){}if(!d||!d.binomes)return;var l=file(),ids=duos.map(function(x){return x.id});
+      Object.keys(d.binomes).forEach(function(id){if(ids.indexOf(id)<0)return;var b=d.binomes[id];
+        var prog={reperage:b.reperage&&b.reperage.total?{score:b.reperage.score,total:b.reperage.total}:null,quiz:b.quiz&&b.quiz.total&&b.quiz.score!=null?{score:b.quiz.score,total:b.quiz.total}:null};
+        var cle=JSON.stringify(prog);if(envoyes[id]===cle||(!prog.reperage&&!prog.quiz))return;envoyes[id]=cle;
+        l=l.filter(function(x){return x.id!==id});l.push({id:id,prog:prog,note:noteDe(b),t:Date.now()})});poser(l)}
+    var dbP=null;function base(){if(!dbP)dbP=(window.claude&&window.claude.use?window.claude.use("db"):Promise.resolve(null)).catch(function(){return null});return dbP}
+    function vider(){var l=file();if(!l.length)return;base().then(function(db){if(!db)return;l.forEach(function(x){
+      var p=[db.collection("a3prog").doc(x.id).set({reperage:x.prog.reperage,quiz:x.prog.quiz,maj:x.t})];
+      if(x.note!=null)p.push(db.collection("notes_a3").doc(x.id).set({note:x.note,reperage:x.prog.reperage,quiz:x.prog.quiz,maj:x.t,direct:1}));
+      Promise.all(p).then(function(){poser(file().filter(function(y){return !(y.id===x.id&&y.t===x.t)}))}).catch(function(){})})})}
+    var orig=Storage.prototype.setItem;Storage.prototype.setItem=function(k,v){orig.apply(this,arguments);if(k===K)setTimeout(function(){preparer();vider()},50)};
+    setInterval(function(){preparer();vider()},15000);window.addEventListener("online",vider);setTimeout(vider,2000)}
+})();</script>
+</body>
+</html>
