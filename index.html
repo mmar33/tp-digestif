@@ -1634,6 +1634,7 @@ function vProf(){
   const sous=SOUS_AT[ongletProf]?`<div class="sousnav">${SOUS_AT[ongletProf].map(([x,l])=>`<button data-sousat="${x}" aria-pressed="${sousAt[ongletProf]===x}">${l}</button>`).join("")}</div>`:ongletProf==="a2"?`<div class="sousnav">${[["notes","Notes"],["synthese","Synthèse"],["corrige","Corrigés des planches"],["questions","Questions"],["test","Essayer une planche"]].map(([x,l])=>`<button data-sous="${x}" aria-pressed="${sousA2===x}">${l}</button>`).join("")}</div>`:"";
   return `<div style="display:grid;gap:18px;padding-top:20px">
    <div class="row" style="justify-content:space-between"><h2 style="font-size:34px">Espace encadrants</h2><button class="btn ghost" id="retour">Retour à l'accueil</button></div>
+   ${bandeauTirage()}
    <button class="testbig" id="testEtudiant">${ico("main")}<span><b>Tester les ateliers comme un étudiant</b><span>Un groupe fictif, sur cette tablette. Rien n'est enregistré ni compté.</span></span></button>
    <div class="tabs nav4">${[["seance","Suivi de la séance"],["a1","Atelier 1 · maquettes"],["a2","Atelier 2 · duel"],["a3","Atelier 3 · 7 familles"],["a4","Atelier 4 · enquête"],["a5","Atelier 5 · défi foie"],["a6","Atelier 6 · rumen"],["reglages","Réglages et QR code"]].filter(([x])=>!/^a\d$/.test(x)||atelierActif(x)).map(([x,l])=>`<button data-tab="${x}" aria-pressed="${ongletProf===x}">${l}</button>`).join("")}</div>
    ${sous}${corps}</div>`;
@@ -3527,7 +3528,7 @@ setInterval(archiverGroupe,30000);
    VERSION 4 : groupes tirés au sort par l'application (mixtes filles/garçons),
    sous-groupes de chaque atelier faits d'avance, ateliers de ~30 min, atelier 5 « Défi foie »
    ========================================================= */
-ATELIERS[4]={id:"a5",n:5,titre:"Défi foie",sous:"Anatomie comparée du foie : puzzles par espèce, correction croisée et quiz",par:"",ic:"etoile"};
+ATELIERS[4]={id:"a5",n:5,titre:"Défi foie",sous:"Anatomie comparée du foie : puzzles par espèce, correction croisée et quiz",parpar:"Rohan Mansuit",ic:"etoile"};
 if(!AVEC_CONTENU.includes("a5"))AVEC_CONTENU.push("a5");
 BESOIN.a5={type:"duos",titre:"5 binômes"};
 BESOIN.a4={type:"equipes",n:2,titre:"2 équipes de 5"};
@@ -3709,6 +3710,12 @@ function start(){
   if(c){const go=()=>{if(db)rejoindre(c.id,c.equipe);else if(dbEtat==="attente")setTimeout(go,500)};setTimeout(go,300)}
 }
 start();
+
+/* bandeau en haut de l'espace encadrants tant que le tirage n'est pas lancé */
+function bandeauTirage(){const sid=profSeance||seanceSel,s=seances[sid];if(!s||!tirageManuel(s))return "";const p=phaseSeance(sid);if(p.phase!=="inscription")return "";
+  const n=new Set(bandes.filter(b=>b.seance===sid).flatMap(b=>b.membres)).size;
+  return `<div class="card" style="border:3px solid var(--pen,#c62828);display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between"><div><b style="font-size:20px">À faire : lancer le tirage au sort</b><p class="note" style="margin:4px 0 0">${esc(s.nom)} · <b>${n}</b> étudiant${n>1?"s":""} présent${n>1?"s":""} sur ${(s.etudiants||[]).length}. Lancez-le quand tout le monde a choisi son nom.</p></div><button class="btn pen gros" id="lancerTirageHaut" ${n?"":"disabled"}>Lancer le tirage</button></div>`}
+document.addEventListener("click",e=>{if(e.target.closest&&e.target.closest("#lancerTirageHaut")){ongletProf="seance";rendre();setTimeout(()=>{const b=document.querySelector("#lancerTirage");if(b)b.click()},50)}});
 </script>
 
 <script>if("serviceWorker" in navigator)window.addEventListener("load",()=>navigator.serviceWorker.register("sw.js").catch(()=>{}));</script>
