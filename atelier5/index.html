@@ -1,6 +1,148 @@
 <!DOCTYPE html>
 <html lang="fr">
 <head><script src="../firebase-config.js"></script><script src="../vendor/firebase-app-compat.js"></script><script src="../vendor/firebase-firestore-compat.js"></script><script src="../adapter.js"></script>
+<script>
+/* Mode local : remplace les services claude.ai (db, user, downloads) quand l'application
+   est ouverte hors de claude.ai (fichier, Moodle, serveur web). Les données sont enregistrées
+   dans le navigateur de l'appareil (localStorage) et partagées entre les pages et onglets
+   du même site, mais pas entre appareils. Sur claude.ai, ce module ne fait rien. */
+(function(){
+  if ((window.claude && window.claude.use) || window.APP_CONFIG) return;
+  var P = "cl-db:", L = "cl-lease:";
+  var ls = (function(){ try{ var k="__cl_t"; localStorage.setItem(k,"1"); localStorage.removeItem(k); return localStorage; }catch(e){ return null; } })();
+  var mem = {};
+  function sget(k){ if(ls){ try{ return ls.getItem(k); }catch(e){} } return Object.prototype.hasOwnProperty.call(mem,k) ? mem[k] : null; }
+  function sset(k,v){ if(ls){ try{ ls.setItem(k,v); return; }catch(e){} } mem[k]=v; }
+  function sdel(k){ if(ls){ try{ ls.removeItem(k); }catch(e){} } delete mem[k]; }
+  function skeys(){ var out=[]; if(ls){ try{ for(var i=0;i<ls.length;i++) out.push(ls.key(i)); }catch(e){} } for(var k in mem) if(out.indexOf(k)<0) out.push(k); return out; }
+
+  function clone(v){ return v===undefined ? undefined : JSON.parse(JSON.stringify(v)); }
+  function deepFreeze(o){ if(o && typeof o==="object"){ Object.freeze(o); Object.keys(o).forEach(function(k){ deepFreeze(o[k]); }); } return o; }
+  function segs(p){ return String(p).replace(/^\/+|\/+$/g,"").split("/").filter(Boolean); }
+  function err(code,msg){ var e=new Error(msg||code); e.code=code; return e; }
+  function readDoc(path){ var r=sget(P+path); if(!r) return null; try{ return JSON.parse(r); }catch(e){ return null; } }
+  function writeDoc(path,data,v){ sset(P+path, JSON.stringify({data:data, v:v})); notify(); }
+  function autoId(){ var c="ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789", s=""; for(var i=0;i<20;i++) s+=c[Math.floor(Math.random()*c.length)]; return s; }
+  function mergeDeep(a,b){ var out=clone(a)||{}; Object.keys(b).forEach(function(k){ var bv=b[k];
+    if(bv && typeof bv==="object" && !Array.isArray(bv) && out[k] && typeof out[k]==="object" && !Array.isArray(out[k])) out[k]=mergeDeep(out[k],bv);
+    else out[k]=clone(bv); }); return out; }
+  function getField(o,f){ return String(f).split(".").reduce(function(x,k){ return x==null?undefined:x[k]; }, o); }
+  function cmp(a,b){ if(a===b) return 0; if(a===undefined||a===null) return -1; if(b===undefined||b===null) return 1; return a<b?-1:a>b?1:0; }
+  function test(v,op,x){
+    switch(op){
+      case "==": case "eq": return JSON.stringify(v)===JSON.stringify(x);
+      case "!=": case "ne": return JSON.stringify(v)!==JSON.stringify(x);
+      case "<": case "lt": return v!==undefined && cmp(v,x)<0;
+      case "<=": case "lte": return v!==undefined && cmp(v,x)<=0;
+      case ">": case "gt": return v!==undefined && cmp(v,x)>0;
+      case ">=": case "gte": return v!==undefined && cmp(v,x)>=0;
+      case "in": return Array.isArray(x) && x.some(function(y){ return JSON.stringify(y)===JSON.stringify(v); });
+      case "not-in": return Array.isArray(x) && !x.some(function(y){ return JSON.stringify(y)===JSON.stringify(v); });
+      case "array-contains": return Array.isArray(v) && v.some(function(y){ return JSON.stringify(y)===JSON.stringify(x); });
+      case "array-contains-any": return Array.isArray(v) && Array.isArray(x) && v.some(function(y){ return x.some(function(z){ return JSON.stringify(y)===JSON.stringify(z); }); });
+    }
+    return false;
+  }
+  var META={fromCache:false, hasPendingWrites:false};
+  function docSnap(path){ var id=segs(path).pop(), r=readDoc(path), d=r?deepFreeze(clone(r.data)):undefined;
+    return {id:id, exists:!!r, data:function(){ return d; }, metadata:META, _v:r?r.v:0}; }
+
+  /* ---- abonnements ---- */
+  var subs=[];
+  var pending=false;
+  function notify(){ if(pending) return; pending=true; setTimeout(function(){ pending=false; subs.slice().forEach(function(s){ try{ s.check(); }catch(e){} }); },0); }
+  window.addEventListener("storage", function(e){ if(!e.key || e.key.indexOf(P)===0) notify(); });
+
+  function docRef(path){
+    var sg=segs(path); if(sg.length%2!==0) throw err("invalid_argument","Chemin de document invalide : "+path);
+    path=sg.join("/");
+    var ref={ id:sg[sg.length-1], path:path,
+      get:function(){ return Promise.resolve(docSnap(path)); },
+      set:function(data){ var r=readDoc(path); writeDoc(path, clone(data)||{}, (r?r.v:0)+1); return Promise.resolve(); },
+      update:function(data){ var r=readDoc(path); if(!r) return Promise.reject(err("invalid_argument","Document absent : "+path)); writeDoc(path, mergeDeep(r.data,data||{}), r.v+1); return Promise.resolve(); },
+      delete:function(){ sdel(P+path); sdel(L+path); notify(); return Promise.resolve(); },
+      collection:function(p){ return colRef(path+"/"+p); },
+      acquire:function(o){ o=o||{}; var ttl=Math.min(600000,Math.max(1000,o.ttlMs||30000)), now=Date.now(), cur=null;
+        try{ cur=JSON.parse(sget(L+path)||"null"); }catch(e){}
+        if(cur && cur.exp>now && cur.holder!==o.holder) return Promise.resolve({acquired:false, expiresAt:new Date(cur.exp).toISOString()});
+        var exp=now+ttl; sset(L+path, JSON.stringify({holder:o.holder, exp:exp}));
+        var r=readDoc(path), v=(r?r.v:0)+1; writeDoc(path, mergeDeep(r?r.data:{}, o.data||{}), v);
+        return Promise.resolve({acquired:true, version:v, expiresAt:new Date(exp).toISOString(), holder:o.holder}); },
+      release:function(o){ var cur=null; try{ cur=JSON.parse(sget(L+path)||"null"); }catch(e){} if(cur && (!o||!o.holder||cur.holder===o.holder)) sdel(L+path); return Promise.resolve(); },
+      onSnapshot:function(next, error){ if(typeof next==="object" && next && next.next){ error=next.error; next=next.next; }
+        var last=null, alive=true;
+        var s={check:function(){ if(!alive) return; var sn=docSnap(path), sig=sn.exists?sn._v+":"+JSON.stringify(sn.data()):"absent"; if(sig===last) return; last=sig; try{ next(sn); }catch(e){ if(error) error(e); } }};
+        subs.push(s); setTimeout(s.check,0);
+        return function(){ alive=false; subs=subs.filter(function(x){ return x!==s; }); }; }
+    };
+    return ref;
+  }
+
+  function colRef(path, q){
+    var sg=segs(path); if(sg.length%2!==1) throw err("invalid_argument","Chemin de collection invalide : "+path);
+    path=sg.join("/"); q=q||{w:[], o:[], l:0};
+    function run(){
+      var pre=P+path+"/", docs=[];
+      skeys().forEach(function(k){ if(k.indexOf(pre)!==0) return; var rest=k.slice(pre.length); if(!rest || rest.indexOf("/")>=0) return; docs.push(docSnap(path+"/"+rest)); });
+      docs=docs.filter(function(d){ return d.exists && q.w.every(function(c){ return test(getField(d.data(),c[0]),c[1],c[2]); }); });
+      if(q.o.length) docs.sort(function(a,b){ for(var i=0;i<q.o.length;i++){ var c=cmp(getField(a.data(),q.o[i][0]),getField(b.data(),q.o[i][0])); if(c) return q.o[i][1]==="desc"?-c:c; } return 0; });
+      else docs.sort(function(a,b){ return a.id<b.id?-1:a.id>b.id?1:0; });
+      if(q.l) docs=docs.slice(0,q.l);
+      return docs;
+    }
+    function qsnap(docs, prev){
+      var changes=docs.map(function(d,i){ var old=prev?prev.findIndex(function(p){ return p.id===d.id; }):-1; return {type:old<0?"added":"modified", doc:d, oldIndex:old, newIndex:i}; });
+      if(prev) prev.forEach(function(p,i){ if(!docs.some(function(d){ return d.id===p.id; })) changes.push({type:"removed", doc:p, oldIndex:i, newIndex:-1}); });
+      return {docs:docs, size:docs.length, empty:!docs.length, docChanges:function(){ return changes; }, metadata:META, forEach:function(f){ docs.forEach(f); }};
+    }
+    var ref={ id:sg[sg.length-1], path:path,
+      doc:function(id){ return docRef(path+"/"+(id||autoId())); },
+      add:function(data){ var d=docRef(path+"/"+autoId()); return d.set(data).then(function(){ return d; }); },
+      where:function(f,op,v){ return colRef(path,{w:q.w.concat([[f,op,v]]), o:q.o, l:q.l}); },
+      orderBy:function(f,dir){ return colRef(path,{w:q.w, o:q.o.concat([[f,dir||"asc"]]), l:q.l}); },
+      limit:function(n){ return colRef(path,{w:q.w, o:q.o, l:n}); },
+      get:function(){ return Promise.resolve(qsnap(run(),null)); },
+      onSnapshot:function(next, error){ if(typeof next==="object" && next && next.next){ error=next.error; next=next.next; }
+        var lastSig=null, lastDocs=null, alive=true;
+        var s={check:function(){ if(!alive) return; var docs=run(), sig=JSON.stringify(docs.map(function(d){ return [d.id,d._v,d.data()]; })); if(sig===lastSig) return;
+          var sn=qsnap(docs,lastDocs); lastSig=sig; lastDocs=docs; try{ next(sn); }catch(e){ if(error) error(e); } }};
+        subs.push(s); setTimeout(s.check,0);
+        return function(){ alive=false; subs=subs.filter(function(x){ return x!==s; }); }; }
+    };
+    return ref;
+  }
+
+  var db={ doc:function(p){ return docRef(p); }, collection:function(p){ return colRef(p); } };
+
+  /* ---- identité de l'appareil ---- */
+  var uid=sget("cl-user-id"); if(!uid){ uid="local-"+autoId().slice(0,12); sset("cl-user-id",uid); }
+  try{ var qs=new URLSearchParams(location.search); if(qs.get("enseignant")==="1") sset("cl-enseignant","1"); if(qs.get("enseignant")==="0") sdel("cl-enseignant"); }catch(e){}
+  function teacher(){ return sget("cl-enseignant")==="1"; }
+  var user={ id:function(){ return Promise.resolve(uid); },
+    me:function(){ return Promise.resolve({id:uid, email:null, name:"", isMe:true, isOwner:teacher(), canEdit:teacher()}); },
+    canEdit:function(){ return Promise.resolve(teacher()); },
+    isOwner:function(){ return Promise.resolve(teacher()); },
+    can:function(){ return Promise.resolve(teacher()); },
+    profiles:function(ids){ var o={}; (ids||[]).forEach(function(i){ o[i]={id:i, name:"", email:null, isMe:i===uid}; }); return Promise.resolve(o); } };
+
+  /* ---- téléchargements ---- */
+  var downloads={ save:function(req){ try{
+      var d=req.data, blob = d instanceof Blob ? d : new Blob([d], {type:req.mimeType||"application/octet-stream"});
+      var a=document.createElement("a"); a.href=URL.createObjectURL(blob); a.download=req.filename||"fichier";
+      document.body.appendChild(a); a.click(); setTimeout(function(){ URL.revokeObjectURL(a.href); a.remove(); },1500);
+      return Promise.resolve({saved:true, filename:a.download});
+    }catch(e){ return Promise.reject(err("failed", String(e))); } } };
+
+  window.claude={ local:true, use:function(name){
+    if(name==="db") return Promise.resolve(db);
+    if(name==="user") return Promise.resolve(user);
+    if(name==="downloads") return Promise.resolve(downloads);
+    return Promise.resolve(null); /* assets, artifact, sample… : indisponibles hors claude.ai */
+  } };
+})();
+
+</script>
+
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Défi foie – anatomie comparée</title>
@@ -155,6 +297,33 @@ body.has-mini main{padding-top:3.6rem}
 #corr .corr-next{display:block;width:100%;margin-top:1rem;border-color:var(--liver);color:var(--liver);font-weight:700;padding:.7rem 1rem}
 
 .corr-notice{background:#E7EEF6;color:#1E2621;border-left:4px solid #2F5D8A;border-radius:8px;padding:.6rem .8rem;margin:0 0 .8rem}
+
+body:not(.enc) .enc-only{display:none!important}
+#stepBar{position:fixed;top:0;left:0;right:0;z-index:30;background:var(--surface);border-bottom:1px solid var(--line);padding:calc(env(safe-area-inset-top,0px) + .45rem) 1rem .45rem;box-shadow:0 2px 8px rgba(0,0,0,.08)}
+#stepBar .sb-in{max-width:46rem;margin:0 auto;display:flex;justify-content:space-between;align-items:center;gap:.8rem}
+#stepBar #sbStep{font-weight:700;line-height:1.25}
+#stepBar #sbTime{font-variant-numeric:tabular-nums;color:var(--liver);font-weight:700}
+#stepBar #sbTime.warn{color:var(--ko)}
+#stepBar #sbNext{white-space:nowrap;text-align:center}
+body.has-mini main{padding-top:5rem}
+.enc-toggle{font:inherit;background:none;border:0;color:var(--muted);text-decoration:underline;cursor:pointer;min-height:2.4rem}
+
+#swapOverlay{position:fixed;inset:0;z-index:50;background:rgba(20,25,23,.72);display:flex;align-items:center;justify-content:center;padding:1rem}
+#swapOverlay.hidden{display:none}
+#swapOverlay .sw-box{background:var(--surface);color:var(--ink);border-radius:16px;max-width:30rem;width:100%;padding:1.4rem 1.3rem;box-shadow:0 10px 30px rgba(0,0,0,.3)}
+#swapOverlay .sw-icon{font-size:2.6rem;line-height:1;margin:0;text-align:center;color:var(--liver)}
+#swapOverlay .sw-title{font-family:Spectral,Georgia,serif;font-size:1.6rem;font-weight:700;text-align:center;margin:.3rem 0 .6rem}
+#swapOverlay ol{padding-left:1.3rem}
+#swapOverlay #swOk{width:100%;margin-top:.8rem;text-align:center}
+#finalNote .fn-title{font-family:Spectral,Georgia,serif;font-size:1.3rem;margin:0}
+#finalNote .fn-note{font-family:Spectral,Georgia,serif;font-size:3.6rem;color:var(--liver);line-height:1;margin:.3rem 0}
+.grid-intro{display:grid;grid-template-columns:repeat(auto-fit,minmax(12rem,1fr));gap:.6rem}
+.intro-in{font:inherit;width:100%;padding:.65rem;border-radius:10px;border:1px solid var(--line);background:var(--surface);color:var(--ink)}
+#chrono .ctrl{display:none!important}
+.enc-link{font:inherit;background:none;border:0;color:var(--muted);text-decoration:underline;cursor:pointer;min-height:2.4rem}
+#again{display:none!important}
+body.enc .auto-val{display:none}
+.auto-val{align-self:center;font-size:.9rem}
 </style>
 </head>
 <body>
@@ -192,11 +361,11 @@ body.has-mini main{padding-top:3.6rem}
       <p id="verdict"></p>
       <div id="missedWrap"></div>
     </div>
-    <button class="primary" id="again">Rejouer</button>
+    <button class="primary" id="again">Rejouer une partie</button>
   </section>
 </main>
 <main id="chrono" class="hidden">
-  <button id="chronoBack">← Retour à l’accueil</button>
+  <button id="chronoBack" class="enc-only">← Retour à l’accueil</button>
   <h2 style="margin-top:1rem">Chrono de l’atelier</h2>
   <p class="muted" id="chronoStepNum"></p>
   <p class="step-name" id="chronoStep"></p>
@@ -208,25 +377,35 @@ body.has-mini main{padding-top:3.6rem}
       <li>L’atelier se fait en <strong>3 manches</strong> : deux manches « puzzle », puis une manche « Défi foie » sous forme de quiz.</li>
       <li><strong>Puzzle</strong> : placez sur le contour les pièces des structures présentes chez l’espèce de votre poste, et mettez de côté celles qui n’existent pas chez elle.</li>
       <li><strong>Entre les puzzles</strong>, votre puzzle est corrigé par un autre binôme, et vous corrigez celui d’un autre binôme. Votre puzzle 2 se fera ensuite sur l’animal suivant.</li>
-      <li><strong>Défi foie</strong> : il se lance tout seul sur la tablette. À la fin, chaque binôme reporte le score du binôme qu’il corrige.</li>
+      <li><strong>Défi foie</strong> : il se lance tout seul sur votre tablette. Le score est pris en compte automatiquement : pas d’échange de tablettes pour cette manche.</li>
       <li>Chaque binôme obtient une <strong>note sur 20</strong>. L’application vous guide à chaque étape : suivez les consignes affichées.</li>
     </ol>
+    <label for="teamIntro" style="font-weight:700;display:block;margin-top:.6rem">Nom de votre binôme</label>
+    <input id="teamIntro" type="text" autocomplete="off" placeholder="Ex. Binôme 3" style="font:inherit;width:100%;padding:.65rem;border-radius:10px;border:1px solid var(--line);background:var(--surface);color:var(--ink)">
+    <div class="grid-intro">
+      <div><label for="stu1Intro" style="font-weight:700;display:block;margin-top:.6rem">Étudiant 1</label><input id="stu1Intro" type="text" autocomplete="off" placeholder="Nom Prénom" class="intro-in"></div>
+      <div><label for="stu2Intro" style="font-weight:700;display:block;margin-top:.6rem">Étudiant 2</label><input id="stu2Intro" type="text" autocomplete="off" placeholder="Nom Prénom" class="intro-in"></div>
+    </div>
+    <p class="muted" style="margin:.5rem 0 0">Cette tablette reste celle de votre binôme : aux étapes de correction, vous la prêterez au binôme qui vous corrige.</p>
   </div>
   <div class="big" id="chronoBig" aria-live="off">00:00</div>
   <p class="total" id="chronoTotal"></p>
   <div class="progress"><span id="chronoBar" style="width:0%"></span></div>
-  <div class="ctrl">
+  <div class="ctrl enc-only">
     <button class="primary" id="chronoStart">Démarrer</button>
     <button id="chronoPrev">Étape précédente</button>
     <button id="chronoNext">Étape suivante</button>
     <button id="chronoReset">Réinitialiser</button>
   </div>
   <div class="card"><ol class="steps" id="chronoList"></ol></div>
+  <p style="text-align:center;margin-top:1.2rem"><button id="restartBtn" class="enc-link enc-only">Recommencer l’atelier pour un nouveau groupe</button></p>
+  <p style="text-align:center;margin-top:.2rem"><button id="encBtn" class="enc-toggle">Espace encadrant</button></p>
   <p class="muted" style="margin-top:.8rem">Un signal sonore retentit à chaque changement d’étape. Le petit chrono en haut de l’écran reste visible pendant le jeu et la correction ; touchez-le pour revenir ici.</p>
 </main>
+<div id="stepBar" class="hidden" role="region" aria-label="Étape en cours"><div class="sb-in"><div class="sb-txt"><div id="sbStep"></div><div id="sbTime"></div></div><button id="sbNext" class="primary">Étape terminée →</button></div></div>
 <button id="miniChrono" class="hidden" aria-label="Ouvrir le chrono de l’atelier"></button>
 <main id="corr" class="hidden">
-  <button id="corrBack">← Retour à l’accueil</button>
+  <button id="corrBack" class="enc-only">← Retour à l’accueil</button>
 
   <h1>Fiche de correction</h1>
   <p>Atelier d’anatomie comparée du foie. Pour chaque élément, comparez avec le corrigé affiché en gris, puis touchez <strong>Bon</strong> ou <strong>Pas bon</strong>. La note sur 20 se calcule toute seule.</p>
@@ -280,62 +459,23 @@ body.has-mini main{padding-top:3.6rem}
     <div class="table-wrap"><table><thead><tr><th>Binôme</th><th>Étudiants</th><th>Puzzle 1</th><th>Puzzle 2</th><th>Défi</th><th>Note /20</th></tr></thead><tbody id="recap"></tbody></table></div>
     <p class="muted" id="syncInfo">Vérification du registre commun…</p>
     <p class="msg" id="msg" aria-live="polite"></p>
-    <div class="seg" style="flex-wrap:wrap"><button id="exportCsv" class="primary">Télécharger les notes (CSV)</button><button id="copy">Copier le récapitulatif</button><button id="clear">Effacer la séance</button></div>
+    <div class="seg" style="flex-wrap:wrap"><button id="exportCsv" class="primary">Télécharger les notes (CSV)</button><button id="copy">Copier le récapitulatif</button><button id="clear" class="enc-only">Effacer la séance</button></div>
     <div id="allNotes" class="hidden" style="margin-top:1.4rem;border-top:1px solid var(--line);padding-top:1rem">
       <h2>Toutes les notes (registre commun)</h2>
       <p class="muted">Visible uniquement par vous et les éditeurs de l’application : toutes les fiches validées, quelle que soit la tablette.</p>
       <p id="allCount" class="muted"></p>
       <div class="table-wrap"><table><thead><tr><th>Date</th><th>Binôme</th><th>Étudiants</th><th>Correcteur</th><th>Puzzle 1</th><th>Puzzle 2</th><th>Défi</th><th>Note /20</th></tr></thead><tbody id="allBody"></tbody></table></div>
-      <div class="seg" style="flex-wrap:wrap;margin-top:.6rem"><button id="allExport" class="primary">Télécharger toutes les notes (CSV)</button><button id="allClear">Vider le registre</button></div>
+      <div class="seg" style="flex-wrap:wrap;margin-top:.6rem"><button id="allExport" class="primary">Télécharger toutes les notes (CSV)</button><button id="allClear" class="enc-only">Vider le registre</button></div>
       <p class="msg" id="allMsg" aria-live="polite"></p>
     </div>
   </section>
 </main>
 <div id="corrBar" class="hidden"><div class="bar"><div class="bar-in">
   <div><div class="note" id="note">0 / 20</div><div class="left" id="left"></div></div>
-  <div class="seg" style="margin:0"><button id="reset">Nouvelle fiche</button><button class="primary" id="save">Valider la fiche</button></div>
+  <div class="seg" style="margin:0"><span class="muted auto-val">Validation automatique à la fin du défi</span><button id="reset" class="enc-only">Nouvelle fiche</button><button class="primary enc-only" id="save">Valider la fiche</button></div>
 </div></div>
 
 </div>
-
-<script>/* Pont avec le portail des ateliers : binômes imposés, correction croisée préremplie, notes envoyées au portail */
-(function(){
-  var q=new URLSearchParams(location.search), duos=null, moi=q.get("duo")||"";
-  try{duos=JSON.parse(q.get("duos")||"null")}catch(e){}
-  if(duos&&duos.length){try{sessionStorage.setItem("a5duos",JSON.stringify(duos));sessionStorage.setItem("a5moi",moi)}catch(e){}}
-  else{try{duos=JSON.parse(sessionStorage.getItem("a5duos")||"null");moi=moi||sessionStorage.getItem("a5moi")||""}catch(e){}}
-  window.__A5={duos:duos,moi:moi};
-  var K="correction-foie-recap", FILE="a5envoi";
-  function moiDuo(){return duos?duos.filter(function(d){return d.id===moi})[0]:null}
-  function cible(){if(!duos||!moi)return null;var i=duos.map(function(d){return d.id}).indexOf(moi);return i<0?null:duos[(i+1)%duos.length]}
-  function trouver(nom){if(!duos||!nom)return null;var n=String(nom).toLowerCase().trim();
-    var d=duos.filter(function(x){return x.nom.toLowerCase()===n})[0];if(d)return d;
-    var m=n.match(/\d+/);if(m)d=duos.filter(function(x){return String(x.nom.match(/\d+/))===m[0]})[0];return d||null}
-  function file(){try{return JSON.parse(localStorage.getItem(FILE)||"[]")}catch(e){return []}}
-  function poser(l){try{orig.call(localStorage,FILE,JSON.stringify(l))}catch(e){}}
-  var dbP=null;function base(){if(!dbP)dbP=(window.claude&&window.claude.use?window.claude.use("db"):Promise.resolve(null)).catch(function(){return null});return dbP}
-  function vider(){var l=file().filter(function(x){return !x.ok});if(!l.length)return;base().then(function(db){if(!db)return;l.forEach(function(x){
-    db.collection("notes_a5").doc(x.id).set({note:x.note,a:x.a,b:x.b,c:x.c,correcteur:x.correcteur||"",maj:x.t}).then(function(){var f=file();f.forEach(function(y){if(y.id===x.id&&y.t===x.t)y.ok=1});poser(f)}).catch(function(){})})})}
-  var orig=Storage.prototype.setItem;
-  Storage.prototype.setItem=function(k,v){orig.apply(this,arguments);if(k!==K||!duos)return;
-    try{var list=JSON.parse(v||"[]"),r=list[list.length-1];if(!r)return;var d=trouver(r.noted);if(!d)return;
-      var f=file().filter(function(x){return x.id!==d.id});f.push({id:d.id,note:r.total,a:r.a,b:r.b,c:r.c,correcteur:r.corrector||"",t:Date.now()});poser(f);setTimeout(vider,50)}catch(e){}};
-  setInterval(vider,15000);window.addEventListener("online",vider);setTimeout(vider,2000);
-  document.addEventListener("DOMContentLoaded",function(){
-    var b=document.createElement("a");b.href="../index.html";b.textContent="← Retour aux ateliers";
-    b.setAttribute("style","position:fixed;left:10px;bottom:10px;z-index:9999;background:#2f7a4a;color:#fff;padding:10px 14px;border-radius:12px;font:600 15px system-ui,sans-serif;text-decoration:none;box-shadow:0 4px 12px rgba(0,0,0,.25)");
-    document.body.appendChild(b);
-    if(!duos)return;
-    var md=moiDuo(),c=cible(),$=function(i){return document.getElementById(i)};
-    if(md&&$("team")&&!$("team").value)$("team").value=md.nom+(md.noms?" ("+md.noms.join(", ")+")":"");
-    function remplir(){if(!c||!md)return;var set=function(i,v){var e=$(i);if(e&&!e.value){e.value=v;e.dispatchEvent(new Event("input",{bubbles:true}))}};
-      set("noted",c.nom);set("corrector",md.nom);set("stu1",(c.noms||[])[0]||"");set("stu2",(c.noms||[]).slice(1).join(", "))}
-    remplir();setInterval(remplir,1500);
-    if(md&&c){var p=document.createElement("p");p.className="corr-notice";p.innerHTML="<strong>Vous êtes le "+md.nom+"</strong> ("+(md.noms||[]).join(", ")+"). Vous corrigez le <strong>"+c.nom+"</strong> ("+(c.noms||[]).join(", ")+"). La note part toute seule au portail quand vous validez la fiche.";
-      var corr=$("corr");if(corr)corr.insertBefore(p,corr.children[2]||null);
-      var st=$("start");if(st){var p2=p.cloneNode(true);st.insertBefore(p2,st.children[2]||null)}}
-  });
-})();</script>
 
 <script>
 (function(){
@@ -459,6 +599,7 @@ body.has-mini main{padding-top:3.6rem}
 
   var $ = function(id){return document.getElementById(id)};
   var state;
+  window.__gameState=function(){ if(!state || !state.rounds) return null; var r2=state.rounds[1]; return {score:state.score, done:state.done, total:state.total}; };
 
   function buildRounds(){
     var pairs=[]; SPECIES_IMG.forEach(function(sp){ sp.parts.forEach(function(p){ pairs.push({sp:sp,p:p}); }); });
@@ -586,7 +727,11 @@ body.has-mini main{padding-top:3.6rem}
     $("game").classList.add("hidden"); $("end").classList.remove("hidden");
     $("endTitle").textContent = state.team ? "Résultat de "+state.team : "Résultat";
     $("finalScore").textContent = state.score+" / "+state.total;
-    $("pts12").textContent = "Points à reporter sur la fiche de correction (épreuve C) : "+String(Math.round(state.score/state.total*20*0.6*2)/2).replace(".",",")+" / 12";
+    var firstTry=false;
+    if(!window.__defiMem){ window.__defiMem={score:state.score,total:state.total}; firstTry=true; }
+    try{ if(!localStorage.getItem("defi-foie-score")){ localStorage.setItem("defi-foie-score", JSON.stringify({score:state.score,total:state.total})); } }catch(e){}
+    var kept=null; try{ kept=JSON.parse(localStorage.getItem("defi-foie-score")||"null"); }catch(e){} if(!kept) kept=window.__defiMem;
+    $("pts12").textContent = kept ? (firstTry ? "Score retenu pour la note : "+kept.score+" / 20, soit "+String(Math.round(kept.score/kept.total*20*0.6*2)/2).replace(".",",")+" / 12 (il sera reporté automatiquement dans la fiche)." : "Partie d’entraînement : seul le premier essai compte ("+kept.score+" / 20).") : "";
     var r = state.score/state.total;
     $("verdict").textContent = r>=0.85 ? "Excellent : le foie n’a plus de secrets pour vous."
       : r>=0.6 ? "Bonne base. Revoyez les points ci-dessous avant l’examen."
@@ -603,7 +748,7 @@ body.has-mini main{padding-top:3.6rem}
 
   $("heroFig").innerHTML = '<div class="plate"><img class="hero" src="'+IMG.chien+'" alt="Schéma du foie de chien, face viscérale"></div>';
   $("go").addEventListener("click",start);
-  $("again").addEventListener("click",function(){ $("end").classList.add("hidden"); $("start").classList.remove("hidden"); window.scrollTo(0,0); });
+  $("again").addEventListener("click",function(){ $("end").classList.add("hidden"); $("go").click(); window.scrollTo(0,0); });
 })();
 </script>
 <script>
@@ -673,6 +818,23 @@ body.has-mini main{padding-top:3.6rem}
     $("ptsC").textContent=fmt(s.c)+" / 12";
     $("note").textContent=fmt(s.total)+" / 20";
     $("left").textContent = s.left ? s.left+" élément"+(s.left>1?"s":"")+" à corriger" : "Tous les éléments sont corrigés";
+    persist();
+  }
+  var CKEY="corr-en-cours", restoring=false;
+  function persist(){
+    if(restoring) return;
+    var d={st:st, spA:$("spA").value, spB:$("spB").value, noted:$("noted").value, corrector:$("corrector").value, stu1:$("stu1").value, stu2:$("stu2").value, score:$("score").value};
+    window.__corrMem=d;
+    try{ localStorage.setItem(CKEY, JSON.stringify(d)); }catch(e){}
+  }
+  function restore(){
+    var d=null; try{ d=JSON.parse(localStorage.getItem(CKEY)||"null"); }catch(e){}
+    if(!d || !d.st) return;
+    restoring=true;
+    st=d.st; if(!st.Cp) st.Cp=[null,null,null,null,null,null,null,null,null,null,null,null];
+    fillSelect($("spA"), d.spA||"Chien"); fillSelect($("spB"), d.spB||"Porc");
+    ["noted","corrector","stu1","stu2","score"].forEach(function(k){ $(k).value=d[k]||""; });
+    renderPuzzle("A"); renderPuzzle("B"); renderC(); restoring=false; setMode(st.mode||"tab");
   }
 
   function setMode(m){
@@ -695,21 +857,26 @@ body.has-mini main{padding-top:3.6rem}
     fresh(); $("noted").value=""; $("corrector").value=""; $("stu1").value=""; $("stu2").value=""; $("score").value="";
     fillSelect($("spA"),"Chien"); fillSelect($("spB"),"Porc");
     renderPuzzle("A"); renderPuzzle("B"); renderC(); setMode("tab"); window.scrollTo(0,0);
+    try{ localStorage.removeItem(CKEY); }catch(e){}
   }
+  ["noted","corrector","stu1","stu2"].forEach(function(id){ $(id).addEventListener("input",function(){ persist(); }); });
 
-  $("spA").onchange=function(){ st.A=[null,null,null,null,null,null,null,null]; renderPuzzle("A"); update(); };
-  $("spB").onchange=function(){ st.B=[null,null,null,null,null,null,null,null]; renderPuzzle("B"); update(); };
+  $("spA").onchange=function(){ renderPuzzle("A"); update(); };
+  $("spB").onchange=function(){ renderPuzzle("B"); update(); };
   $("mTab").onclick=function(){ setMode("tab"); };
   $("mPap").onclick=function(){ setMode("pap"); };
   $("score").oninput=update;
   $("reset").onclick=function(){ if(confirm("Effacer cette fiche et en commencer une nouvelle ?")) resetForm(); };
-  $("save").onclick=function(){
+  $("save").onclick=function(){ doSave(false); };
+  function doSave(silent){
     var s=scores();
-    if(!$("noted").value.trim()){ alert("Indiquez le binôme noté."); $("noted").focus(); return; }
-    if(s.left && !confirm(s.left+" élément(s) ne sont pas encore corrigés et compteront comme faux. Valider quand même ?")) return;
+    if(!$("noted").value.trim()){ if(silent){ $("noted").value="Binôme"; } else { alert("Indiquez le binôme noté."); $("noted").focus(); return false; } }
+    if(!silent && s.left && !confirm(s.left+" élément(s) ne sont pas encore corrigés et compteront comme faux. Valider quand même ?")) return false;
     var list=load();
     list.push({date:new Date().toLocaleDateString("fr-FR"), noted:$("noted").value.trim(), corrector:$("corrector").value.trim(), s1:$("stu1").value.trim(), s2:$("stu2").value.trim(), spA:$("spA").value, spB:$("spB").value, a:s.a, b:s.b, c:s.c, total:s.total});
     store(list); renderRecap();
+    window.__lastNote=list[list.length-1];
+    try{ localStorage.setItem("binome-note", JSON.stringify(list[list.length-1])); }catch(e){}
     var rec=list[list.length-1], who=$("noted").value.trim();
     $("msg").textContent="Fiche validée : "+who+" obtient "+fmt(s.total)+" / 20.";
     if(window.__notesDb){
@@ -717,8 +884,10 @@ body.has-mini main{padding-top:3.6rem}
         .then(function(){ $("msg").textContent="Fiche validée : "+who+" obtient "+fmt(rec.total)+" / 20. Note envoyée au registre commun."; })
         .catch(function(){ $("msg").textContent="Fiche validée : "+who+" obtient "+fmt(rec.total)+" / 20, mais l’envoi au registre commun a échoué : la note reste enregistrée sur cette tablette."; });
     }
-    resetForm();
-  };
+    resetForm(); return true;
+  }
+  window.__corrValidate=function(){ return doSave(true); };
+  window.__corrNew=function(){ resetForm(); };
   $("copy").onclick=function(){
     var list=load(); if(!list.length) return;
     var txt=rows(list).map(function(l){ return l.join("\t"); }).join("\n");
@@ -752,7 +921,8 @@ body.has-mini main{padding-top:3.6rem}
   window.__corrDownloadCsv=downloadCsv; window.__corrFmt=fmt;
   $("clear").onclick=function(){ if(confirm("Effacer toutes les notes de la séance sur cette tablette ?")){ store([]); renderRecap(); $("msg").textContent="Séance effacée."; } };
 
-  resetForm(); renderRecap();
+  var _saved=null; try{ _saved=localStorage.getItem(CKEY); }catch(e){}
+  resetForm(); if(_saved){ try{ localStorage.setItem(CKEY,_saved); }catch(e){} restore(); } renderRecap(); update();
   window.__corrRefresh=function(){ renderRecap(); update(); };
 })();
 
@@ -772,11 +942,11 @@ body.has-mini main{padding-top:3.6rem}
   var STEPS=[
     {t:"Lancement",d:3,c:"Lisez les consignes ci-dessous, formez les binômes, prenez un numéro et repérez sur la fiche de route votre premier poste et le binôme que vous corrigez."},
     {t:"Puzzle 1",d:6,c:"Placez les pièces des structures présentes chez l’espèce de votre poste ; mettez les autres de côté."},
-    {t:"Correction du puzzle 1",d:1,c:"Allez au poste du binôme que vous corrigez, notez son puzzle, puis défaites-le. Votre puzzle 2 se fera ensuite sur l’animal suivant."},
-    {t:"Puzzle 2",d:6,c:"Passez à l’animal suivant (poste qui suit celui que vous avez corrigé, voir la fiche de route) et réalisez votre puzzle 2."},
-    {t:"Correction du puzzle 2",d:2,c:"Allez au poste où le binôme que vous corrigez a fait son puzzle 2, notez-le avec « Corriger un binôme » sans valider la fiche, puis défaites et rangez le puzzle."},
-    {t:"Défi foie",d:10,c:"Jouez au Défi foie sur votre tablette, ou remplissez la version papier."},
-    {t:"Correction du défi et validation",d:2,c:"Reportez le score du défi du binôme que vous corrigez dans sa fiche, validez-la, puis vérifiez que la table est prête."}
+    {t:"Correction du puzzle 1",d:1,c:"Échangez les tablettes : prenez celle du binôme que vous corrigez, allez à son poste et notez son puzzle. Rendez la tablette, puis défaites le puzzle."},
+    {t:"Puzzle 2",d:6,c:"Avec votre tablette, passez à l’animal suivant (poste qui suit celui que vous avez corrigé, voir la fiche de route) et réalisez votre puzzle 2."},
+    {t:"Correction du puzzle 2",d:2,c:"Échangez les tablettes : prenez celle du binôme que vous corrigez, allez au poste de son puzzle 2 et notez-le sans valider la fiche. Rendez la tablette, puis défaites et rangez le puzzle."},
+    {t:"Défi foie",d:10,c:"Jouez au Défi foie sur votre propre tablette. Seul le premier essai compte pour la note."},
+    {t:"Note de l’atelier",d:2,c:"La fiche est validée automatiquement avec le score du défi. Découvrez votre note globale, puis remettez la table en état."}
   ];
   var TOTAL=STEPS.reduce(function(a,x){return a+x.d*60000;},0);
   var bounds=[], acc=0; STEPS.forEach(function(x){ bounds.push(acc); acc+=x.d*60000; });
@@ -816,6 +986,7 @@ body.has-mini main{padding-top:3.6rem}
   }
   function enterStep(i){
     var a=ACTIONS[i];
+    if(window.__flowStep && window.__flowStep(i,a,{launchDefi:launchDefi,showCorrAt:showCorrAt,showChrono:showChrono})) return;
     if(a==="defi") launchDefi();
     else if(a) showCorrAt(a);
     else showChrono();
@@ -833,6 +1004,7 @@ body.has-mini main{padding-top:3.6rem}
     $("chronoStepNum").textContent = done ? "Atelier terminé" : "Étape "+(i+1)+" sur "+STEPS.length+" · "+STEPS[i].d+" min";
     $("chronoStep").textContent = done ? "Fin de l’atelier" : STEPS[i].t;
     $("chronoIntro").classList.toggle("hidden", done || i!==0);
+    $("go").classList.toggle("hidden", !(st.started && !done && i===DEFI));
     $("chronoTip").textContent = done ? "Vérifiez que la table est prête pour le groupe suivant." : STEPS[i].c;
     $("chronoBig").textContent = mmss(stepLeft);
     $("chronoBig").classList.toggle("warn", !done && stepLeft<=30000 && st.started);
@@ -841,14 +1013,21 @@ body.has-mini main{padding-top:3.6rem}
     $("chronoStart").textContent = st.running ? "Pause" : (st.started ? "Reprendre" : "Démarrer");
     list.querySelectorAll("li").forEach(function(li){ var k=+li.getAttribute("data-i"); li.className = done||k<i ? "done" : (k===i&&st.started ? "now" : ""); });
     var mini=$("miniChrono"), onChrono=!$("chrono").classList.contains("hidden");
-    mini.classList.toggle("hidden", !st.started || onChrono);
-    document.body.classList.toggle("has-mini", st.started && !onChrono);
+    mini.classList.add("hidden");
+    var bar=$("stepBar"); bar.classList.toggle("hidden", !st.started);
+    document.body.classList.toggle("has-mini", st.started);
+    $("sbStep").textContent = done ? "Atelier terminé" : "Étape "+(i+1)+"/"+STEPS.length+" · "+STEPS[i].t;
+    $("sbTime").textContent = done ? "Merci !" : mmss(stepLeft)+(st.running?"":" (pause)");
+    $("sbTime").classList.toggle("warn", !done && stepLeft<=30000/(st.speed||1));
+    $("sbNext").classList.toggle("hidden", done);
+    $("sbNext").textContent = i===STEPS.length-1 ? "Terminer l’atelier ✓" : "Étape terminée →";
     mini.textContent = done ? "Atelier terminé" : STEPS[i].t+" · "+mmss(stepLeft)+(st.running?"":" (pause)");
     mini.classList.toggle("warn", !done && stepLeft<=30000);
     if(st.running && lastIdx!==null && i!==lastIdx) beep(2);
     if(st.started && !done && launchIdx!==null && i!==launchIdx){ launchIdx=i; enterStep(i); }
     launchIdx=i;
     if(done && st.running && !lastDone){ beep(4); st.running=false; st.before=TOTAL; save(); }
+    if(done && !lastDone && st.started){ setTimeout(function(){ showChrono(); if(window.__flowDone) window.__flowDone(); },0); }
     lastIdx=i; lastDone=done;
   }
   function jumpTo(ms){ st.before=Math.max(0,Math.min(TOTAL,ms)); if(st.running) st.startedAt=Date.now(); st.started=true; lastIdx=idxAt(st.before); save(); render(); }
@@ -870,7 +1049,43 @@ body.has-mini main{padding-top:3.6rem}
   $("miniChrono").addEventListener("click",showChrono);
   $("chronoBack").addEventListener("click",backHome);
   document.addEventListener("click",function(){ setTimeout(render,0); });
+  $("sbNext").addEventListener("click",function(){
+    var last = idxAt(elapsed())===STEPS.length-1;
+    if(last && !confirm("Terminer l’atelier ?")) return;
+    if(!st.running && !last){ st.startedAt=Date.now(); st.running=true; }
+    $("chronoNext").click();
+  });
+  var ENC_CODE="foie";
+  function setEnc(on){ document.body.classList.toggle("enc",on); $("encBtn").textContent = on ? "Quitter l’espace encadrant" : "Espace encadrant"; try{ sessionStorage.setItem("enc-foie", on?"1":""); }catch(e){} }
+  $("encBtn").addEventListener("click",function(){
+    if(document.body.classList.contains("enc")){ setEnc(false); return; }
+    var c=prompt("Espace réservé à l’encadrant. Code :");
+    if(c && c.trim().toLowerCase()===ENC_CODE) setEnc(true); else if(c!==null) alert("Code incorrect.");
+  });
+  var encInit=false; try{ if(sessionStorage.getItem("enc-foie")==="1") encInit=true; }catch(e){}
+  setEnc(encInit);
+  $("restartBtn").addEventListener("click",function(){
+    $("chronoReset").click();
+    setTimeout(function(){ if(!st.started){ $("chronoStart").click(); showChrono(); } },50);
+  });
+  $("teamIntro").value=$("team").value;
+  $("teamIntro").addEventListener("input",function(){ $("team").value=this.value; });
+  $("team").addEventListener("input",function(){ $("teamIntro").value=this.value; });
+  document.addEventListener("pointerdown",function(){ try{ if(!ctx){ var AC=window.AudioContext||window.webkitAudioContext; if(AC) ctx=new AC(); } if(ctx && ctx.state==="suspended") ctx.resume(); }catch(e){} });
   setInterval(render,250); render();
+  (function autostart(){
+    var e=elapsed();
+    if(!st.started || e>=TOTAL){
+      st={running:true,startedAt:Date.now(),before:0,started:true,speed:st.speed};
+      if(typeof recompute==="function") recompute();
+      try{ ["binome-note","defi-foie-score","binome-info","corr-en-cours"].forEach(function(k){ localStorage.removeItem(k); }); }catch(e){}
+      window.__lastNote=null; window.__defiMem=null; if(window.__corrNew) window.__corrNew();
+      save(); lastIdx=0; launchIdx=0; showChrono();
+    } else {
+      var i=idxAt(e); launchIdx=i; lastIdx=i; enterStep(i);
+    }
+    render();
+  })();
 })();
 </script>
 
@@ -888,8 +1103,9 @@ body.has-mini main{padding-top:3.6rem}
   function reminder(sec){ var r=document.createElement("p"); r.className="muted corr-who"; sec.insertBefore(r, sec.firstChild); return r; }
   var remB=reminder(secs[2]), remC=reminder(secs[3]);
   function notice(sec,html,after){ var n=document.createElement("p"); n.className="corr-notice"; n.innerHTML=html; if(after){ sec.insertBefore(n, after.nextSibling); } else { sec.insertBefore(n, sec.firstChild); } return n; }
-  notice(secs[1],"<strong>À la fin de cette correction</strong>, défaites le puzzle, puis passez au poste suivant : <strong>votre puzzle 2 se fera sur l’animal suivant</strong> (celui du poste qui suit celui que vous corrigez, voir la fiche de route).");
-  notice(secs[2],"<strong>À la fin de cette correction</strong>, défaites et rangez le puzzle : place au <strong>Défi foie</strong>.", remB);
+  notice(secs[1],"<strong>Consigne de correction.</strong> Vous tenez la tablette du binôme que vous corrigez. Allez à son poste, comparez chaque pièce de son puzzle avec le corrigé au dos de la planche et touchez « Bon » ou « Pas bon ». <strong>Ne validez pas la fiche.</strong> Rendez ensuite la tablette, défaites le puzzle, puis passez à l’animal suivant pour votre puzzle 2.");
+  notice(secs[2],"<strong>Consigne de correction.</strong> Vous tenez de nouveau la tablette du binôme que vous corrigez. Allez au poste de son puzzle 2, jugez chaque pièce avec le corrigé au dos de la planche. <strong>Ne validez pas encore la fiche.</strong> Rendez la tablette, puis défaites et rangez le puzzle : place au Défi foie.", remB);
+  notice(secs[3],"Le score du défi joué sur cette tablette est reporté automatiquement ci-dessous. La fiche est <strong>validée automatiquement</strong> à la fin du défi, et la note globale s’affiche à l’écran.", remC);
   function nextBtn(sec,label,target){ var b=document.createElement("button"); b.type="button"; b.className="corr-next"; b.textContent=label; b.onclick=function(){ go(target); }; sec.appendChild(b); }
   nextBtn(secs[1],"Page suivante : puzzle 2 →","B");
   nextBtn(secs[2],"Page suivante : défi foie →","C");
@@ -954,6 +1170,176 @@ body.has-mini main{padding-top:3.6rem}
     btn.disabled=false;
   };
 })();
+</script>
+
+<script>
+(function(){
+  var $=function(id){return document.getElementById(id)};
+  function get(k){ try{ return JSON.parse(localStorage.getItem(k)||"null"); }catch(e){ return null; } }
+  function set(k,v){ try{ localStorage.setItem(k,JSON.stringify(v)); }catch(e){} }
+  function fmt(n){ return (Math.round((+n||0)*100)/100).toString().replace(".",","); }
+  function esc(t){ return String(t==null?"":t).replace(/[&<>"]/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c];}); }
+
+  // Identité du binôme propriétaire de la tablette
+  function info(){ return get("binome-info")||{}; }
+  function saveInfo(){ set("binome-info",{team:$("teamIntro").value.trim(), s1:$("stu1Intro").value.trim(), s2:$("stu2Intro").value.trim()}); }
+  var inf=info(); if(inf.team && !$("teamIntro").value){ $("teamIntro").value=inf.team; $("team").value=inf.team; }
+  if(inf.s1) $("stu1Intro").value=inf.s1; if(inf.s2) $("stu2Intro").value=inf.s2;
+  ["teamIntro","stu1Intro","stu2Intro"].forEach(function(id){ $(id).addEventListener("input",saveInfo); });
+  function owner(){ var i=info(); return i.team||"ce binôme"; }
+
+  // Préremplissage de la fiche et report automatique du défi
+  function prefill(){
+    var i=info();
+    if(!$("noted").value && i.team) $("noted").value=i.team;
+    if(!$("stu1").value && i.s1) $("stu1").value=i.s1;
+    if(!$("stu2").value && i.s2) $("stu2").value=i.s2;
+    var sc=get("defi-foie-score")||window.__defiMem||null, box=$("score");
+    var autoP=$("autoScoreInfo");
+    if(!autoP){ autoP=document.createElement("p"); autoP.id="autoScoreInfo"; autoP.className="muted"; box.parentNode.insertBefore(autoP, box.nextSibling); }
+    if(sc && box && !box.value){ box.value=sc.score; box.dispatchEvent(new Event("input")); }
+    autoP.textContent = sc ? "Score reporté automatiquement depuis la partie jouée sur cette tablette"+(sc.partial?" (partie interrompue par le temps)":" (premier essai)")+" : "+sc.score+" / 20." : "Aucune partie terminée sur cette tablette pour l’instant.";
+  }
+  var origPage=window.__corrPage;
+  if(origPage){ window.__corrPage=function(p){ prefill(); origPage(p); }; }
+  $("toCorr") && $("toCorr").addEventListener("click",function(){ setTimeout(prefill,0); });
+
+  // Consigne plein écran
+  var ov=document.createElement("div"); ov.id="swapOverlay"; ov.className="hidden"; ov.setAttribute("role","dialog"); ov.setAttribute("aria-modal","true");
+  ov.innerHTML='<div class="sw-box"><p class="sw-icon" aria-hidden="true">⇄</p><p class="sw-title" id="swTitle"></p><div id="swText"></div><button class="primary" id="swOk"></button></div>';
+  document.body.appendChild(ov);
+  var swCb=null;
+  function showSwap(title,html,btn,cb){ $("swTitle").textContent=title; $("swText").innerHTML=html; $("swOk").textContent=btn; swCb=cb||null; ov.classList.remove("hidden"); $("swOk").focus(); }
+  $("swOk").addEventListener("click",function(){ ov.classList.add("hidden"); var c=swCb; swCb=null; if(c) c(); });
+
+  window.__flowStep=function(i,a,api){
+    var who=esc(owner());
+    if(a==="C"){
+      autoValidate(); api.showChrono(); renderFinal(); fn.classList.remove("hidden"); window.scrollTo(0,0);
+      return true;
+    }
+    if(a==="A"||a==="B"){
+      api.showCorrAt(a);
+      var what = a==="A" ? "la correction du puzzle 1" : "la correction du puzzle 2";
+      showSwap("Échangez les tablettes",
+        '<p>Cette tablette appartient au binôme <strong>'+who+'</strong>.</p><ol><li><strong>Donnez-la</strong> au binôme qui vous corrige.</li><li><strong>Prenez</strong> la tablette du binôme que vous corrigez.</li></ol><p class="muted">Étape suivante : '+what+'.</p>',
+        "J’ai la tablette du binôme que je corrige", function(){ prefill(); });
+      return true;
+    }
+    if(i===3){
+      api.showChrono();
+      showSwap("Récupérez votre tablette",
+        '<p>Rendez cette tablette au binôme <strong>'+who+'</strong> et récupérez la vôtre.</p><p>Défaites le puzzle que vous avez corrigé, puis passez à l’<strong>animal suivant</strong> pour votre puzzle 2.</p>',
+        "C’est bien notre tablette", null);
+      return true;
+    }
+    if(a==="defi"){
+      api.showChrono();
+      showSwap("Récupérez votre tablette",
+        '<p>Rendez cette tablette au binôme <strong>'+who+'</strong> et récupérez la vôtre, puis rangez le puzzle corrigé.</p><p>Le <strong>Défi foie</strong> se joue sur votre propre tablette : seul le premier essai compte pour votre note.</p>',
+        "C’est notre tablette : lancer le défi", function(){ api.launchDefi(); });
+      return true;
+    }
+    return false;
+  };
+
+  // Note globale du binôme en fin d'atelier
+  var fn=document.createElement("div"); fn.id="finalNote"; fn.className="card stack hidden";
+  var big=$("chronoBig"); big.parentNode.insertBefore(fn, big);
+  function renderFinal(){
+    var n=get("binome-note")||window.__lastNote||null, i=info();
+    if(n){
+      fn.innerHTML='<h3 class="fn-title">Note globale du binôme '+esc(n.noted||i.team||"")+'</h3><p class="fn-note">'+fmt(n.total)+' / 20</p>'+
+        '<p>Puzzle 1'+(n.spA?' ('+esc(n.spA)+')':'')+' : <strong>'+fmt(n.a)+' / 4</strong> · Puzzle 2'+(n.spB?' ('+esc(n.spB)+')':'')+' : <strong>'+fmt(n.b)+' / 4</strong> · Défi foie : <strong>'+fmt(n.c)+' / 12</strong></p>'+
+        ((+n.a||0)+(+n.b||0)===0 ? '<p class="corr-notice">Aucune pièce de puzzle n’a été jugée « Bon » sur la fiche de correction de cette tablette : les puzzles valent donc 0. Le binôme correcteur doit toucher « Bon » ou « Pas bon » pour chaque pièce aux deux étapes de correction.</p>' : '')+
+        '<p class="muted">Note attribuée par le binôme '+esc(n.corrector||"correcteur")+'. Elle est enregistrée sur cette tablette'+(window.__notesDb?" et dans le registre commun":"")+'.</p>';
+    } else {
+      fn.innerHTML='<h3 class="fn-title">Note globale du binôme</h3><p>La note s’affichera ici à la fin du défi, une fois la fiche validée automatiquement.</p>';
+    }
+  }
+  function hasAnswers(){
+    var m=window.__corrMem; if(!m){ try{ m=JSON.parse(localStorage.getItem("corr-en-cours")||"null"); }catch(e){} }
+    if(!m || !m.st) return false;
+    return ["A","B","Cp"].some(function(k){ return (m.st[k]||[]).some(function(x){ return x!==null; }); });
+  }
+  function autoValidate(){
+    if((get("binome-note") || window.__lastNote) && !hasAnswers()) return;
+    if(!get("defi-foie-score") && window.__gameState){
+      var g=window.__gameState();
+      if(g && g.total){ var sc={score:g.score,total:g.total,partial:g.done<g.total}; set("defi-foie-score",sc); window.__defiMem=sc; }
+    }
+    prefill();
+    if(window.__corrValidate) window.__corrValidate();
+  }
+  window.__flowDone=function(){ autoValidate(); renderFinal(); fn.classList.remove("hidden"); window.scrollTo(0,0); };
+  setInterval(function(){
+    var stepTxt=($("chronoStep").textContent||""), doneTxt=(stepTxt==="Fin de l’atelier"||stepTxt==="Note de l’atelier");
+    if(doneTxt){ if(fn.classList.contains("hidden")){ renderFinal(); fn.classList.remove("hidden"); } }
+    else if(!fn.classList.contains("hidden")) fn.classList.add("hidden");
+  },500);
+  $("chronoReset") && $("chronoReset").addEventListener("click",function(){ setTimeout(function(){
+    if(($("chronoStart").textContent||"")==="Démarrer"){ ["binome-note","defi-foie-score","binome-info","corr-en-cours"].forEach(function(k){ try{ localStorage.removeItem(k); }catch(e){} }); window.__lastNote=null; window.__defiMem=null; if(window.__corrNew) window.__corrNew(); ["teamIntro","stu1Intro","stu2Intro","team"].forEach(function(id){ if($(id)) $(id).value=""; }); }
+  },0); });
+})();
+</script>
+<script>
+/* Pont avec le portail des ateliers : binômes transmis par le portail, identité préremplie,
+   notes envoyées au portail (collection notes_a5 et copie locale a5envoi).
+   Fonctionnement de l'atelier : chaque binôme corrige le suivant ; la fiche est remplie sur la
+   tablette du binôme noté (échange de tablettes) et validée automatiquement à la fin. */
+(function(){
+  var q=new URLSearchParams(location.search), duos=null, moi=q.get("duo")||"";
+  try{duos=JSON.parse(q.get("duos")||"null")}catch(e){}
+  if(duos&&duos.length){try{sessionStorage.setItem("a5duos",JSON.stringify(duos));sessionStorage.setItem("a5moi",moi)}catch(e){}}
+  else{try{duos=JSON.parse(sessionStorage.getItem("a5duos")||"null");moi=moi||sessionStorage.getItem("a5moi")||""}catch(e){}}
+  window.__A5={duos:duos,moi:moi};
+  var K="correction-foie-recap", FILE="a5envoi";
+  var $=function(i){return document.getElementById(i)};
+  function idx(){return duos?duos.map(function(d){return d.id}).indexOf(moi):-1}
+  function moiDuo(){var i=idx();return i<0?null:duos[i]}
+  function correcteur(){var i=idx();return i<0?null:duos[(i-1+duos.length)%duos.length]}
+  function corrige(){var i=idx();return i<0?null:duos[(i+1)%duos.length]}
+  function trouver(nom){if(!duos||!nom)return null;var n=String(nom).toLowerCase().trim();
+    var d=duos.filter(function(x){return x.nom.toLowerCase()===n})[0];if(d)return d;
+    var m=n.match(/\d+/);if(m)d=duos.filter(function(x){return String(x.nom.match(/\d+/))===m[0]})[0];return d||null}
+  function file(){try{return JSON.parse(localStorage.getItem(FILE)||"[]")}catch(e){return []}}
+  var orig=Storage.prototype.setItem;
+  function poser(l){try{orig.call(localStorage,FILE,JSON.stringify(l))}catch(e){}}
+  var dbP=null;function base(){if(!dbP)dbP=(window.claude&&window.claude.use?window.claude.use("db"):Promise.resolve(null)).catch(function(){return null});return dbP}
+  function vider(){var l=file().filter(function(x){return !x.ok});if(!l.length)return;base().then(function(db){if(!db)return;l.forEach(function(x){
+    if(String(x.id).indexOf("TEST")===0)return;
+    db.collection("notes_a5").doc(x.id).set({note:x.note,a:x.a,b:x.b,c:x.c,correcteur:x.correcteur||"",maj:x.t}).then(function(){var f=file();f.forEach(function(y){if(y.id===x.id&&y.t===x.t)y.ok=1});poser(f)}).catch(function(){})})})}
+  Storage.prototype.setItem=function(k,v){orig.apply(this,arguments);if(k!==K||!duos)return;
+    try{var list=JSON.parse(v||"[]"),r=list[list.length-1];if(!r)return;var d=trouver(r.noted)||moiDuo();if(!d)return;
+      var f=file().filter(function(x){return x.id!==d.id});f.push({id:d.id,note:r.total,a:r.a,b:r.b,c:r.c,correcteur:r.corrector||"",t:Date.now()});poser(f);setTimeout(vider,50)}catch(e){}};
+  setInterval(vider,15000);window.addEventListener("online",vider);setTimeout(vider,2000);
+
+  /* lien de retour vers le portail */
+  var back=document.createElement("p");back.style.cssText="text-align:center;margin:.4rem 0 0";
+  back.innerHTML='<a href="../index.html" class="enc-toggle" style="text-decoration:underline">← Retour au portail des ateliers</a>';
+  var encP=$("encBtn")&&$("encBtn").parentNode; if(encP&&encP.parentNode) encP.parentNode.insertBefore(back,encP.nextSibling);
+
+  if(!duos||!moi)return;
+  var md=moiDuo(), cr=correcteur(), cg=corrige();
+  if(!md)return;
+  function setVal(id,v){var e=$(id);if(e&&!e.value&&v){e.value=v;e.dispatchEvent(new Event("input",{bubbles:true}))}}
+  function remplir(){
+    setVal("teamIntro",md.nom); setVal("team",md.nom);
+    setVal("stu1Intro",(md.noms||[])[0]||""); setVal("stu2Intro",(md.noms||[]).slice(1).join(", "));
+    setVal("noted",md.nom); setVal("stu1",(md.noms||[])[0]||""); setVal("stu2",(md.noms||[]).slice(1).join(", "));
+    if(cr) setVal("corrector",cr.nom);
+  }
+  remplir(); setInterval(remplir,1500);
+  ["teamIntro","stu1Intro","stu2Intro"].forEach(function(id){var e=$(id);if(e)e.readOnly=true;});
+  var intro=$("chronoIntro");
+  if(intro){var p=document.createElement("p");p.className="corr-notice";
+    p.innerHTML="<strong>Vous êtes le "+md.nom+"</strong>"+((md.noms||[]).length?" ("+md.noms.join(", ")+")":"")+". Cette tablette est la vôtre. "+
+      (cg?"Aux étapes de correction, vous corrigez le <strong>"+cg.nom+"</strong> sur sa tablette. ":"")+
+      (cr?"Le <strong>"+cr.nom+"</strong> vous corrige sur la vôtre. ":"")+
+      "Votre note part toute seule au portail à la fin de l’atelier.";
+    intro.insertBefore(p,intro.children[1]||null);}
+})();
+
 </script>
 </body>
 </html>

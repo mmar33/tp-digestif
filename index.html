@@ -3,6 +3,146 @@
 <meta name="theme-color" content="#2f7a4a"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-capable" content="yes">
 <link rel="manifest" href="manifest.webmanifest"><link rel="icon" href="icone-192.png"><link rel="apple-touch-icon" href="icone-192.png">
 <script src="firebase-config.js"></script><script src="vendor/firebase-app-compat.js"></script><script src="vendor/firebase-firestore-compat.js"></script><script src="vendor/qrcode.js"></script><script src="adapter.js"></script>
+<script>
+/* Mode local : remplace les services claude.ai (db, user, downloads) quand l'application
+   est ouverte hors de claude.ai (fichier, Moodle, serveur web). Les données sont enregistrées
+   dans le navigateur de l'appareil (localStorage) et partagées entre les pages et onglets
+   du même site, mais pas entre appareils. Sur claude.ai, ce module ne fait rien. */
+(function(){
+  if ((window.claude && window.claude.use) || window.APP_CONFIG) return;
+  var P = "cl-db:", L = "cl-lease:";
+  var ls = (function(){ try{ var k="__cl_t"; localStorage.setItem(k,"1"); localStorage.removeItem(k); return localStorage; }catch(e){ return null; } })();
+  var mem = {};
+  function sget(k){ if(ls){ try{ return ls.getItem(k); }catch(e){} } return Object.prototype.hasOwnProperty.call(mem,k) ? mem[k] : null; }
+  function sset(k,v){ if(ls){ try{ ls.setItem(k,v); return; }catch(e){} } mem[k]=v; }
+  function sdel(k){ if(ls){ try{ ls.removeItem(k); }catch(e){} } delete mem[k]; }
+  function skeys(){ var out=[]; if(ls){ try{ for(var i=0;i<ls.length;i++) out.push(ls.key(i)); }catch(e){} } for(var k in mem) if(out.indexOf(k)<0) out.push(k); return out; }
+
+  function clone(v){ return v===undefined ? undefined : JSON.parse(JSON.stringify(v)); }
+  function deepFreeze(o){ if(o && typeof o==="object"){ Object.freeze(o); Object.keys(o).forEach(function(k){ deepFreeze(o[k]); }); } return o; }
+  function segs(p){ return String(p).replace(/^\/+|\/+$/g,"").split("/").filter(Boolean); }
+  function err(code,msg){ var e=new Error(msg||code); e.code=code; return e; }
+  function readDoc(path){ var r=sget(P+path); if(!r) return null; try{ return JSON.parse(r); }catch(e){ return null; } }
+  function writeDoc(path,data,v){ sset(P+path, JSON.stringify({data:data, v:v})); notify(); }
+  function autoId(){ var c="ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789", s=""; for(var i=0;i<20;i++) s+=c[Math.floor(Math.random()*c.length)]; return s; }
+  function mergeDeep(a,b){ var out=clone(a)||{}; Object.keys(b).forEach(function(k){ var bv=b[k];
+    if(bv && typeof bv==="object" && !Array.isArray(bv) && out[k] && typeof out[k]==="object" && !Array.isArray(out[k])) out[k]=mergeDeep(out[k],bv);
+    else out[k]=clone(bv); }); return out; }
+  function getField(o,f){ return String(f).split(".").reduce(function(x,k){ return x==null?undefined:x[k]; }, o); }
+  function cmp(a,b){ if(a===b) return 0; if(a===undefined||a===null) return -1; if(b===undefined||b===null) return 1; return a<b?-1:a>b?1:0; }
+  function test(v,op,x){
+    switch(op){
+      case "==": case "eq": return JSON.stringify(v)===JSON.stringify(x);
+      case "!=": case "ne": return JSON.stringify(v)!==JSON.stringify(x);
+      case "<": case "lt": return v!==undefined && cmp(v,x)<0;
+      case "<=": case "lte": return v!==undefined && cmp(v,x)<=0;
+      case ">": case "gt": return v!==undefined && cmp(v,x)>0;
+      case ">=": case "gte": return v!==undefined && cmp(v,x)>=0;
+      case "in": return Array.isArray(x) && x.some(function(y){ return JSON.stringify(y)===JSON.stringify(v); });
+      case "not-in": return Array.isArray(x) && !x.some(function(y){ return JSON.stringify(y)===JSON.stringify(v); });
+      case "array-contains": return Array.isArray(v) && v.some(function(y){ return JSON.stringify(y)===JSON.stringify(x); });
+      case "array-contains-any": return Array.isArray(v) && Array.isArray(x) && v.some(function(y){ return x.some(function(z){ return JSON.stringify(y)===JSON.stringify(z); }); });
+    }
+    return false;
+  }
+  var META={fromCache:false, hasPendingWrites:false};
+  function docSnap(path){ var id=segs(path).pop(), r=readDoc(path), d=r?deepFreeze(clone(r.data)):undefined;
+    return {id:id, exists:!!r, data:function(){ return d; }, metadata:META, _v:r?r.v:0}; }
+
+  /* ---- abonnements ---- */
+  var subs=[];
+  var pending=false;
+  function notify(){ if(pending) return; pending=true; setTimeout(function(){ pending=false; subs.slice().forEach(function(s){ try{ s.check(); }catch(e){} }); },0); }
+  window.addEventListener("storage", function(e){ if(!e.key || e.key.indexOf(P)===0) notify(); });
+
+  function docRef(path){
+    var sg=segs(path); if(sg.length%2!==0) throw err("invalid_argument","Chemin de document invalide : "+path);
+    path=sg.join("/");
+    var ref={ id:sg[sg.length-1], path:path,
+      get:function(){ return Promise.resolve(docSnap(path)); },
+      set:function(data){ var r=readDoc(path); writeDoc(path, clone(data)||{}, (r?r.v:0)+1); return Promise.resolve(); },
+      update:function(data){ var r=readDoc(path); if(!r) return Promise.reject(err("invalid_argument","Document absent : "+path)); writeDoc(path, mergeDeep(r.data,data||{}), r.v+1); return Promise.resolve(); },
+      delete:function(){ sdel(P+path); sdel(L+path); notify(); return Promise.resolve(); },
+      collection:function(p){ return colRef(path+"/"+p); },
+      acquire:function(o){ o=o||{}; var ttl=Math.min(600000,Math.max(1000,o.ttlMs||30000)), now=Date.now(), cur=null;
+        try{ cur=JSON.parse(sget(L+path)||"null"); }catch(e){}
+        if(cur && cur.exp>now && cur.holder!==o.holder) return Promise.resolve({acquired:false, expiresAt:new Date(cur.exp).toISOString()});
+        var exp=now+ttl; sset(L+path, JSON.stringify({holder:o.holder, exp:exp}));
+        var r=readDoc(path), v=(r?r.v:0)+1; writeDoc(path, mergeDeep(r?r.data:{}, o.data||{}), v);
+        return Promise.resolve({acquired:true, version:v, expiresAt:new Date(exp).toISOString(), holder:o.holder}); },
+      release:function(o){ var cur=null; try{ cur=JSON.parse(sget(L+path)||"null"); }catch(e){} if(cur && (!o||!o.holder||cur.holder===o.holder)) sdel(L+path); return Promise.resolve(); },
+      onSnapshot:function(next, error){ if(typeof next==="object" && next && next.next){ error=next.error; next=next.next; }
+        var last=null, alive=true;
+        var s={check:function(){ if(!alive) return; var sn=docSnap(path), sig=sn.exists?sn._v+":"+JSON.stringify(sn.data()):"absent"; if(sig===last) return; last=sig; try{ next(sn); }catch(e){ if(error) error(e); } }};
+        subs.push(s); setTimeout(s.check,0);
+        return function(){ alive=false; subs=subs.filter(function(x){ return x!==s; }); }; }
+    };
+    return ref;
+  }
+
+  function colRef(path, q){
+    var sg=segs(path); if(sg.length%2!==1) throw err("invalid_argument","Chemin de collection invalide : "+path);
+    path=sg.join("/"); q=q||{w:[], o:[], l:0};
+    function run(){
+      var pre=P+path+"/", docs=[];
+      skeys().forEach(function(k){ if(k.indexOf(pre)!==0) return; var rest=k.slice(pre.length); if(!rest || rest.indexOf("/")>=0) return; docs.push(docSnap(path+"/"+rest)); });
+      docs=docs.filter(function(d){ return d.exists && q.w.every(function(c){ return test(getField(d.data(),c[0]),c[1],c[2]); }); });
+      if(q.o.length) docs.sort(function(a,b){ for(var i=0;i<q.o.length;i++){ var c=cmp(getField(a.data(),q.o[i][0]),getField(b.data(),q.o[i][0])); if(c) return q.o[i][1]==="desc"?-c:c; } return 0; });
+      else docs.sort(function(a,b){ return a.id<b.id?-1:a.id>b.id?1:0; });
+      if(q.l) docs=docs.slice(0,q.l);
+      return docs;
+    }
+    function qsnap(docs, prev){
+      var changes=docs.map(function(d,i){ var old=prev?prev.findIndex(function(p){ return p.id===d.id; }):-1; return {type:old<0?"added":"modified", doc:d, oldIndex:old, newIndex:i}; });
+      if(prev) prev.forEach(function(p,i){ if(!docs.some(function(d){ return d.id===p.id; })) changes.push({type:"removed", doc:p, oldIndex:i, newIndex:-1}); });
+      return {docs:docs, size:docs.length, empty:!docs.length, docChanges:function(){ return changes; }, metadata:META, forEach:function(f){ docs.forEach(f); }};
+    }
+    var ref={ id:sg[sg.length-1], path:path,
+      doc:function(id){ return docRef(path+"/"+(id||autoId())); },
+      add:function(data){ var d=docRef(path+"/"+autoId()); return d.set(data).then(function(){ return d; }); },
+      where:function(f,op,v){ return colRef(path,{w:q.w.concat([[f,op,v]]), o:q.o, l:q.l}); },
+      orderBy:function(f,dir){ return colRef(path,{w:q.w, o:q.o.concat([[f,dir||"asc"]]), l:q.l}); },
+      limit:function(n){ return colRef(path,{w:q.w, o:q.o, l:n}); },
+      get:function(){ return Promise.resolve(qsnap(run(),null)); },
+      onSnapshot:function(next, error){ if(typeof next==="object" && next && next.next){ error=next.error; next=next.next; }
+        var lastSig=null, lastDocs=null, alive=true;
+        var s={check:function(){ if(!alive) return; var docs=run(), sig=JSON.stringify(docs.map(function(d){ return [d.id,d._v,d.data()]; })); if(sig===lastSig) return;
+          var sn=qsnap(docs,lastDocs); lastSig=sig; lastDocs=docs; try{ next(sn); }catch(e){ if(error) error(e); } }};
+        subs.push(s); setTimeout(s.check,0);
+        return function(){ alive=false; subs=subs.filter(function(x){ return x!==s; }); }; }
+    };
+    return ref;
+  }
+
+  var db={ doc:function(p){ return docRef(p); }, collection:function(p){ return colRef(p); } };
+
+  /* ---- identité de l'appareil ---- */
+  var uid=sget("cl-user-id"); if(!uid){ uid="local-"+autoId().slice(0,12); sset("cl-user-id",uid); }
+  try{ var qs=new URLSearchParams(location.search); if(qs.get("enseignant")==="1") sset("cl-enseignant","1"); if(qs.get("enseignant")==="0") sdel("cl-enseignant"); }catch(e){}
+  function teacher(){ return sget("cl-enseignant")==="1"; }
+  var user={ id:function(){ return Promise.resolve(uid); },
+    me:function(){ return Promise.resolve({id:uid, email:null, name:"", isMe:true, isOwner:teacher(), canEdit:teacher()}); },
+    canEdit:function(){ return Promise.resolve(teacher()); },
+    isOwner:function(){ return Promise.resolve(teacher()); },
+    can:function(){ return Promise.resolve(teacher()); },
+    profiles:function(ids){ var o={}; (ids||[]).forEach(function(i){ o[i]={id:i, name:"", email:null, isMe:i===uid}; }); return Promise.resolve(o); } };
+
+  /* ---- téléchargements ---- */
+  var downloads={ save:function(req){ try{
+      var d=req.data, blob = d instanceof Blob ? d : new Blob([d], {type:req.mimeType||"application/octet-stream"});
+      var a=document.createElement("a"); a.href=URL.createObjectURL(blob); a.download=req.filename||"fichier";
+      document.body.appendChild(a); a.click(); setTimeout(function(){ URL.revokeObjectURL(a.href); a.remove(); },1500);
+      return Promise.resolve({saved:true, filename:a.download});
+    }catch(e){ return Promise.reject(err("failed", String(e))); } } };
+
+  window.claude={ local:true, use:function(name){
+    if(name==="db") return Promise.resolve(db);
+    if(name==="user") return Promise.resolve(user);
+    if(name==="downloads") return Promise.resolve(downloads);
+    return Promise.resolve(null); /* assets, artifact, sample… : indisponibles hors claude.ai */
+  } };
+})();
+</script>
 <title>TP système digestif</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@75..100,400..800&family=Bricolage+Grotesque:opsz,wght@12..96,600..800&family=IBM+Plex+Mono:wght@500;600&family=Barlow+Condensed:wght@600;700&family=Source+Sans+3:wght@400;600;700&display=swap">
@@ -1470,7 +1610,7 @@ function vProf(){
    <div class="row"><button class="btn" id="csv">Copier le tableau (pour Excel)</button><button class="btn ghost" id="dl">Télécharger en CSV</button></div>
 `;
   else if(k==="seance")corps=vProfSeance();
-  else if(k==="a1")corps=vProfA1();
+  else if(["a1","a3","a4","a5","a6"].includes(k))corps=vProfSuite(k);
   else if(k==="reglages")corps=vProfAteliers()+carteReglagesDuel();
   else if(k==="synthese")corps=vSynthese();
   else if(k==="corrige"){const pl=PLANCHES[plancheCorr], rs=resultats.filter(r=>r.planche===plancheCorr);
@@ -1483,11 +1623,11 @@ function vProf(){
      <div class="settings" style="margin-bottom:12px"><label for="tmode">Manche 1<select id="tmode"><option value="erreurs" ${(reglages.mode1||"erreurs")==="erreurs"?"selected":""}>Les 7 erreurs</option><option value="trous" ${reglages.mode1==="trous"?"selected":""}>Légendes à compléter</option><option value="hasard" ${reglages.mode1==="hasard"?"selected":""}>Au hasard (l'une ou l'autre)</option></select></label></div>
      <p class="note">Choisissez la planche de la manche 1 :</p><div class="row">${Object.entries(PLANCHES).map(([id,p])=>`<button class="btn ghost" data-test="${id}">${esc(p.nom)}</button>`).join("")}<button class="btn pen" data-test="hasard">Au hasard</button></div></div>`;
   else corps=`<p class="note" style="margin:0">Les ${QUESTIONS.length} questions de la banque ; chaque duel en tire ${reglages.nq} au hasard.</p><div class="qgrid">${QUESTIONS.map(Q=>`<div class="card"><img src="${Q.img}" alt=""><p class="note" style="margin:8px 0 0">${esc(Q.voir)} · ${esc(Q.vue)}</p><p style="margin:4px 0 4px"><b>${esc(Q.q)}</b></p><p style="margin:0">${esc(Q.bonne)}</p><p class="note" style="margin:4px 0 0">${esc(Q.ref)} · ${esc(Q.info)}</p></div>`).join("")}</div>`;
-  const sous=ongletProf==="a2"?`<div class="sousnav">${[["notes","Notes"],["synthese","Synthèse"],["corrige","Corrigés des planches"],["questions","Questions"],["test","Essayer une planche"]].map(([x,l])=>`<button data-sous="${x}" aria-pressed="${sousA2===x}">${l}</button>`).join("")}</div>`:"";
+  const sous=SOUS_AT[ongletProf]?`<div class="sousnav">${SOUS_AT[ongletProf].map(([x,l])=>`<button data-sousat="${x}" aria-pressed="${sousAt[ongletProf]===x}">${l}</button>`).join("")}</div>`:ongletProf==="a2"?`<div class="sousnav">${[["notes","Notes"],["synthese","Synthèse"],["corrige","Corrigés des planches"],["questions","Questions"],["test","Essayer une planche"]].map(([x,l])=>`<button data-sous="${x}" aria-pressed="${sousA2===x}">${l}</button>`).join("")}</div>`:"";
   return `<div style="display:grid;gap:18px;padding-top:20px">
    <div class="row" style="justify-content:space-between"><h2 style="font-size:34px">Espace encadrants</h2><button class="btn ghost" id="retour">Retour à l'accueil</button></div>
    <button class="testbig" id="testEtudiant">${ico("main")}<span><b>Tester les ateliers comme un étudiant</b><span>Un groupe fictif, sur cette tablette. Rien n'est enregistré ni compté.</span></span></button>
-   <div class="tabs nav4">${[["seance","Suivi de la séance"],["a1","Atelier 1 · maquettes"],["a2","Atelier 2 · duel"],["reglages","Réglages et QR code"]].map(([x,l])=>`<button data-tab="${x}" aria-pressed="${ongletProf===x}">${l}</button>`).join("")}</div>
+   <div class="tabs nav4">${[["seance","Suivi de la séance"],["a1","Atelier 1 · maquettes"],["a2","Atelier 2 · duel"],["a3","Atelier 3 · 7 familles"],["a4","Atelier 4 · enquête"],["a5","Atelier 5 · défi foie"],["a6","Atelier 6 · rumen"],["reglages","Réglages et QR code"]].filter(([x])=>!/^a\d$/.test(x)||atelierActif(x)).map(([x,l])=>`<button data-tab="${x}" aria-pressed="${ongletProf===x}">${l}</button>`).join("")}</div>
    ${sous}${corps}</div>`;
 }
 function carteReglagesDuel(){return `<div class="card"><h3>Réglages de l'atelier 2 (duel)</h3><div class="settings">
@@ -1523,7 +1663,9 @@ function brancher(){
   on("#indice","click",()=>{jeu.q[qIdx].indice=true;sauver();rendre()});
   brancherMystere(); on("#equipeOK","click",validerEquipe); all("[data-coul]",b=>{jeu.couleur=b.dataset.coul;jeu.roles={pilote:($("#pilote")||{}).value||"",lecteur:($("#lecteur")||{}).value||""};rendre()}); all("[data-masc]",b=>{jeu.mascotte=b.dataset.masc;jeu.roles={pilote:($("#pilote")||{}).value||"",lecteur:($("#lecteur")||{}).value||""};rendre()}); all("[data-ms]",b=>repondreMS(+b.dataset.ms)); on("#son","click",()=>{sonOn=!sonOn;LS.set("sonDuel",sonOn);rendre()});
   on("#suiv","click",suivanteQ); on("#joker","click",jouerJoker); on("#prendreBarone","click",prendreBarone);
-  all("[data-tab]",b=>{ongletProf=b.dataset.tab;grpEdit=null;rendre()}); all("[data-sous]",b=>{sousA2=b.dataset.sous;rendre()}); on("#testEtudiant","click",demarrerTestEtudiant);
+  all("[data-tab]",b=>{ongletProf=b.dataset.tab;grpEdit=null;rendre()}); on("#profFamMaj","click",()=>{delete profFam[profSeance||seanceSel];rendre()}); all("[data-sous]",b=>{sousA2=b.dataset.sous;rendre()}); all("[data-sousat]",b=>{sousAt[ongletProf]=b.dataset.sousat;rendre()}); all("[data-projat]",()=>{projeter=!projeter;rendre()});
+  all("[data-csvat]",b=>{navigator.clipboard.writeText(csvAt(b.dataset.csvat,"\t")).then(()=>toast("Tableau copié : collez-le dans Excel")).catch(()=>toast("Copie refusée par le navigateur"))});
+  all("[data-dlat]",async b=>{try{const dl=window.claude&&await window.claude.use("downloads");if(!dl){toast("Téléchargement indisponible ici : utilisez « Copier »");return}await dl.save({filename:"notes_atelier"+b.dataset.dlat.slice(1)+".csv",data:"\ufeff"+csvAt(b.dataset.dlat,";")})}catch(e){toast("Téléchargement annulé")}}); on("#testEtudiant","click",demarrerTestEtudiant);
   all("[data-pc]",b=>{plancheCorr=b.dataset.pc;rendre()});
   on("#projeter","click",()=>{projeter=!projeter;rendre()});
   all("[data-ask]",b=>{aSupprimer=b.dataset.ask;rendre()});
@@ -1846,6 +1988,158 @@ function vProfA1(){
         <table class="mini">${CRITERES.map(c=>`<tr><td>${esc(c.titre)}</td><td class="num">${e.pts[c.id]}/${c.max}</td><td class="wrap">${esc((e.coms||{})[c.id]||"")}</td></tr>`).join("")}<tr><td><b>Commentaire final</b></td><td></td><td class="wrap">${esc(e.final)}</td></tr></table></div>`:""}</div>`}).join(""):`<p class="note">Pas encore évaluée.</p>`}
      ${a.maquette?`<div class="row" style="margin-top:8px"><select data-assign="${g.id}"><option value="">Demander une évaluation (en plus) à…</option>${eligibles.map(x=>`<option value="${x.id}">${esc(x.nom)}</option>`).join("")}</select></div>`:""}</div>`}).join("");
 }
+/* ----- suivi par atelier (ateliers 3 à 6) dans l'espace encadrants ----- */
+let profFam={};
+function profChargerFam(sid){if(!db||!sid||profFam[sid])return;profFam[sid]={docs:[]};db.collection("familles").where("seance","==",sid).get().then(s=>{profFam[sid]={docs:s.docs.map(d=>d.data()),t:Date.now()};if(vue==="prof")rendre()}).catch(()=>{})}
+function profAvancement(aid,g,tid){
+  if(aid==="a3"){const n=notesA3.find(x=>x.id===tid),pr=a3prog[tid]||{},src=n||pr,fam=new Set();((profFam[g.seance]||{}).docs||[]).forEach(p=>((p.poses||{})[tid]||[]).forEach(f=>fam.add(f)));
+    const ev=[src.reperage?`repérage ${src.reperage.score}/${src.reperage.total}`:"",src.quiz?`quiz ${src.quiz.score}/${src.quiz.total}`:""].filter(Boolean).join(", ");
+    return {st:n?"fait":ev?"encours":"afaire",txt:[fam.size?`jeu : ${fam.size} famille${fam.size>1?"s":""} posée${fam.size>1?"s":""} (${[...fam].map(f=>famDe(f).nom).join(", ")})`:"",ev?`évaluation : ${ev}`:"",n?"évaluation terminée":""].filter(Boolean).join(" · ")||"pas encore commencé"}}
+  if(aid==="a4"){const d=a4docs[tid]||{},nb=A4_PIECES.filter(p=>d[p.id]).length;
+    return {st:d.fini?"fait":(d.vuIntro||nb)?"encours":"afaire",txt:d.fini?`enquête bouclée · pièces ${fr(A4_PIECES.reduce((s,p)=>s+a4PtsPiece(p,d[p.id]),0))}/12 · conclusion : ${esc(String(d.concl||"").toLowerCase())}`:d.vuIntro||nb?`${nb}/3 pièces examinées${d.carte?" · carte surprise tirée":""}`:"pas encore commencé"}}
+  if(aid==="a5"){const n=notesA5.find(x=>x.id===tid);return {st:n?"fait":"afaire",txt:n?`puzzle 1 : ${fr(+n.a||0)}/4 · puzzle 2 : ${fr(+n.b||0)}/4 · défi : ${fr(+n.c||0)}/12${n.correcteur?" · corrigé par "+esc(n.correcteur):""}`:"fiche pas encore validée"}}
+  if(aid==="a6"){const d=a6docs[tid]||{},ok=A6_MISSIONS.filter(mi=>a6M(d,mi.id).ok).length,es=A6_MISSIONS.reduce((s,mi)=>s+(a6M(d,mi.id).essais||[]).length,0);
+    return {st:d.fini?"fait":d.vuIntro?"encours":"afaire",txt:d.vuIntro?`missions réussies ${ok}/3 (${es} essai${es>1?"s":""})${d.quizFini?` · quiz ${A6_QUIZ.filter(x=>(d.quiz||{})[x.id]===x.b).length}/${A6_QUIZ.length}`:""}${d.fini?" · terminé":""}`:"pas encore commencé"}}
+  return {st:"afaire",txt:""}}
+function vProfAt(aid){const sid=profSeance||seanceSel||seanceParDefaut(),gs=groupesDe(sid),a=ATELIERS.find(x=>x.id===aid);
+  if(aid==="a3")profChargerFam(sid);
+  if(!gs.length)return `<p class="note">Les groupes ne sont pas encore formés pour cette séance.</p>`;
+  const LIBS={fait:"terminé",encours:"en cours",afaire:"à faire"}, B=BESOIN[aid]||{};
+  return `<p class="note" style="margin:0">Séance : ${esc((seances[sid]||{}).nom||"")} (changez-la dans l'onglet « Suivi de la séance »). Atelier ${a.n} · ${esc(titreAt(a))}, en ${esc(B.titre||"sous-groupes")}.${aid==="a6"?" La note de l'atelier 6 est la même pour tout le groupe : la moyenne des deux équipes.":""}${aid==="a3"?` <button class="link" id="profFamMaj">Actualiser le jeu</button>`:""}</p>`+
+   gs.map(g=>{const sd=subsDe(g.id,aid);const p=phaseSeance(sid),cour=p.phase==="rot"&&atelierDe(g.k,p.r).id===aid;
+    const lignes=sd?sd.equipes.map((m,i)=>{const tid=g.id+"-"+aid+"-e"+(i+1),av=profAvancement(aid,g,tid),n=m.length?noteEtu(g,m[0],aid):null;
+      return `<tr><td><b>${B.type==="duos"?"Binôme":"Équipe"} ${i+1}</b></td><td class="wrap">${m.map(x=>esc(nomCourt(sid,x))).join(", ")}</td><td><span class="chip ${av.st}">${LIBS[av.st]}</span> <span class="note">${av.txt}</span></td><td class="num"><b>${n!=null?fr(n):"–"}</b></td></tr>`}).join(""):`<tr><td colspan="4" class="note">Sous-groupes pas encore formés.</td></tr>`;
+    return `<div class="card"><div class="row" style="justify-content:space-between;align-items:center"><span style="display:flex;gap:10px;align-items:center">${mascSVG(g.mascotte,34)}<b style="font-size:18px;color:${g.couleur}">${esc(g.nom)}</b></span>${cour?`<span class="chip encours">sur cet atelier maintenant</span>`:""}</div>
+     <div class="tablebox"><table><tr><th></th><th>Membres</th><th>Avancement</th><th>Note /20</th></tr>${lignes}</table></div></div>`}).join("")}
+/* ----- espace encadrants : notes, synthèse et corrigés pour chaque atelier (comme l'atelier 2) ----- */
+const SOUS_AT={
+ a1:[["notes","Notes"],["suivi","Suivi des évaluations"],["synthese","Synthèse"],["grille","Grille d'évaluation"]],
+ a3:[["notes","Notes"],["suivi","Suivi"],["synthese","Synthèse"],["cartes","Corrigé des cartes"],["questions","Questions du quiz"]],
+ a4:[["notes","Notes"],["suivi","Suivi"],["synthese","Synthèse"],["corrige","Corrigé de l'enquête"]],
+ a5:[["notes","Notes"],["suivi","Suivi"],["synthese","Synthèse"],["corrige","Corrigés et barème"]],
+ a6:[["notes","Notes"],["suivi","Suivi"],["synthese","Synthèse"],["corrige","Corrigé des missions"],["quiz","Questions du quiz"]]};
+let sousAt={a1:"notes",a3:"notes",a4:"notes",a5:"notes",a6:"notes"};
+const A3_BANQUE=[{"th":"Estomac","sp":"Comparé","q":"Au niveau de quelle vertèbre thoracique l’œsophage traverse-t-il le hiatus œsophagien chez le cheval ?","r":"13e","x":"Cheval : 13e vertèbre thoracique, ruminants : 8e ou 9e, carnivores : 9e."},{"th":"Estomac","sp":"Comparé","q":"Chez les ongulés, l’œsophage est fortement déporté à gauche dans la moitié caudale du cou.","r":"Vrai","x":"Le déport à gauche est marqué chez les ongulés, moindre chez les carnivores."},{"th":"Estomac","sp":"Comparé","q":"Lequel de ces sites n’est PAS une zone de rétrécissement de l’œsophage (site d’obstruction) ?","r":"Le cardia du rumen","x":"Les obstructions se font à la jonction pharyngo-œsophagienne, à l’entrée de la poitrine, à la base du cœur et au hiatus œsophagien."},{"th":"Estomac","sp":"Chien","q":"La muqueuse de l’œsophage du chien est fortement kératinisée.","r":"Faux","x":"L’épithélium est très kératinisé chez les ruminants, pas chez le chien."},{"th":"Estomac","sp":"Comparé","q":"Quelle est la longueur approximative de l’œsophage du chien ?","r":"30 cm","x":"Chien ≈ 30 cm, bœuf ≈ 90 cm, cheval 120 à 150 cm."},{"th":"Estomac","sp":"Chien","q":"La muqueuse gastrique des carnivores est entièrement glandulaire.","r":"Vrai","x":"Pas de région proventriculaire : muqueuses cardiale (bande brève), fundique et pylorique."},{"th":"Estomac","sp":"Chien","q":"Sur quelle courbure de l’estomac s’attache le grand omentum ?","r":"La grande courbure","x":"Le grand omentum naît de la grande courbure ; le petit omentum s’attache à la petite courbure."},{"th":"Estomac","sp":"Chien","q":"L’estomac vide du chien est palpable à travers la paroi abdominale gauche.","r":"Faux","x":"Vide, il est entièrement sous les côtes (10e à 12e côte) et non palpable ; plein, il dépasse l’arc costal et devient palpable à gauche."},{"th":"Estomac","sp":"Chien","q":"Quelle muqueuse de l’estomac du chien est jaunâtre et peu plissée ?","r":"La muqueuse pylorique","x":"La muqueuse pylorique est jaunâtre, plus mince et moins plissée ; la fundique est rosâtre à rougeâtre."},{"th":"Estomac","sp":"Chien","q":"Quel geste chirurgical prévient la récidive du syndrome dilatation-torsion de l’estomac ?","r":"La gastropexie","x":"La gastropexie fixe l’estomac à la paroi abdominale."},{"th":"Estomac","sp":"Chien","q":"La muqueuse fundique sécrète l’acide chlorhydrique et le pepsinogène.","r":"Vrai","x":"Les glandes gastriques du fundus et du corps sécrètent HCl, pepsinogène et quelques hormones."},{"th":"Estomac","sp":"Cheval","q":"Quelle structure limite la muqueuse aglandulaire de l’estomac du cheval ?","r":"Le margo plicatus","x":"Le margo plicatus sépare la muqueuse proventriculaire (blanchâtre, aglandulaire) de la muqueuse glandulaire."},{"th":"Estomac","sp":"Cheval","q":"Le sac aveugle (saccus caecus) de l’estomac du cheval est tapissé d’une muqueuse aglandulaire.","r":"Vrai","x":"La muqueuse proventriculaire, très étendue, envahit le saccus caecus et la petite courbure."},{"th":"Estomac","sp":"Cheval","q":"Quelle est la capacité de l’estomac du cheval ?","r":"6 à 30 L","x":"6 à 30 L, faible pour la taille de l’animal."},{"th":"Estomac","sp":"Cheval","q":"Quel organe est accolé à la grande courbure et au saccus caecus chez le cheval (latéralement) ?","r":"La rate","x":"La rate est reliée à la grande courbure par le ligament gastro-splénique."},{"th":"Estomac","sp":"Cheval","q":"Chez le cheval, le cardia et le pylore sont proches : la petite courbure est brève.","r":"Vrai","x":"Estomac très incurvé, en haricot : petite courbure brève, grande courbure très étendue."},{"th":"Estomac","sp":"Lapin","q":"Bien qu’herbivore, le lapin a un estomac sans cul-de-sac gastrique ni région proventriculaire.","r":"Vrai","x":"Son estomac est organisé comme celui du chien : muqueuse entièrement glandulaire."},{"th":"Estomac","sp":"Porc","q":"Comment se répartit la muqueuse glandulaire de l’estomac du porc ?","r":"1/3 cardiale, 1/3 fundique, 1/3 pylorique","x":"Omnivore : répartition à peu près égale entre muqueuses cardiale, fundique et pylorique."},{"th":"Estomac","sp":"Porc","q":"Comment s’appelle le bouchon conjonctivo-adipeux qui obture en partie le pylore du porc ?","r":"Le torus pylorique","x":"Le torus pylorique, aussi bien développé dans la caillette des ruminants."},{"th":"Estomac","sp":"Porc","q":"L’estomac du porc présente une ébauche de proventricule près du cardia, à muqueuse aglandulaire.","r":"Vrai","x":"C’est la pars œsophagienne, une bande restreinte de quelques centimètres autour du cardia."},{"th":"Estomac","sp":"Vache","q":"Quel compartiment représente environ 80 % du volume de l’estomac de la vache ?","r":"Le rumen","x":"Rumen ≈ 80 % (150 à 200 L), caillette ≈ 8 %, feuillet ≈ 7 %, réseau ≈ 5 %."},{"th":"Estomac","sp":"Vache","q":"Quel est le seul compartiment à muqueuse glandulaire chez la vache ?","r":"La caillette","x":"La caillette (abomasum) est l’estomac « vrai » : muqueuse fundique et pylorique."},{"th":"Estomac","sp":"Vache","q":"Le sac dorsal du rumen contient les gaz issus de la fermentation.","r":"Vrai","x":"Le sac ventral contient le fourrage en fermentation."},{"th":"Estomac","sp":"Vache","q":"Où réalise-t-on le trocardage du rumen en cas de météorisation ?","r":"Creux du flanc gauche","x":"Le cul-de-sac dorsal du rumen est en rapport avec le creux du flanc gauche."},{"th":"Estomac","sp":"Vache","q":"Un corps étranger pointu peut provoquer une réticulite puis une péricardite. Dans quel compartiment se bloque-t-il ?","r":"Le réseau","x":"Le réseau repose sur le processus xiphoïde, au contact du diaphragme, à proximité du cœur."},{"th":"Estomac","sp":"Vache","q":"Chez le veau, le rumen est déjà le compartiment le plus développé.","r":"Faux","x":"Chez le veau, c’est la caillette qui est la plus développée."},{"th":"Estomac","sp":"Vache","q":"Quel est le rôle principal du feuillet (omasum) ?","r":"Réguler le passage vers la caillette et absorber l’eau","x":"Ses lames triturent les aliments ; seuls les aliments assez fins passent dans la caillette. Il absorbe aussi l’eau."},{"th":"Estomac","sp":"Vache","q":"Quel compartiment se contracte de façon quasi continue et initie les contractions des autres ?","r":"Le réseau","x":"Le réseau (≈ 3 longues contractions/min) oriente le bol vers le rumen, la bouche ou le feuillet."},{"th":"Estomac","sp":"Vache","q":"Le feuillet est situé à gauche du rumen.","r":"Faux","x":"Le feuillet est situé à droite du rumen et du réseau, en région post-diaphragmatique."},{"th":"Estomac","sp":"Vache","q":"Quelle partie du rumen reçoit l’œsophage ?","r":"L’atrium du rumen","x":"L’atrium, crânio-dorsal, reçoit le cardia et communique avec le réseau."},{"th":"Estomac","sp":"Vache","q":"Le déplacement à gauche de la caillette est une affection chirurgicale de la vache.","r":"Vrai","x":"La caillette, normalement ventrale et à droite, se déplace entre le rumen et la paroi gauche."},{"th":"Estomac","sp":"Vache","q":"Sur quel sillon du rumen s’attache le feuillet superficiel du grand omentum ?","r":"Le sillon longitudinal gauche","x":"Le feuillet profond s’attache sur le sillon longitudinal droit."},{"th":"Intestin grêle","sp":"Comparé","q":"Quelle espèce possède le jéjunum le plus long ?","r":"Le bœuf (≈ 40 m)","x":"Bœuf ≈ 40 m, cheval ≈ 22 m, homme ≈ 7 m, chien ≈ 3,5 m."},{"th":"Intestin grêle","sp":"Chien","q":"Quels conduits s’ouvrent sur la papille duodénale majeure ?","r":"Le conduit cholédoque et le conduit pancréatique","x":"La papille mineure porte le conduit pancréatique accessoire (inconstant chez le chat)."},{"th":"Intestin grêle","sp":"Chien","q":"Chez les carnivores, le jéjuno-iléon est enveloppé dans le grand omentum.","r":"Vrai","x":"Il occupe le ventre et les flancs, de l’hypochondre au bassin."},{"th":"Intestin grêle","sp":"Cheval","q":"Où se situe la racine du mésentère chez le cheval ?","r":"En regard de L2","x":"Racine du mésentère vers L2 : environ 20 m de jéjunum y sont suspendus, très mobiles."},{"th":"Intestin grêle","sp":"Cheval","q":"L’iléon du cheval, court et à paroi épaisse, rejoint la base du cæcum.","r":"Vrai","x":"Environ 1 m, uni au cæcum par le pli iléo-cæcal."},{"th":"Intestin grêle","sp":"Cheval","q":"Pourquoi le jéjunum du cheval est-il prédisposé aux hernies et aux torsions ?","r":"Parce qu’il est très mobile, suspendu à un long mésentère","x":"Long (≈ 20 m), très circonvolutionné et très mobile."},{"th":"Intestin grêle","sp":"Vache","q":"À quelle distance du pylore se trouve la papille duodénale majeure chez les ruminants ?","r":"≈ 60 cm","x":"Papille majeure ≈ 60 cm du pylore, papille mineure ≈ 90 cm."},{"th":"Intestin grêle","sp":"Vache","q":"Chez les ruminants, les intestins sont refoulés dans la moitié droite de l’abdomen par le rumen.","r":"Vrai","x":"Le rumen occupe le flanc gauche ; les intestins sont logés dans la bourse supra-omentale, à droite."},{"th":"Intestin grêle","sp":"Lapin","q":"Comment s’appelle la dilatation terminale de l’iléon du lapin ?","r":"Le sacculus rotundus","x":"Le sacculus rotundus (ampoule iléale) précède le cæcum."},{"th":"Intestin grêle","sp":"Cheval","q":"Le duodénum du cheval présente une ampoule bien développée. Quelle est sa longueur ?","r":"≈ 20 cm","x":"Duodénum ≈ 1 m, avec une ampoule duodénale d’environ 20 cm."},{"th":"Cæcum","sp":"Chien","q":"Quelle est la forme du cæcum du chien ?","r":"En spirale (tire-bouchon)","x":"Chien : 5–6 cm, spiralé. Chat : 2–3 cm, en crochet."},{"th":"Cæcum","sp":"Cheval","q":"Combien de bandes charnues parcourent le corps du cæcum du cheval ?","r":"Quatre","x":"Quatre bandes : dorsale, ventrale, latérale et médiale, avec des bosselures."},{"th":"Cæcum","sp":"Cheval","q":"Quelle est la capacité du cæcum du cheval ?","r":"≈ 40 L","x":"Cæcum énorme : ≈ 1 m de long et ≈ 40 L."},{"th":"Cæcum","sp":"Comparé","q":"Les carnivores et les ruminants ont un cæcum bosselé à bandes charnues.","r":"Faux","x":"Les bosselures du cæcum et du côlon ascendant sont absentes chez les carnivores et les ruminants."},{"th":"Cæcum","sp":"Vache","q":"Où se place l’apex du cæcum chez la vache ?","r":"À l’entrée du bassin","x":"Il est accessible à la palpation transrectale."},{"th":"Cæcum","sp":"Lapin","q":"Comment se termine le cæcum du lapin ?","r":"Par l’appendice vermiforme","x":"Sa partie distale, étroite (≈ 1/3 de la longueur), se termine par l’appendice vermiforme."},{"th":"Cæcum","sp":"Porc","q":"Dans quel flanc se trouve le cæcum du porc ?","r":"Le flanc gauche, partie dorsale","x":"Cæcum dans la région dorsale du flanc gauche, apex vers l’entrée du bassin."},{"th":"Cæcum","sp":"Lapin","q":"Le cæcum du lapin est enroulé sur lui-même sur environ un tour et demi.","r":"Vrai","x":"Avec le côlon ascendant, il occupe la plus grande partie du ventre et du flanc droit."},{"th":"Côlon","sp":"Vache","q":"De quoi est constituée l’anse spirale du côlon ascendant de la vache ?","r":"2 tours centripètes, une flexure centrale, 2 tours centrifuges","x":"Les tours centrifuges ont un calibre plus faible."},{"th":"Côlon","sp":"Porc","q":"Combien de tours centripètes compte le côlon spiral du porc ?","r":"3","x":"Porc : 3 tours centripètes vers le bas (ventralement) puis 3 tours centrifuges au centre."},{"th":"Côlon","sp":"Cheval","q":"Quelle partie du gros côlon du cheval est un rétrécissement, siège fréquent d’obstruction ?","r":"La courbure pelvienne","x":"La courbure pelvienne, à l’entrée du bassin, est palpable par voie transrectale."},{"th":"Côlon","sp":"Cheval","q":"Le côlon dorsal gauche du cheval est lisse et ne porte qu’une seule bande charnue.","r":"Vrai","x":"Diamètre ≈ 10 cm, contre ≈ 40 cm et 4 bandes pour les côlons ventraux."},{"th":"Côlon","sp":"Cheval","q":"Quelle est la capacité du gros intestin du cheval ?","r":"≈ 140 L","x":"≈ 10 m de long et ≈ 140 L : deux grands réservoirs de fermentation (cæcum et côlon ascendant)."},{"th":"Côlon","sp":"Chien","q":"Où se situe le côlon transverse chez les carnivores ?","r":"Caudal à l’estomac, crânial à la racine du mésentère","x":"Bref et profond, il passe de droite à gauche."},{"th":"Côlon","sp":"Lapin","q":"Le côlon ascendant du lapin présente une forte dilatation à son origine : l’ampoule du côlon.","r":"Vrai","x":"Il suit ensuite l’enroulement du cæcum."},{"th":"Côlon","sp":"Chien","q":"Les glandes para-anales sont propres aux carnivores.","r":"Vrai","x":"Elles peuvent s’infecter et doivent parfois être vidées."},{"th":"Côlon","sp":"Cheval","q":"Comment s’appelle aussi le côlon descendant du cheval ?","r":"Le petit côlon","x":"Le petit côlon mesure ≈ 3 m, est bosselé et circonvolutionné."},{"th":"Foie & pancréas","sp":"Cheval","q":"Quelle espèce n’a pas de vésicule biliaire ?","r":"Le cheval","x":"Le cheval n’a pas de vésicule biliaire."},{"th":"Foie & pancréas","sp":"Vache","q":"Chez les ruminants, le foie est entièrement déporté à droite.","r":"Vrai","x":"Il est tourné vers la droite : lobe gauche ventral, lobe droit dorsal."},{"th":"Foie & pancréas","sp":"Vache","q":"Chez le bœuf, quel lobe du foie est le seul à être divisé ?","r":"Le lobe caudé","x":"Le lobe caudé se divise en processus caudé et processus papillaire ; les lobes gauche et droit ne sont pas divisés."},{"th":"Foie & pancréas","sp":"Porc","q":"Quel aspect permet de reconnaître le foie du porc ?","r":"Le contour des lobules est très net à sa surface","x":"Le tissu conjonctif interlobulaire, abondant, dessine les lobules."},{"th":"Foie & pancréas","sp":"Chien","q":"Combien de lobes principaux compte le foie du chien ?","r":"6","x":"Lobes gauche latéral et médial, carré, droit médial et latéral, caudé (avec processus caudé et papillaire)."},{"th":"Foie & pancréas","sp":"Chien","q":"Quelle est la forme du pancréas du chien ?","r":"En V, deux lobes réunis par un corps","x":"Le lobe droit est dans le mésoduodénum, le lobe gauche dans le grand omentum."},{"th":"Foie & pancréas","sp":"Cheval","q":"Quel vaisseau traverse l’anneau pancréatique du cheval ?","r":"La veine porte","x":"L’anneau pancréatique existe chez le cheval et le porc."},{"th":"Foie & pancréas","sp":"Lapin","q":"Le pancréas du lapin est un organe mince et presque transparent, diffus dans le mésoduodénum.","r":"Vrai","x":"Son conduit s’ouvre dans le duodénum près de la jonction duodéno-jéjunale."},{"th":"Foie & pancréas","sp":"Comparé","q":"Quelles cellules pancréatiques sécrètent l’insuline ?","r":"Les cellules B","x":"Cellules A : glucagon ; cellules B : insuline (pancréas endocrine)."},{"th":"Foie & pancréas","sp":"Comparé","q":"Quelle enzyme pancréatique dégrade les protéines ?","r":"La trypsine","x":"Amylase : glucides ; lipase : graisses ; trypsine : protéines."},{"th":"Foie & pancréas","sp":"Comparé","q":"Le foie synthétise l’albumine et produit la bile.","r":"Vrai","x":"Il intervient aussi dans la néoglucogenèse, le stockage du glycogène et la détoxification."},{"th":"Topographie","sp":"Comparé","q":"Quelle artère irrigue l’estomac, le foie, la rate et le pancréas ?","r":"Le tronc cœliaque","x":"Branches : artères gastrique gauche, hépatique et splénique."},{"th":"Topographie","sp":"Comparé","q":"Quelle artère irrigue le côlon descendant et le rectum ?","r":"L’artère mésentérique caudale","x":"Branches : artère colique gauche et artère rectale crâniale."},{"th":"Topographie","sp":"Comparé","q":"Le sang veineux de l’intestin rejoint directement la veine cave caudale.","r":"Faux","x":"Il passe par la veine porte, qui le conduit au foie avant la circulation générale."},{"th":"Topographie","sp":"Comparé","q":"Quel système stimule la motricité et les sécrétions digestives ?","r":"Le système parasympathique (nerf vague)","x":"Le parasympathique stimule ; le sympathique inhibe la motricité et provoque une vasoconstriction."},{"th":"Topographie","sp":"Comparé","q":"Qu’est-ce qu’un méso ?","r":"Une lame de péritoine reliant le feuillet pariétal au feuillet viscéral","x":"Le méso porte les vaisseaux et les nerfs de l’organe (mésentère, mésocôlon…)."},{"th":"Topographie","sp":"Comparé","q":"Quel autre nom donne-t-on au petit omentum ?","r":"Ligament hépato-gastrique","x":"Il est tendu entre la porte du foie et la petite courbure de l’estomac."},{"th":"Topographie","sp":"Cheval","q":"Chez le cheval, l’intestin peut se déplacer dans l’espace néphro-splénique et provoquer une colique.","r":"Vrai","x":"C’est l’accrochement néphro-splénique."},{"th":"Topographie","sp":"Comparé","q":"Comment s’appelle le plexus nerveux entérique situé entre les couches de la musculeuse ?","r":"Le plexus d’Auerbach (myentérique)","x":"Le plexus de Meissner est sous-muqueux."},{"th":"Topographie","sp":"Comparé","q":"Les shunts porto-systémiques concernent surtout le chien et le chat.","r":"Vrai","x":"Le sang porte court-circuite alors le foie."}];
+const seanceProfAt=()=>profSeance||seanceSel||seanceParDefaut();
+function nomLong(sid,id){const s=seances[sid];const e=s&&s.etudiants.find(x=>x.id===id);return e?e.p+" "+e.n:id}
+function equipesAt(aid){const sid=seanceProfAt(),out=[];groupesDe(sid).forEach(g=>{const sd=subsDe(g.id,aid);if(!sd)return;sd.equipes.forEach((m,i)=>out.push({g,i,m,tid:g.id+"-"+aid+"-e"+(i+1)}))});return out}
+const libEq=(aid,i)=>((BESOIN[aid]||{}).type==="duos"?"Binôme ":"Équipe ")+(i+1);
+const pct=x=>Math.round(x*100)+" %";
+const barreS=(t,n,txt)=>`<span class="barre"><i style="width:${n?Math.round(t/n*100):0}%"></i></span> <span class="num">${txt!=null?txt:t+"/"+n}</span>`;
+function enteteAt(aid){const sid=seanceProfAt();return `<p class="note" style="margin:0">Séance : ${esc((seances[sid]||{}).nom||"aucune")} (changez-la dans l'onglet « Suivi de la séance »).</p>`}
+function vProfSuite(aid){const s=sousAt[aid]||"notes";
+  if(s==="suivi")return aid==="a1"?vProfA1Eq():vProfAt(aid);
+  if(s==="notes")return vProfNotesAt(aid);
+  if(s==="synthese")return enteteAt(aid)+({a1:synthA1,a3:synthA3,a4:synthA4,a5:synthA5,a6:synthA6}[aid])();
+  if(s==="grille")return corrA1();
+  if(s==="cartes")return corrA3Cartes();
+  if(s==="questions")return corrA3Questions();
+  if(s==="corrige")return ({a4:corrA4,a5:corrA5,a6:corrA6}[aid])();
+  if(s==="quiz")return corrA6Quiz();
+  return ""}
+/* --- notes --- */
+function colsAt(aid,t){
+  if(aid==="a1"){const n=noteA1(t.tid),fait=evals.some(e=>e.evaluateur===t.tid&&e.statut==="envoyee");return [["Maquette (note reçue) /20",n!=null?fr(n):"–"],["A évalué une autre équipe",fait?"oui":"non"]]}
+  if(aid==="a3"){const src=notesA3.find(x=>x.id===t.tid)||a3prog[t.tid]||{},fam=new Set();((profFam[t.g.seance]||{}).docs||[]).forEach(p=>((p.poses||{})[t.tid]||[]).forEach(f=>fam.add(f)));
+    return [["Repérage",src.reperage?src.reperage.score+"/"+src.reperage.total:"–"],["Quiz",src.quiz?src.quiz.score+"/"+src.quiz.total:"–"],["Familles posées (jeu)",String(fam.size)]]}
+  if(aid==="a4"){const d=a4docs[t.tid]||{};return [...A4_PIECES.map((p,k)=>["Pièce "+(k+1)+" /4",d.fini?fr(a4PtsPiece(p,d[p.id])):"–"]),["Conclusion",d.concl?d.concl+(d.concl===A4_CONCL[0]?" ✓":" ✗"):"–"]]}
+  if(aid==="a5"){const n=notesA5.find(x=>x.id===t.tid);return [["Puzzle 1 /4",n?fr(+n.a||0):"–"],["Puzzle 2 /4",n?fr(+n.b||0):"–"],["Défi foie /12",n?fr(+n.c||0):"–"],["Corrigé par",n&&n.correcteur?n.correcteur:"–"]]}
+  if(aid==="a6"){const d=a6docs[t.tid]||{},n=a6Note(d);return [["Missions /12",d.vuIntro?fr(a6PtsMissions(d)):"–"],["Quiz /8",d.quizFini?fr(a6PtsQuiz(d)):"–"],["Note de l'équipe /20",n!=null?fr(n):"–"]]}
+  return []}
+function lignesNotesAt(aid){const sid=seanceProfAt();return equipesAt(aid).map(t=>{const c=colsAt(aid,t),n=t.m.length?noteEtu(t.g,t.m[0],aid):null;return {t,c,n,sid}})}
+function vProfNotesAt(aid){if(aid==="a3")profChargerFam(seanceProfAt());const L=lignesNotesAt(aid);
+  if(!L.length)return enteteAt(aid)+`<p class="note">Les sous-groupes ne sont pas encore formés pour cette séance.</p>`;
+  const cols=L[0].c.map(x=>x[0]),notes=L.filter(l=>l.n!=null).map(l=>l.n),moy=notes.length?notes.reduce((s,x)=>s+x,0)/notes.length:null;
+  return enteteAt(aid)+`<div class="tablebox"><table><tr><th>Groupe</th><th></th><th>Membres</th>${cols.map(c=>`<th>${esc(c)}</th>`).join("")}<th>Note /20${aid==="a6"?" (moyenne du groupe)":""}</th></tr>
+   ${L.map(l=>`<tr><td><b style="color:${l.t.g.couleur}">${esc(l.t.g.nom)}</b></td><td>${libEq(aid,l.t.i)}</td><td class="wrap">${l.t.m.map(x=>esc(nomCourt(l.sid,x))).join(", ")}</td>${l.c.map(x=>`<td class="num wrap">${esc(x[1])}</td>`).join("")}<td class="num"><b>${l.n!=null?fr(l.n):"–"}</b></td></tr>`).join("")}</table></div>
+   <p class="note">${L.length} ${(BESOIN[aid]||{}).type==="duos"?"binôme(s)":"équipe(s)"} · ${notes.length} noté(s)${moy!=null?` · moyenne ${fr(Math.round(moy*10)/10)} / 20`:""}. Chaque étudiant reçoit la note de son ${(BESOIN[aid]||{}).type==="duos"?"binôme":"équipe"}${aid==="a6"?" (pour l'atelier 6 : la moyenne des deux équipes du groupe)":""}.</p>
+   <div class="row"><button class="btn" data-csvat="${aid}">Copier le tableau par étudiant (pour Excel)</button><button class="btn ghost" data-dlat="${aid}">Télécharger en CSV</button></div>`}
+function csvAt(aid,sep){const L=lignesNotesAt(aid);if(!L.length)return "";const sid=L[0].sid,h=["Seance","Groupe","Sous-groupe","Etudiant",...L[0].c.map(x=>x[0]),"Note /20"],rows=[];
+  L.forEach(l=>l.t.m.forEach(e=>{const n=noteEtu(l.t.g,e,aid);rows.push([(seances[sid]||{}).nom||"",l.t.g.nom,libEq(aid,l.t.i),nomLong(sid,e),...l.c.map(x=>x[1]),n!=null?fr(n):""])}));
+  return [h,...rows].map(r=>r.map(c=>sep===";"?`"${String(c).replace(/"/g,'""')}"`:String(c)).join(sep)).join("\n")}
+/* --- tableau de synthèse commun (même présentation que l'atelier 2) --- */
+function tableSynthAt(L,vide,intro){if(!L.length)return `<p class="note">${vide}</p>`;L.sort((a,b)=>a.taux-b.taux);
+  return `<div class="${projeter?"proj":""}"><div class="row" style="justify-content:space-between;margin:12px 0"><p class="note" style="margin:0">${intro||"Du plus raté au mieux réussi, toutes équipes de la séance confondues. À projeter pour le débrief."}</p><button class="btn ghost sm" data-projat="1">${projeter?"Affichage normal":"Grand affichage"}</button></div>
+   <div class="tablebox"><table><tr><th>Type</th><th>Item</th><th>Réussi</th><th>À retenir</th></tr>
+   ${L.map(l=>`<tr><td>${esc(l.type)}</td><td class="wrap"><b>${esc(l.titre)}</b></td><td>${barreS(l.t,l.n,l.lib)}</td><td class="wrap">${esc(l.txt||"")}${l.clin?`<span class="clin">${esc(l.clin)}</span>`:""}</td></tr>`).join("")}</table></div></div>`}
+function synthA1(){const ids=new Set(equipesAt("a1").map(t=>t.tid)),E=evals.filter(e=>e.statut==="envoyee"&&ids.has(e.cible));
+  if(!E.length)return `<p class="note">La synthèse apparaîtra dès qu'une évaluation de maquette aura été envoyée.</p>`;
+  const L=[];CRITERES.forEach(c=>{if(c.liste)return;const s=E.reduce((a,e)=>a+(+((e.pts||{})[c.id])||0),0),m=E.length*c.max;L.push({type:"Critère",titre:c.titre,t:s,n:m,taux:s/m,lib:pct(s/m)+" des points",txt:c.aide})});
+  SEGMENTS.forEach((sg,k)=>{const t=E.filter(e=>(e.portions||[]).includes(k)).length;L.push({type:"Portion",titre:sg,t,n:E.length,taux:t/E.length,txt:"Reconnue sur "+t+" maquette(s) sur "+E.length+"."})});
+  const tot=E.map(e=>+e.total||0),moy=tot.reduce((s,x)=>s+x,0)/tot.length;
+  return `<div class="card"><h3 style="margin-top:0">${E.length} maquette(s) évaluée(s) · note moyenne attribuée par les pairs ${fr(Math.round(moy*10)/10)} / 20</h3>
+   ${E.some(e=>e.final)?`<details><summary>Commentaires finaux des évaluateurs</summary>${E.filter(e=>e.final).map(e=>`<p style="margin:6px 0">« ${esc(e.final)} »</p>`).join("")}</details>`:""}</div>`+tableSynthAt(L,"","Critères et portions, du moins réussi au mieux réussi (évaluations par les pairs de la séance).")}
+function synthA3(){const sid=seanceProfAt();profChargerFam(sid);const ids=new Set(equipesAt("a3").map(t=>t.tid)),L=[],Q={},R={};let nb=0;
+  ids.forEach(id=>{const src=notesA3.find(x=>x.id===id)||a3prog[id];if(!src)return;nb++;
+    ((src.quiz||{}).det||[]).forEach(x=>{const k=x.q;Q[k]=Q[k]||{type:"Quiz · "+x.th,titre:x.q,t:0,n:0,txt:"Réponse : "+x.r};Q[k].n++;if(x.ok)Q[k].t++});
+    ((src.reperage||{}).det||[]).forEach(x=>{const k=x.esp+"|"+x.n;R[k]=R[k]||{type:"Repérage · "+x.esp,titre:x.n,t:0,n:0,txt:""};R[k].n++;if(x.ok)R[k].t++})});
+  Object.values(Q).concat(Object.values(R)).forEach(l=>{l.taux=l.t/l.n;L.push(l)});
+  const docs=(profFam[sid]||{}).docs||[],st={},fx={};docs.forEach(d=>{Object.entries(d.st||{}).forEach(([k,v])=>{st[k]=st[k]||[0,0];st[k][0]+=v[0];st[k][1]+=v[1]});(d.fx||[]).forEach(([cid,cr])=>{const k=cid+"|"+cr;fx[k]=(fx[k]||0)+1})});
+  const J=[];FAMILLES.forEach(f=>{const c=st["c_"+f.id],v=st["v_"+f.id];if(c&&c[0]+c[1])J.push({type:"Jeu · critères",titre:f.nom,t:c[0],n:c[0]+c[1],taux:c[0]/(c[0]+c[1]),txt:"Critères de reconnaissance choisis justes."});
+    if(v&&v[0]+v[1])J.push({type:"Jeu · validation 3D",titre:f.nom,t:v[0],n:v[0]+v[1],taux:v[0]/(v[0]+v[1]),txt:"Familles validées sur le modèle 3D du premier coup."})});
+  const pieges=Object.entries(fx).sort((a,b)=>b[1]-a[1]).slice(0,10).map(([k,n])=>{const [cid,cr]=k.split("|"),c=CARTES7[cid];if(!c)return "";const vrai=Object.values(CARTES7).find(x=>x.puces.includes(cr));
+    return `<tr><td class="wrap"><b>${esc(famDe(c.f).nom)} · ${esc(c.membre)}</b></td><td class="wrap">« ${esc(cr)} »${vrai?`<span class="clin">Ce critère appartient à : ${esc(famDe(vrai.f).nom)} · ${esc(vrai.membre)}</span>`:""}</td><td class="num">${n}</td></tr>`}).join("");
+  return `<h3 style="margin:14px 0 0">Évaluation (repérage et quiz)</h3>`+tableSynthAt(L,nb?"Les binômes de cette séance n'ont pas encore transmis le détail de leurs réponses (il arrive avec la nouvelle version de l'atelier).":"La synthèse apparaîtra dès qu'un binôme aura fait une épreuve.")+
+   `<h3 style="margin:18px 0 0">Jeu des 7 familles <button class="link" id="profFamMaj">Actualiser le jeu</button></h3>`+tableSynthAt(J,"Pas encore de statistiques de jeu pour cette séance (elles sont enregistrées pour les parties lancées avec cette version).","Par famille : critères de reconnaissance justes et validations sur le modèle 3D.")+
+   (pieges?`<div class="card" style="margin-top:12px"><h3 style="margin-top:0">Critères les plus souvent choisis à tort</h3><div class="tablebox"><table><tr><th>Carte demandée</th><th>Critère choisi</th><th>Fois</th></tr>${pieges}</table></div></div>`:"")}
+function synthA4(){const D=equipesAt("a4").map(t=>a4docs[t.tid]).filter(d=>d&&d.fini);
+  if(!D.length)return `<p class="note">La synthèse apparaîtra dès qu'une équipe aura bouclé l'enquête.</p>`;
+  const L=[];A4_PIECES.forEach((p,k)=>p.qs.forEach(q=>{let s=0;const faux={};D.forEach(d=>{s+=a4PtsQ(q,(d[p.id]||{})[q.id])/q.pts;const r=(d[p.id]||{})[q.id];(Array.isArray(r)?r:r?[r]:[]).forEach(x=>{if(!q.bonnes.includes(x))faux[x]=(faux[x]||0)+1})});
+    const fz=Object.entries(faux).sort((a,b)=>b[1]-a[1]).slice(0,2);L.push({type:"Pièce "+(k+1),titre:q.t,t:s,n:D.length,taux:s/D.length,lib:pct(s/D.length)+" des points",txt:q.corr,clin:fz.length?"Pièges choisis : "+fz.map(([x,n])=>x+" ("+n+")").join(", "):""})}));
+  const C={};D.forEach(d=>C[d.concl]=(C[d.concl]||0)+1);
+  return `<div class="card"><h3 style="margin-top:0">Conclusions des ${D.length} équipe(s)</h3>${A4_CONCL.map(c=>`<p style="margin:4px 0">${barreS(C[c]||0,D.length)} ${esc(c)}${c===A4_CONCL[0]?" <b>(bonne réponse)</b>":""}</p>`).join("")}</div>`+tableSynthAt(L,"")}
+function synthA5(){const N=equipesAt("a5").map(t=>notesA5.find(x=>x.id===t.tid)).filter(Boolean);
+  if(!N.length)return `<p class="note">La synthèse apparaîtra dès qu'un binôme aura validé sa fiche.</p>`;
+  const m=k=>N.reduce((s,n)=>s+(+n[k]||0),0)/N.length,parts=[["a","Puzzle 1",4],["b","Puzzle 2",4],["c","Défi foie",12]],notes=N.map(n=>+n.note||0),moy=notes.reduce((s,x)=>s+x,0)/notes.length;
+  const bins=[[0,10],[10,12],[12,14],[14,16],[16,18],[18,20.1]];
+  return `<div class="card"><h3 style="margin-top:0">${N.length} fiche(s) validée(s) · moyenne ${fr(Math.round(moy*10)/10)} / 20</h3>
+   ${parts.map(([k,l,mx])=>`<p style="margin:6px 0">${barreS(m(k),mx,fr(Math.round(m(k)*10)/10)+" / "+mx)} <b>${l}</b></p>`).join("")}
+   <h3>Répartition des notes</h3>${bins.map(([a,b])=>{const n=notes.filter(x=>x>=a&&x<b).length;return `<p style="margin:4px 0">${barreS(n,N.length)} ${a} à ${b>20?20:b}</p>`}).join("")}
+   <p class="note">La partie la plus faible est à reprendre en priorité lors du débrief : ouvrez l'onglet « Corrigés et barème » pour projeter les corrections.</p></div>`}
+function synthA6(){const D=equipesAt("a6").map(t=>a6docs[t.tid]).filter(d=>d&&d.vuIntro);
+  if(!D.length)return `<p class="note">La synthèse apparaîtra dès qu'une équipe aura commencé l'atelier.</p>`;
+  const L=[];A6_MISSIONS.forEach((mi,k)=>{const Ms=D.map(d=>a6M(d,mi.id)).filter(m=>(m.essais||[]).length||m.ok);if(!Ms.length)return;
+    const ok=Ms.filter(m=>m.ok).length,es=Ms.reduce((s,m)=>s+(m.essais||[]).length,0)/Ms.length;
+    L.push({type:"Mission "+(k+1),titre:mi.titre,t:ok,n:Ms.length,taux:ok/Ms.length,txt:"Réussie par "+ok+" équipe(s) sur "+Ms.length+" · "+fr(Math.round(es*10)/10)+" essai(s) en moyenne."});
+    mi.obj.forEach(o=>{const t=Ms.filter(m=>(m.essais||[]).some(e=>e.r&&o.ok(a6Simuler(e.r)))).length;L.push({type:"Mission "+(k+1)+" · objectif",titre:o.t,t,n:Ms.length,taux:t/Ms.length,txt:"Atteint au moins une fois."})})});
+  const Qd=D.filter(d=>d.quizFini);A6_QUIZ.forEach(q=>{if(!Qd.length)return;const t=Qd.filter(d=>(d.quiz||{})[q.id]===q.b).length;L.push({type:"Quiz",titre:q.t,t,n:Qd.length,taux:t/Qd.length,txt:"Réponse : "+q.o[q.b],clin:q.e})});
+  return tableSynthAt(L,"")}
+/* --- suivi atelier 1 par équipe (évaluations reçues, photo, correction de la note) --- */
+function vProfA1Eq(){const T=equipesAt("a1");if(!T.length)return enteteAt("a1")+`<p class="note">Les équipes ne sont pas encore formées pour cette séance.</p>`;
+  return enteteAt("a1")+`<p class="note" style="margin:0">Les équipes ne voient jamais qui les a notées. Vous pouvez corriger la note de maquette (la note de l'atelier ajoute 4 points si l'équipe a elle-même évalué une maquette).</p>`+T.map(t=>{const a=a1docs[t.tid]||{},ev=evals.filter(e=>e.cible===t.tid),n=noteA1(t.tid);
+   return `<div class="card"><div class="row" style="justify-content:space-between"><span><b style="font-size:18px;color:${t.g.couleur}">${esc(t.g.nom)} · ${libEq("a1",t.i)}</b><br><span class="note">${t.m.map(x=>esc(nomCourt(seanceProfAt(),x))).join(", ")} · ${a.maquette?"maquette terminée à "+new Date(a.maquette).toLocaleTimeString("fr-FR",{hour:"2-digit",minute:"2-digit"}):a.debut?"maquette en cours":"pas encore commencé"}</span></span>
+    <span class="row"><span class="note">Maquette</span><b class="num" style="font-size:22px">${n!=null?fr(n):"–"}</b><span class="note">/20 · corriger :</span><input class="petit" type="number" min="0" max="20" step="0.5" data-noteprof="${t.tid}" value="${a.noteProf!=null?a.noteProf:""}" placeholder="auto"></span></div>
+    ${ev.length?ev.map(e=>{const qui=equipesAt("a1").find(x=>x.tid===e.evaluateur);return `<div class="evalbox"><div class="row" style="justify-content:space-between"><span>Évaluée par <b>${qui?esc(qui.g.nom+" · "+libEq("a1",qui.i)):"une autre équipe"}</b> ${e.statut==="envoyee"?"· envoyée à "+new Date(e.envoi).toLocaleTimeString("fr-FR",{hour:"2-digit",minute:"2-digit"}):"· <i>en cours</i>"}</span>${e.statut==="envoyee"?`<b class="num">${e.total} / 20</b>`:""}</div>
+     ${e.statut==="envoyee"?`<div class="evgrid">${photoSrc(e)?`<a href="${photoSrc(e)}" target="_blank" rel="noopener"><img src="${photoSrc(e)}" alt="Photo de la maquette"></a>`:"<span class='note'>pas de photo</span>"}
+      <table class="mini">${CRITERES.map(c=>`<tr><td>${esc(c.titre)}</td><td class="num">${c.liste?(e.portions||[]).length:(e.pts||{})[c.id]}/${c.max}</td><td class="wrap">${esc((e.coms||{})[c.id]||"")}</td></tr>`).join("")}<tr><td><b>Commentaire final</b></td><td></td><td class="wrap">${esc(e.final||"")}</td></tr></table></div>`:""}</div>`}).join(""):`<p class="note">Pas encore évaluée.</p>`}</div>`}).join("")}
+/* --- corrigés --- */
+function corrA1(){return `<div class="card"><h3 style="margin-top:0">Grille d'évaluation de la maquette (sur 20)</h3><div class="tablebox"><table><tr><th>Critère</th><th>Points</th><th>Comment noter</th></tr>
+  ${CRITERES.map(c=>`<tr><td class="wrap"><b>${esc(c.titre)}</b></td><td class="num">${c.max}</td><td class="wrap">${esc(c.aide)}${c.liste?`<span class="clin">${SEGMENTS.map((s,k)=>(k+1)+". "+s).join(" · ")}</span>`:""}</td></tr>`).join("")}</table></div>
+  <p class="note">Note de l'atelier pour chaque équipe : note de la maquette ramenée sur 16, + 4 points si l'équipe a évalué la maquette d'une autre équipe. Ordre attendu des 7 portions : ${SEGMENTS.join(" → ")}.</p></div>`}
+function corrA3Cartes(){return `<p class="note" style="margin:0">Les 42 cartes du jeu, avec leurs critères de reconnaissance (les bonnes réponses de la question « critère ») et leur « Le saviez-vous ? ».</p>`+FAMILLES.map(f=>`<div class="card" style="border-left:6px solid ${f.c}"><h3 style="margin:0;color:${f.c}">${esc(f.nom)} <span class="note">· ${esc(f.sous)} · titre : « ${esc(TITRE7[f.id]||f.nom)} »</span></h3>
+  <div class="tablebox"><table><tr><th>Carte</th><th>Critères de reconnaissance</th><th>Le saviez-vous ?</th></tr>${f.cartes.map((c,i)=>`<tr><td><b>${esc(f.membres[i])}</b></td><td class="wrap">${c[0].map(x=>"• "+esc(x)).join("<br>")}</td><td class="wrap">${esc(c[1])}</td></tr>`).join("")}</table></div></div>`).join("")}
+function corrA3Questions(){const th=[...new Set(A3_BANQUE.map(q=>q.th))];return `<p class="note" style="margin:0">Les ${A3_BANQUE.length} questions de la banque ; chaque binôme en tire 12 au hasard (en équilibrant les thèmes), plus 6 structures à repérer sur les modèles 3D. Note de l'évaluation = repérage sur 10 + quiz sur 10.</p>`+
+  th.map(t=>`<details class="card"><summary><b>${esc(t)}</b> <span class="note">(${A3_BANQUE.filter(q=>q.th===t).length} questions)</span></summary><div class="tablebox"><table><tr><th>Question</th><th>Réponse</th><th>Explication</th></tr>${A3_BANQUE.filter(q=>q.th===t).map(q=>`<tr><td class="wrap">${esc(q.q)} <span class="note">(${esc(q.sp)})</span></td><td class="wrap"><b>${esc(q.r)}</b></td><td class="wrap">${esc(q.x)}</td></tr>`).join("")}</table></div></details>`).join("")}
+function corrA4(){return `<div class="card"><h3 style="margin-top:0">Barème</h3><p style="margin:0">6 points d'office pour l'enquête menée au bout, 4 points par pièce à conviction (12 au total), 2 points pour la bonne conclusion (1 point pour une autre conclusion justifiée). Une mauvaise case cochée ne retire jamais de point ; pour « citez trois anomalies », deux bonnes réponses suffisent pour avoir tous les points.</p></div>`+
+  A4_PIECES.map(p=>`<div class="card"><h3 style="margin-top:0">${esc(p.titre)}</h3><div class="row" style="gap:8px;flex-wrap:wrap">${p.imgs.map(s=>`<a href="${s}" target="_blank" rel="noopener"><img src="${s}" alt="" style="height:140px;border-radius:8px"></a>`).join("")}</div>
+   <div class="tablebox"><table><tr><th>Question</th><th>Points</th><th>Bonnes réponses</th></tr>${p.qs.map(q=>`<tr><td class="wrap">${esc(q.t)}</td><td class="num">${q.pts}</td><td class="wrap"><b>${esc(q.corr)}</b>${q.suffit?`<span class="clin">${q.suffit} bonnes réponses suffisent pour tous les points.</span>`:""}</td></tr>`).join("")}</table></div></div>`).join("")+
+  `<div class="card"><h3 style="margin-top:0">Cartes surprises et conclusion</h3>${A4_CARTES.map(([k,t])=>`<p style="margin:4px 0"><b>Carte ${k}</b> · ${esc(t)}</p>`).join("")}<p><b>Conclusion attendue : ${esc(A4_CONCL[0].toLowerCase())}</b> (lésions hémorragiques sur plusieurs organes, chiens morts en moins de 24 h, même parc, appâts suspects, aucun antécédent).</p></div>`}
+function corrA5(){return `<div class="card"><h3 style="margin-top:0">Barème du défi foie (sur 20)</h3><p style="margin:0">Puzzle 1 sur 4, puzzle 2 sur 4, défi foie sur 12. Chaque fiche est corrigée par un autre binôme, à l'aide des corrections intégrées à l'atelier.</p>
+  <p><a class="btn" href="atelier5/index.html" target="_blank" rel="noopener">Ouvrir l'atelier 5 complet, avec les corrections des puzzles et du défi</a></p><p class="note" style="margin:0">L'atelier s'ouvre dans un nouvel onglet en mode libre (sans groupe) : utilisez ses onglets de correction pour projeter les réponses lors du débrief. Rien n'y est enregistré dans les notes.</p></div>`}
+function a6Solutions(mi){const V=mi.verrou||{},out=[];
+  for(let conc=20;conc<=70;conc+=5)for(const fourrage of (V.fourrage?[V.fourrage]:Object.keys(A6_FOURRAGES)))for(const cereale of Object.keys(A6_CEREALES))for(const distrib of Object.keys(A6_DISTRIB))for(const tampon of [false,true]){
+    const r={conc,fourrage,cereale,distrib,tampon},s=a6Simuler(r);if(mi.obj.every(o=>o.ok(s))){const ch=["fourrage","cereale","distrib","tampon"].filter(k=>r[k]!==mi.depart[k]).length+(conc!==mi.depart.conc?1:0);out.push({r,s,ch,d:Math.abs(conc-mi.depart.conc)})}}
+  return out.sort((a,b)=>a.ch-b.ch||a.d-b.d)}
+const a6RationTxt=r=>`${r.conc} % de concentré · ${A6_FOURRAGES[r.fourrage].nom} · ${A6_CEREALES[r.cereale].nom} · ${A6_DISTRIB[r.distrib].nom}${r.tampon?" · avec bicarbonate":""}`;
+function corrA6(){return `<div class="card"><h3 style="margin-top:0">Barème (sur 20)</h3><p style="margin:0">Chaque mission sur 4 : réussie en 3 essais au plus, 4 points ; en 4 à 6 essais, 3 points ; au-delà, 2 points. Pas réussie : 1 point pour avoir essayé plus des points selon la part des objectifs atteints au meilleur essai, moins 1 point au-delà de 3 essais et 1 point de plus au-delà de 6 (jamais moins de 1 point). Quiz final : 20 questions à 0,4 point (8 points). Note du groupe = moyenne des deux équipes.</p></div>`+
+  A6_MISSIONS.map((mi,k)=>{const S=a6Solutions(mi),n=S.length,ex=S.slice(0,3);return `<div class="card"><h3 style="margin-top:0">Mission ${k+1} · ${esc(mi.titre)}</h3><p style="margin:0 0 6px">${esc(mi.recit)}</p>
+   <p class="note" style="margin:0">Ration de départ : ${esc(a6RationTxt(mi.depart))}${mi.verrou&&mi.verrou.fourrage?" · fourrage imposé":""}</p>
+   <p style="margin:8px 0 4px"><b>Objectifs</b></p>${mi.obj.map(o=>`<p style="margin:2px 0">• ${esc(o.t)}</p>`).join("")}
+   <p style="margin:10px 0 4px"><b>Exemples de rations qui réussissent</b> <span class="note">(${n} combinaison${n>1?"s":""} possible${n>1?"s":""} ; les plus proches de la ration de départ)</span></p>
+   ${ex.length?`<div class="tablebox"><table><tr><th>Ration</th><th>pH moyen</th><th>Lait</th><th>TB</th><th>Méthane</th></tr>${ex.map(e=>`<tr><td class="wrap">${esc(a6RationTxt(e.r))}</td><td class="num">${fr(Math.round(e.s.pHm*100)/100)}</td><td class="num">${fr(Math.round(e.s.lait*10)/10)} kg</td><td class="num">${fr(Math.round(e.s.tb*100)/100)} %</td><td class="num">${Math.round(e.s.ch4)} g/j</td></tr>`).join("")}</table></div>`:`<p class="note">Aucune combinaison ne remplit tous les objectifs.</p>`}</div>`}).join("")}
+function corrA6Quiz(){return `<p class="note" style="margin:0">Les ${A6_QUIZ.length} questions du quiz final (0,4 point chacune), dans l'ordre où les équipes les voient.</p><div class="tablebox"><table><tr><th></th><th>Question</th><th>Réponse</th><th>Explication</th></tr>${A6_QUIZ.map((q,i)=>`<tr><td class="num">${i+1}</td><td class="wrap">${esc(q.t)}</td><td class="wrap"><b>${esc(q.o[q.b])}</b></td><td class="wrap">${esc(q.e)}</td></tr>`).join("")}</table></div>`}
+function famStat(type,fam,ok){const E=famEtat;if(!E)return;E.st=E.st||{};const k=type+"_"+fam;E.st[k]=E.st[k]||[0,0];E.st[k][ok?0:1]++}
+
 function lireListe(txt){
   const lignes=txt.split(/\r?\n/).map(l=>l.replace(/\[.*?\]\(.*?\)/g,"").replace(/\S+@\S+/g,"").trim()).filter(Boolean);
   const maj=w=>/^[A-ZÀ-ÖØ-Ý][A-ZÀ-ÖØ-Ý'’\-]+$/.test(w);
@@ -1868,7 +2162,7 @@ function carteSeancesBase(){const ids=Object.keys(seances).sort();
 function vProfAteliers(){
   return carteSeances()+`<div class="card"><h3>Ateliers proposés aux étudiants</h3><p class="note" style="margin-top:0">Un atelier désactivé est grisé chez les étudiants et ne compte pas dans la note finale. Les ateliers 3 à 6 seront activables dès que leur contenu sera ajouté.</p>
    ${ATELIERS.map(a=>`<div class="duel"><span><b>Atelier ${a.n}</b> · ${esc(titreAt(a))}${a.par?` <span class="note">(${esc(a.par)})</span>`:""}</span>${AVEC_CONTENU.includes(a.id)?`<label class="row"><input type="checkbox" data-actif="${a.id}" ${atelierActif(a.id)?"checked":""}> actif</label>`:`<span class="note">contenu à venir</span>`}</div>`).join("")}</div>
-   <div class="card qrcard"><div class="qr">${qrSVG()}</div><div><h3>QR code d'accès</h3><p>${window.APP_CONFIG?"À projeter ou imprimer en début de séance : les étudiants le scannent avec l'appareil photo de leur téléphone, puis choisissent leur nom. Aucun compte n'est nécessaire.":"Chaque groupe le scanne avec un téléphone pour ouvrir l'application. Aucun compte n'est nécessaire. Astuce : « Ajouter à l'écran d'accueil » permet de la rouvrir même sans réseau."}</p><p class="note" style="word-break:break-all">${urlApp()}</p></div></div>`;
+   <div class="card qrcard"><div class="qr">${qrSVG()}</div><div><h3>QR code d'accès</h3><p>Chaque groupe le scanne avec un téléphone pour ouvrir l'application. Aucun compte n'est nécessaire. Astuce : « Ajouter à l'écran d'accueil » permet de la rouvrir même sans réseau.</p><p class="note" style="word-break:break-all">${urlApp()}</p></div></div>`;
 }
 function csvEtudiants(){const sid=profSeance, s=seances[sid]; if(!s)return "";
   const dispo=ATELIERS.filter(a=>atelierActif(a.id)), h=["Nom","Prénom","Groupe",...dispo.map(a=>"Atelier "+a.n),"Note finale"];
@@ -1933,7 +2227,9 @@ const TEST_MEMBRES=[...Array(10).keys()].map(i=>"Encadrant·e "+(i+1));
 TEST_G.membres=TEST_MEMBRES; TEST_G.k=0;
 
 /* ----- temps ----- */
-function debutSeance(s){if(!s)return null;const t=Date.parse(s.debut||(s.date+"T08:10"));return isNaN(t)?null:t}
+/* tirage au sort : par défaut lancé à la main par un encadrant (s.manuel !== false) ; sinon à l'heure fixe s.debut */
+const tirageManuel=s=>!!s&&s.manuel!==false;
+function debutSeance(s){if(!s)return null;if(tirageManuel(s))return s.tirageDemande||null;const t=Date.parse(s.debut||(s.date+"T08:10"));return isNaN(t)?null:t}
 const dureeRot=s=>((s&&+s.dureeRot)||30)*60e3;
 const groupesDe=sid=>groupes.filter(g=>g.seance===sid).sort((a,b)=>(a.k||0)-(b.k||0));
 function phaseSeance(sid){const s=seances[sid],d=deroules[sid],H0=debutSeance(s);
@@ -1941,6 +2237,7 @@ function phaseSeance(sid){const s=seances[sid],d=deroules[sid],H0=debutSeance(s)
   const prets={};groupesDe(sid).forEach(g=>{if(d&&(g.pret===d.r||(d.r>=0&&d.r<NB_ROT&&groupeAFini(g,atelierDe(g.k,d.r).id))))prets[g.id]=1});
   if(d&&d.r>=0){const R=dureeRot(s);return {phase:"rot",r:d.r,reste:Math.max(0,R-(Date.now()-d.t)),prets}}
   if(groupesDe(sid).length)return {phase:"prepa",prets};
+  if(!H0&&tirageManuel(s))return {phase:"inscription",reste:null,manuel:true};
   if(H0&&Date.now()<H0)return {phase:"inscription",reste:H0-Date.now()};
   return {phase:"formation"}}
 const atelierDe=(k,r)=>ATELIERS[((k||0)+r)%NB_ROT];
@@ -2054,7 +2351,7 @@ function vInscriptionBande(){const sid=moiE.sid,s=seances[sid],p=phaseSeance(sid
   let corps="";
   if(p.phase!=="inscription"){corps=`<div class="card"><h3>Les groupes sont déjà formés</h3><p>Vous arrivez après la formation des groupes : l'application vous place dans le groupe le plus petit.</p><button class="btn pen gros" id="enRetard">Rejoindre un groupe</button></div>`}
   else if(b){corps=`<div class="card"><span class="eyebrow">Votre petit groupe</span><h2 style="margin:4px 0 8px">${b.membres.map(m=>esc(nomCourt(sid,m))).join(" · ")}</h2>
-     <p>Les groupes de 10 seront formés à <b>${new Date(debutSeance(s)).toLocaleTimeString("fr-FR",{hour:"2-digit",minute:"2-digit"})}</b> (dans <b id="cptRot">${fmt(p.reste)}</b>). Les membres de votre petit groupe seront dans le même groupe de 10.</p>
+     <p>${p.manuel?`Les groupes de 10 seront formés quand l'enseignant lancera le tirage au sort.`:`Les groupes de 10 seront formés à <b>${new Date(debutSeance(s)).toLocaleTimeString("fr-FR",{hour:"2-digit",minute:"2-digit"})}</b> (dans <b id="cptRot">${fmt(p.reste)}</b>).`} Les membres de votre petit groupe seront dans le même groupe de 10.</p>
      ${b.membres.length<5?`<p class="note">Il reste ${5-b.membres.length} place${5-b.membres.length>1?"s":""} dans votre petit groupe : un camarade peut le rejoindre depuis son téléphone.</p>`:""}</div>`}
   else{const libres=s.etudiants.filter(e=>!deja.has(e.id)&&e.id!==moiE.eid).sort((a,b)=>a.n.localeCompare(b.n,"fr"));
     const ouvertes=bandes.filter(x=>x.seance===sid&&x.membres.length<5);
@@ -2201,10 +2498,9 @@ function vA3(){const g=monGroupe();if(!g){vue="hub";return vHub()}const duos=duo
       <li><b>Famille complète</b> : posez-la. Votre téléphone ouvre le modèle 3D de l'espèce : touchez les <b>2 structures</b> demandées. Deux bonnes réponses : la famille est à vous, avec son titre (« Maître du rumen », « Seigneur du cæcum »…). Sinon, les 6 cartes retournent dans la pioche. La famille Vaisseaux et péritoine se valide sur le schéma 3D de la vascularisation.</li>
       <li>Le duo qui a posé le plus de familles gagne. Le jeu ne compte pas dans la note : un duo qui n'a posé aucune famille n'est pas pénalisé.</li></ul></details>
      <p class="note" style="margin:8px 0 0">Dans l'évaluation, touchez votre avatar en haut de l'écran pour voir votre profil, vos badges et l'album des cartes gagnées.</p></div>
-    <div class="card"><h3>Les duos</h3><p class="note" style="margin-top:0">L'évaluation se fait sur le téléphone d'un des deux membres du duo.</p>
-     <div class="duolist">${duos.map((d,k)=>{const n=g.id==="TEST"?((testE.a3||{})[d.id]):(notesA3.find(x=>x.id===d.id)||{}).note;const moiD=t&&t.id===d.id;return `<div class="duo ${moiD?"moi":""}"><span class="dn">${k+1}</span><b>${esc(d.nom)}${moiD?" (vous)":""}</b>${n!=null?`<span class="chip fait">${ico("coche")} évaluation faite</span>`:moiD||g.id==="TEST"?`<button class="btn sm pen" data-a3duo="${d.id}">Notre évaluation</button>`:`<span class="note">sur son téléphone</span>`}</div>`}).join("")}</div></div>
     <div class="card famcarte"><div class="famstack petit">${famDosHTML("","--r:-8deg")}${famDosHTML("","--r:5deg")}</div><div><h3>1. Le jeu des 7 familles (non noté)</h3><p class="note" style="margin-top:0">Chaque duo joue sur un de ses téléphones : les cartes arrivent dans votre main.</p><button class="btn pen gros" id="famOuvrir">Jouer aux 7 familles</button></div></div>
-    <div class="card"><h3>2. L'évaluation de votre duo</h3><p class="note" style="margin:0">Touchez « Notre évaluation » ci-dessus. La note s'enregistre toute seule à la fin, même si vous revenez plus tard sur l'application.</p></div>
+    <div class="card"><h3>2. Ensuite : l'évaluation de votre duo (notée)</h3><p class="note" style="margin-top:0">Quand la partie est finie, chaque duo fait son évaluation sur le téléphone qui a servi au jeu. Vous pouvez d'abord vous entraîner au quiz (non noté) dans l'évaluation. La note s'enregistre toute seule à la fin, même si vous revenez plus tard sur l'application.</p>
+     <div class="duolist">${duos.map((d,k)=>{const n=g.id==="TEST"?((testE.a3||{})[d.id]):(notesA3.find(x=>x.id===d.id)||{}).note;const moiD=t&&t.id===d.id;return `<div class="duo ${moiD?"moi":""}"><span class="dn">${k+1}</span><b>${esc(d.nom)}${moiD?" (vous)":""}</b>${n!=null?`<span class="chip fait">${ico("coche")} évaluation faite</span>`:moiD||g.id==="TEST"?`<button class="btn sm pen" data-a3duo="${d.id}">Notre évaluation (après le jeu)</button>`:`<span class="note">sur son téléphone</span>`}</div>`}).join("")}</div></div>
    </div>`}
 function syncA3(){let d=null;try{d=JSON.parse(localStorage.getItem("tp-digestif-eval-v1")||"null")}catch(e){}if(!d||!d.binomes)return;
   Object.values(d.binomes).forEach(b=>{if(!b.quiz||!b.reperage||!b.id)return;const note=Math.round((b.reperage.score/b.reperage.total*10+b.quiz.score/b.quiz.total*10)*10)/10;
@@ -2233,13 +2529,14 @@ function vProfSeance(){
   const gs=groupesDe(sid), p=phaseSeance(sid), dans=new Set(gs.flatMap(g=>g.membres||[])), enBande=new Set(bandes.filter(b=>b.seance===sid).flatMap(b=>b.membres));
   const absents=s.etudiants.filter(e=>!dans.has(e.id)&&!enBande.has(e.id)).sort((a,b)=>a.n.localeCompare(b.n,"fr")), dispo=ATELIERS_APP();
   const hd=new Date(debutSeance(s)).toLocaleTimeString("fr-FR",{hour:"2-digit",minute:"2-digit"});
-  const etat=p.phase==="inscription"?`Inscriptions en cours (${enBande.size} étudiants dans ${bandes.filter(b=>b.seance===sid).length} petits groupes) · groupes formés à <b>${hd}</b> (dans ${fmt(p.reste)})`:p.phase==="prepa"?`Groupes formés · démarrage quand tous sont prêts (${gs.filter(g=>p.prets[g.id]).length}/${gs.length})`:p.phase==="rot"?`Rotation <b>${p.r+1} sur ${NB_ROT}</b> · ${gs.filter(g=>p.prets[g.id]).length}/${gs.length} groupes prêts · changement au plus tard dans ${fmt(p.reste)}`:p.phase==="fin"?"Séance terminée":"Formation des groupes…";
+  const etat=p.phase==="inscription"?`Inscriptions en cours : <b>${enBande.size}</b> étudiant${enBande.size>1?"s":""} présent${enBande.size>1?"s":""}${p.manuel?" · les groupes seront tirés au sort quand vous appuierez sur le bouton ci-dessous":` · groupes formés à <b>${hd}</b> (dans ${fmt(p.reste)})`}`:p.phase==="prepa"?`Groupes formés · démarrage quand tous sont prêts (${gs.filter(g=>p.prets[g.id]).length}/${gs.length})`:p.phase==="rot"?`Rotation <b>${p.r+1} sur ${NB_ROT}</b> · ${gs.filter(g=>p.prets[g.id]).length}/${gs.length} groupes prêts · changement au plus tard dans ${fmt(p.reste)}`:p.phase==="fin"?"Séance terminée":"Formation des groupes…";
   const cartes=gs.map(g=>{const a=p.phase==="rot"?atelierDe(g.k,p.r):null;return `<div class="card tcard"><div class="row" style="justify-content:space-between">${mascSVG(g.mascotte,30)}<b style="font-size:17px;color:${g.couleur};flex:1">${esc(g.nom)}</b>${a?`<span class="chip encours">atelier ${a.n}</span>`:""}${p.prets&&p.prets[g.id]?`<span class="chip fait">prêt</span>`:""}</div><p class="note" style="margin:6px 0 0">${(g.membres||[]).map(m=>esc(nomCourt(sid,m))).join(", ")}</p></div>`}).join("");
   const lignes=gs.flatMap(g=>(g.membres||[]).map(m=>({g,m}))).sort((a,b)=>etu(sid,a.m).localeCompare(etu(sid,b.m),"fr")).map(({g,m})=>{const n=noteEtudiant(g,m);
     return `<tr><td>${esc(etu(sid,m))}</td><td><span style="color:${g.couleur};font-weight:650">${esc(g.nom)}</span></td>${dispo.map(a=>celluleNote(g,m,a.id)).join("")}<td class="num"><b>${n.finale!=null?fr(n.finale):"–"}</b></td></tr>`}).join("");
   return `<div class="row" style="align-items:end;gap:14px"><label class="field">Séance<select id="pSeance">${ids.map(x=>`<option value="${x}" ${x===sid?"selected":""}>${esc(seances[x].nom)}</option>`).join("")}</select></label>
     <div class="kpis"><span><b>${dans.size||enBande.size}</b>/${s.etudiants.length} présents</span><span><b>${gs.length}</b> groupes</span><span class="${absents.length?"rouge":""}"><b>${absents.length}</b> absent${absents.length>1?"s":""}</span></div></div>
-   <div class="banner" style="background:var(--sheet);border:1px solid var(--rule)">${etat}. Tout se fait automatiquement : cette page sert seulement à suivre.</div>
+   <div class="banner" style="background:var(--sheet);border:1px solid var(--rule)">${etat}.${p.manuel?"":" Tout se fait automatiquement : cette page sert seulement à suivre."}</div>
+   ${p.phase==="inscription"?`<div class="card tirage"><h3 style="margin:0 0 6px">Tirage au sort des groupes</h3><p class="note" style="margin:0 0 10px">Attendez que tous les étudiants présents aient choisi leur nom sur leur téléphone (${enBande.size} pour l'instant), puis lancez le tirage : les groupes de 10, les équipes et les binômes de chaque atelier sont formés aussitôt.</p><button class="btn pen gros" id="lancerTirage" ${enBande.size?"":"disabled"}>Lancer le tirage au sort maintenant</button>${p.manuel?"":`<p class="note" style="margin:8px 0 0">Sinon, le tirage aura lieu automatiquement à ${hd}.</p>`}</div>`:""}
    <div class="row"><button class="btn pen" id="afficheOuvrir">Afficher qui est avec qui (groupes, équipes, binômes)</button></div>
    <div class="tgrid">${cartes}</div>
    <div class="tablebox"><table><tr><th>Étudiant·e</th><th>Groupe</th>${dispo.map(a=>`<th>Atelier ${a.n}</th>`).join("")}<th>Note finale</th></tr>${lignes||`<tr><td colspan="${3+dispo.length}" class="note">Les groupes ne sont pas encore formés.</td></tr>`}</table></div>
@@ -2252,9 +2549,10 @@ function csvEtudiants(){const sid=profSeance, s=seances[sid]; if(!s)return "";co
     if(!g)return [e.n,e.p,"ABSENT",...dispo.map(()=>""),""];const n=noteEtudiant(g,e.id);return [e.n,e.p,g.nom,...dispo.map(a=>n.par[a.id]!=null?fr(n.par[a.id]):""),n.finale!=null?fr(n.finale):""]});
   return "﻿"+[h,...lignes].map(l=>l.map(c=>`"${String(c).replace(/"/g,'""')}"`).join(";")).join("\n")}
 function carteSeances(){const sid=profSeance||seanceSel||seanceParDefaut(), s=seances[sid];
-  const h=s?new Date(debutSeance(s)).toTimeString().slice(0,5):"08:10";
-  return (s?`<div class="card"><h3>Horaires · ${esc(s.nom)}</h3><p class="note" style="margin-top:0">À régler une fois avant le TP. À l'heure de formation, les petits groupes (1 à 5 personnes) sont assemblés en groupes de ~10 ; les ateliers démarrent quand tous les groupes sont prêts, et chaque rotation change quand tous les groupes sont prêts ou au bout de la durée prévue.</p>
-    <div class="settings"><label for="nsDebut">Formation des groupes à<input id="nsDebut" type="time" value="${h}" style="padding:8px;border:1.5px solid var(--rule);border-radius:8px"></label>
+  const h=s&&s.debut?new Date(Date.parse(s.debut)).toTimeString().slice(0,5):"08:10", man=tirageManuel(s);
+  return (s?`<div class="card"><h3>Horaires · ${esc(s.nom)}</h3><p class="note" style="margin-top:0">À régler une fois avant le TP. Au moment du tirage, les étudiants présents sont répartis en groupes de ~10 ; les ateliers démarrent quand tous les groupes sont prêts, et chaque rotation change quand tous les groupes sont prêts ou au bout de la durée prévue.</p>
+    <div class="settings"><label for="nsMode">Tirage au sort des groupes<select id="nsMode"><option value="manuel" ${man?"selected":""}>Lancé par un encadrant, le jour du TP (bouton dans « Suivi de la séance »)</option><option value="heure" ${man?"":"selected"}>À une heure fixe</option></select></label>
+    <label for="nsDebut" ${man?'style="opacity:.5"':""}>Heure fixe du tirage<input id="nsDebut" type="time" value="${h}" ${man?"disabled":""} style="padding:8px;border:1.5px solid var(--rule);border-radius:8px"></label>
     <label for="nsDuree">Durée max. d'une rotation (min)<input id="nsDuree" type="number" min="5" max="60" value="${(s.dureeRot||30)}"></label></div>
     <div class="row" style="margin-top:10px"><button class="btn pen" id="nsHoraire">Enregistrer</button><button class="btn ghost" id="nsMaintenant">Répétition : former les groupes dans 1 minute</button></div></div>`:"")+carteSeancesBase()}
 function vRejoindre(){vue="hub";return vHub()}
@@ -2282,8 +2580,12 @@ function brancherV2(){
   on("#repValider","click",validerRepartition);
   on("#famOuvrir","click",ouvrirFamilles);
   all("[data-a3duo]",b=>{location.href=lienA3(monGroupe(),b.dataset.a3duo)});
-  on("#nsMaintenant","click",async()=>{const sid=profSeance;const d=new Date(Date.now()+60e3);const iso=new Date(d.getTime()-d.getTimezoneOffset()*60e3).toISOString().slice(0,19);seances[sid].debut=iso;await ecrire("seances",sid,{debut:iso},"update");toast("Les groupes seront formés dans 1 minute");rendre()});
-  on("#nsHoraire","click",async()=>{const sid=profSeance;const h=$("#nsDebut").value,dr=+$("#nsDuree").value||30;if(!h){toast("Indiquez l'heure");return}const iso=seances[sid].date+"T"+h;seances[sid].debut=iso;seances[sid].dureeRot=dr;await ecrire("seances",sid,{debut:iso,dureeRot:dr},"update");toast("Horaires enregistrés");rendre()});
+  on("#nsMaintenant","click",async()=>{const sid=profSeance;const d=new Date(Date.now()+60e3);const iso=new Date(d.getTime()-d.getTimezoneOffset()*60e3).toISOString().slice(0,19);const patch=tirageManuel(seances[sid])?{tirageDemande:Date.now()+60e3}:{debut:iso};Object.assign(seances[sid],patch);await ecrire("seances",sid,patch,"update");toast("Les groupes seront formés dans 1 minute");rendre()});
+  on("#nsMode","change",e=>{const el=$("#nsDebut");if(el){el.disabled=e.target.value==="manuel";el.parentElement.style.opacity=el.disabled?.5:1}});
+  on("#nsHoraire","click",async()=>{const sid=profSeance;const man=($("#nsMode")||{}).value!=="heure",h=$("#nsDebut").value,dr=+$("#nsDuree").value||30;if(!man&&!h){toast("Indiquez l'heure");return}
+    const patch={manuel:man,dureeRot:dr};if(!man)patch.debut=seances[sid].date+"T"+h;Object.assign(seances[sid],patch);await ecrire("seances",sid,patch,"update");toast(man?"Le tirage sera lancé par un encadrant":"Horaires enregistrés");rendre()});
+  on("#lancerTirage","click",()=>{const sid=profSeance,n=new Set(bandes.filter(b=>b.seance===sid).flatMap(b=>b.membres)).size;
+    modale("Lancer le tirage au sort ?",`${n} étudiant${n>1?"s":""} présent${n>1?"s":""} seront répartis en groupes de 10. Les retardataires pourront encore rejoindre le plus petit groupe.`,"Oui, lancer",async()=>{const patch={tirageDemande:Date.now()};Object.assign(seances[sid],patch);await ecrire("seances",sid,patch,"update");toast("Tirage au sort en cours…");assurerFormation(sid);rendre()},"","Pas encore")});
   document.querySelectorAll("#retourHub").forEach(b=>b.addEventListener("click",()=>{ctxEquipe=null;repart=null}));
 }
 /* =========================================================
@@ -2477,24 +2779,44 @@ const A6_MISSIONS=[
   cle:{k:"ch4",nom:"le méthane émis",seuil:5,u:" g/j"},
   obj:[{t:"Méthane au plus 435 g par vache et par jour (−10 %)",ok:s=>s.ch4<=435},{t:"pH moyen au-dessus de 6,0",ok:s=>s.pHm>6.0},{t:"Taux butyreux d'au moins 4,0 %",ok:s=>s.tb>=4.0}]}];
 const A6_QUIZ=[
- {id:"q1",t:"Quand la part de concentré augmente, quel acide gras volatil prend une plus grande place dans le rumen ?",o:["L'acétate","Le propionate","Le butyrate"],b:1,e:"L'amidon fermente surtout en propionate ; l'acétate vient plutôt des fibres."},
- {id:"q2",t:"Sur l'échelle INRA, en dessous de quel pH moyen parle-t-on d'acidose latente (subaiguë) ?",o:["6,5","6,0","5,0"],b:1,e:"6,5 et plus : optimal ; 6,25 à 6,5 : acidose légère ; 6,0 à 6,25 : interactions digestives ; 6,0 ou moins : acidose latente."},
- {id:"q3",t:"Pourquoi les fibres longues protègent-elles le pH du rumen ?",o:["Elles contiennent du bicarbonate","Elles font mastiquer et ruminer, donc saliver","Elles fermentent plus vite que l'amidon"],b:1,e:"Chaque minute de mastication apporte 200 à 250 mL de salive riche en bicarbonate."},
- {id:"q4",t:"Quelle céréale est la moins acidogène ?",o:["Le blé","L'orge","Le maïs"],b:2,e:"L'amidon du maïs se dégrade lentement dans le rumen ; celui du blé et de l'orge très vite."},
- {id:"q5",t:"Vrai ou faux : distribuer le concentré en plus de repas fait nettement monter le pH moyen.",o:["Vrai","Faux"],b:1,e:"Faux : le pH moyen change peu, mais les creux après les repas sont moins profonds et le taux butyreux remonte."},
- {id:"q6",t:"Quel signe fait suspecter une acidose subaiguë dans un troupeau laitier ?",o:["Une hausse du taux butyreux","Une baisse du taux butyreux et des boiteries","Une hausse de la rumination"],b:1,e:"Baisse du taux butyreux, ingestion irrégulière, bouses molles, boiteries et abcès du foie."},
- {id:"q7",t:"Vrai ou faux : par kg de matière organique digérée, une ration riche en concentré produit moins de méthane.",o:["Vrai","Faux"],b:0,e:"Vrai : le propionate capte de l'hydrogène qui ne sert plus à fabriquer du méthane."},
- {id:"q8",t:"Le bicarbonate de sodium ajouté à la ration (5 à 20 g/kg MS) fait monter le pH du rumen d'environ…",o:["0,07 unité","0,5 unité","1 unité"],b:0,e:"Méta-analyse de Meschy et al. (2004) : +0,07 en moyenne, avec un peu plus de lait et d'ingestion."}];
+ {id:"q1",t:"Où se fait la fermentation des fibres chez la vache ?",o:["Dans le rumen","Dans la caillette","Dans l'œsophage"],b:0,e:"Le rumen est une grande cuve de fermentation peuplée de microbes."},
+ {id:"q2",t:"Qui fait le travail de fermentation dans le rumen ?",o:["Des micro-organismes (bactéries, protozoaires, champignons)","Les enzymes de la vache","Le foie"],b:0,e:"La vache héberge des milliards de microbes qui fermentent les aliments pour elle."},
+ {id:"q3",t:"Vrai ou faux : la vache fabrique elle-même une enzyme qui digère la cellulose.",o:["Vrai","Faux"],b:1,e:"Faux : ce sont les microbes du rumen qui digèrent la cellulose."},
+ {id:"q4",t:"Comment s'appellent les acides produits par la fermentation dans le rumen ?",o:["Les acides gras volatils (AGV)","Les acides aminés","Les acides nucléiques"],b:0,e:"Acétate, propionate et butyrate sont les trois principaux AGV."},
+ {id:"q5",t:"À quoi servent surtout les AGV pour la vache ?",o:["À fournir de l'énergie","À fabriquer les os","À colorer le lait"],b:0,e:"Les AGV, absorbés par la paroi du rumen, sont la principale source d'énergie du ruminant."},
+ {id:"q6",t:"Quel AGV est produit surtout à partir des fibres (foin, herbe) ?",o:["L'acétate","Le propionate","Le lactate"],b:0,e:"Les rations riches en fibres donnent beaucoup d'acétate."},
+ {id:"q7",t:"Quel AGV augmente quand la ration est riche en céréales ?",o:["Le propionate","L'acétate","Le butyrate uniquement"],b:0,e:"L'amidon des céréales fermente surtout en propionate."},
+ {id:"q8",t:"Vrai ou faux : l'acétate sert à la mamelle pour fabriquer la matière grasse du lait.",o:["Vrai","Faux"],b:0,e:"Vrai : moins d'acétate, c'est souvent un taux butyreux plus bas."},
+ {id:"q9",t:"Quel gaz la fermentation du rumen produit-elle, que la vache rejette surtout en rotant ?",o:["Le méthane","L'oxygène","L'azote"],b:0,e:"Le méthane est éliminé par éructation (les rots), très peu par l'arrière."},
+ {id:"q10",t:"Vrai ou faux : la vache rejette du gaz en rotant plusieurs fois par heure.",o:["Vrai","Faux"],b:0,e:"Vrai : l'éructation évacue en continu les gaz de fermentation."},
+ {id:"q11",t:"Que se passe-t-il si les gaz ne peuvent plus sortir du rumen ?",o:["Le rumen gonfle : c'est la météorisation","La vache produit plus de lait","Le pH remonte"],b:0,e:"Les gaz s'accumulent et le rumen gonfle, surtout dans le flanc gauche."},
+ {id:"q12",t:"Quand le pH du rumen descend trop bas, comment appelle-t-on ce problème ?",o:["L'acidose ruminale","La météorisation","La cétose"],b:0,e:"Trop d'acides produits et pas assez de tampon : c'est l'acidose."},
+ {id:"q13",t:"Quel type d'aliment augmente le plus le risque d'acidose ?",o:["Beaucoup de céréales riches en amidon","Beaucoup de foin long","De l'eau"],b:0,e:"L'amidon fermente vite et produit beaucoup d'acides d'un coup."},
+ {id:"q14",t:"Qu'est-ce qui apporte le tampon naturel du rumen ?",o:["La salive","Le sang","Le lait"],b:0,e:"La salive est riche en bicarbonate, qui neutralise une partie des acides."},
+ {id:"q15",t:"Pourquoi les fibres longues aident-elles à garder un bon pH ?",o:["Elles font ruminer, donc saliver","Elles contiennent de l'acide","Elles empêchent de boire"],b:0,e:"Plus la vache rumine, plus elle produit de salive tampon."},
+ {id:"q16",t:"Vrai ou faux : la rumination consiste à remâcher des aliments remontés du rumen.",o:["Vrai","Faux"],b:0,e:"Vrai : le bol remonte, est remâché, puis réavalé."},
+ {id:"q17",t:"Dans quel ordre les aliments passent-ils dans les estomacs du ruminant ?",o:["Rumen et réseau, puis feuillet, puis caillette","Caillette, puis rumen, puis feuillet","Feuillet, puis rumen, puis caillette"],b:0,e:"La caillette, le « vrai » estomac acide, est en dernier."},
+ {id:"q18",t:"Vrai ou faux : le bicarbonate de sodium ajouté à la ration aide à limiter l'acidose.",o:["Vrai","Faux"],b:0,e:"Vrai : c'est un tampon, il remonte un peu le pH du rumen."},
+ {id:"q19",t:"Chez quel animal les fibres sont-elles surtout fermentées dans le cæcum et le côlon, après l'intestin grêle ?",o:["Le cheval","La vache","Le mouton"],b:0,e:"Le cheval est un fermenteur « postérieur », la vache un fermenteur « antérieur »."},
+ {id:"q20",t:"Que gagne la vache en digérant aussi les microbes du rumen plus loin dans son tube digestif ?",o:["Des protéines","Du méthane","De l'eau"],b:0,e:"Les microbes sont riches en protéines : la vache les digère dans la caillette et l'intestin."}];
 const A6_PRED=[["monte","monter"],["baisse","baisser"],["stable","rester à peu près stable"]];
 const a6Doc=tid=>a6docs[tid]||{};
 function a6Ecrire(tid,patch){const d=Object.assign({},a6docs[tid],patch,{maj:Date.now()});a6docs[tid]=d;if(String(tid).startsWith("TEST")){testE.a6=testE.a6||{};testE.a6[tid]=d;return}ecrire("a6",tid,d,"set")}
 const a6M=(d,id)=>((d.m||{})[id])||{essais:[]};
 const a6Ok=(mi,s)=>mi.obj.every(o=>o.ok(s));
-function a6PtsMission(m){if(!m)return 0;if(m.ok)return Math.max(1,5-(m.essais||[]).length);return 0}
+/* barème indulgent (exercice difficile) : 4 pts par mission = réussie à n'importe quel essai ;
+   sinon 1 pt pour avoir essayé + 3 pts au prorata du meilleur essai (part des objectifs atteints, avec une ration modifiée). Quiz : 20 questions à 0,4 pt. Les prédictions ne coûtent jamais de points. */
+const A6_PTS_Q=8/20;
+function a6Meilleur(mi,m){let best=0;const memeDepart=r=>["conc","fourrage","cereale","distrib","tampon"].every(k=>r[k]===mi.depart[k]);(m.essais||[]).forEach(e=>{if(!e.r||memeDepart(e.r))return;const s=a6Simuler(e.r);best=Math.max(best,mi.obj.filter(o=>o.ok(s)).length/mi.obj.length)});return best}
+/* mission sur 4 : réussie = 4 points ; −1 point si la solution n'est pas trouvée au bout de 3 essais, −1 point de plus si elle ne l'est pas au bout de 6 essais.
+   Pas réussie : 1 point pour avoir essayé + des points par objectif atteint au meilleur essai, avec les mêmes retraits ; jamais moins de 1 point dès le premier essai. */
+function a6Retrait(m){const n=(m.essais||[]).length;return m.ok?(n>3?1:0)+(n>6?1:0):(n>=3?1:0)+(n>=6?1:0)}
+function a6PtsMission(m,mi){if(!m)return 0;const n=(m.essais||[]).length;if(!n&&!m.ok)return 0;const base=m.ok?4:Math.min(4,Math.round((1+3*(mi?a6Meilleur(mi,m):0))*2)/2);return Math.max(1,base-a6Retrait(m))}
 function a6Preds(d){let n=0,j=0;A6_MISSIONS.forEach(mi=>(a6M(d,mi.id).essais||[]).forEach(e=>{if(e.pred){n++;if(e.predOk)j++}}));return {n,j}}
-function a6PtsPred(d){const p=a6Preds(d);return p.n?Math.round(4*p.j/p.n*4)/4:0}
-function a6PtsQuiz(d){const q=d.quiz||{};return A6_QUIZ.reduce((s,x)=>s+(q[x.id]===x.b?0.5:0),0)}
-function a6Note(d,force){if(!d||(!d.fini&&!force))return null;const n=A6_MISSIONS.reduce((s,mi)=>s+a6PtsMission(a6M(d,mi.id)),0)+a6PtsPred(d)+a6PtsQuiz(d);return Math.min(20,Math.round(n*2)/2)}
+function a6PtsPred(d){return 0}
+function a6PtsMissions(d){return A6_MISSIONS.reduce((s,mi)=>s+a6PtsMission(a6M(d,mi.id),mi),0)}
+function a6PtsQuiz(d){const q=d.quiz||{};return Math.round(A6_QUIZ.reduce((s,x)=>s+(q[x.id]===x.b?A6_PTS_Q:0),0)*10)/10}
+function a6Note(d,force){if(!d||(!d.fini&&!force))return null;const n=a6PtsMissions(d)+a6PtsQuiz(d);return Math.min(20,Math.round(n*2)/2)}
 function a6NoteGroupe(g,force){const sd=subsDe(g.id,"a6");if(!sd)return null;
   const notes=sd.equipes.map((m,i)=>{const tid=g.id+"-a6-e"+(i+1);const d=g.id==="TEST"?((testE&&testE.a6)||{})[tid]:a6docs[tid];return a6Note(d,force&&d&&(d.vuIntro||d.m))});
   if(g.id==="TEST"){const v=notes.filter(x=>x!=null);return v.length?Math.round(v.reduce((s,x)=>s+x,0)/v.length*10)/10:null}
@@ -2555,10 +2877,10 @@ function vA6(){const g=monGroupe();if(!g){vue="hub";return vHub()}const t=monEqu
   if(e==="intro")c=`<div class="card a6intro"><span class="eyebrow">Atelier 6 · 30 minutes · sans enseignant</span><h2 style="margin:6px 0 10px">Pilote du rumen</h2>
     <p>Votre équipe devient la conseillère en alimentation de trois élevages laitiers. Pour chacun, vous réglez la ration (part de concentré, fourrage, céréale, nombre de repas, tampon), vous lancez la simulation et vous lisez ce qui se passe dans le rumen : pH sur 24 h, risque d'acidose, acides gras volatils, rumination, méthane, lait.</p>
     <div class="briefetapes" style="margin:12px 0">
-      <div><b>1</b><span><b>Trois missions</b> (environ 7 min chacune). Chaque mission a ses objectifs : atteignez-les tous. Réussie au 1<sup>er</sup> essai : 4 points ; au 2<sup>e</sup> : 3 ; au 3<sup>e</sup> : 2 ; ensuite : 1. Après 3 essais ratés, vous pouvez passer (0 point) et voir une solution.</span></div>
-      <div><b>2</b><span><b>Une prédiction avant chaque simulation</b> : l'indicateur clé de la mission va-t-il monter, baisser ou rester stable ? 4 points selon la part de prédictions justes.</span></div>
-      <div><b>3</b><span><b>Le quiz final</b> (environ 5 min) : 8 questions, 4 points.</span></div></div>
-    <div class="a4bareme">${ico("coche")}<span><b>Notation sur 20 par équipe</b> : missions 12 points, prédictions 4 points, quiz 4 points. Les deux équipes du groupe ont les mêmes missions ; <b>la note du groupe est la moyenne des deux équipes</b>, et elle s'enregistre toute seule.</span></div>
+      <div><b>1</b><span><b>Trois missions</b> (environ 6 min chacune). Chaque mission a ses objectifs : essayez de tous les atteindre, en autant d'essais que nécessaire. Mission réussie en 3 essais au plus : 4 points ; en 4 à 6 essais : 3 points ; au-delà : 2 points. Pas réussie : 1 point pour avoir essayé, plus des points pour chaque objectif atteint par votre meilleur essai, moins 1 point après 3 essais sans trouver et 1 point de plus après 6 essais (jamais moins de 1 point). Vous pouvez passer une mission après 3 essais.</span></div>
+      <div><b>2</b><span><b>Une prédiction avant chaque simulation</b> : l'indicateur clé va-t-il monter, baisser ou rester stable ? Elle sert à réfléchir et à gagner des badges, <b>elle ne fait jamais perdre de points</b>.</span></div>
+      <div><b>3</b><span><b>Le quiz final</b> (environ 8 min) : 20 questions faciles sur la fermentation, 8 points.</span></div></div>
+    <div class="a4bareme">${ico("coche")}<span><b>Notation sur 20 par équipe, volontairement bienveillante</b> : missions 12 points, quiz 8 points. Le but est de comprendre en jouant avec le simulateur : réfléchissez avant chaque essai, car chaque mission perd 1 point si la solution n'est pas trouvée au bout de 3 essais, et 1 point de plus au bout de 6 essais (jamais moins de 1 point). Les deux équipes du groupe ont les mêmes missions ; <b>la note du groupe est la moyenne des deux équipes</b>, et elle s'enregistre toute seule.</span></div>
     <p><b>Repères</b> : sur l'échelle INRA, un pH moyen de 6,0 ou moins signe une <b>acidose latente (subaiguë)</b>. L'indice de risque d'acidose (IRA) note six critères de la ration de 0 à 2 : en dessous de 0,67 pas de risque, au-delà de 1,33 risque élevé.</p>
     <p class="note">Une seule équipe, plusieurs téléphones : les essais sont partagés. Discutez avant chaque simulation, c'est là que se joue la prédiction. Le simulateur est un modèle pédagogique construit à partir des équations du livre INRA <i>Alimentation des ruminants</i> (2018) et d'essais publiés : il reproduit les tendances, pas une vache réelle.</p>
     <button class="btn pen gros" id="a6go">Commencer la mission 1</button></div>`;
@@ -2567,27 +2889,27 @@ function vA6(){const g=monGroupe();if(!g){vue="hub";return vHub()}const t=monEqu
     const sDep=a6Simuler(mi.depart), sDer=der?a6Simuler(der.r):sDep, precDer=es.length>1?a6Simuler(es[es.length-2].r):sDep;
     const objs=`<ul class="a6obj">${mi.obj.map(o=>{const ok=der?o.ok(sDer):null;return `<li class="${ok==null?"":ok?"ok":"ko"}">${ok==null?"○":ok?ico("coche"):"✕"} ${esc(o.t)}</li>`}).join("")}</ul>`;
     const pred=a6Pred[mi.id];
-    c=`<div class="card"><span class="eyebrow">Mission ${A6_MISSIONS.indexOf(mi)+1} sur 3 · ${es.length} essai${es.length>1?"s":""}</span><h2 style="margin:6px 0 8px">${esc(mi.titre)}</h2><p>${esc(mi.recit)}</p>
+    c=`<div class="card"><span class="eyebrow">Mission ${A6_MISSIONS.indexOf(mi)+1} sur 3 · ${es.length} essai${es.length>1?"s":""}${es.length?` · ${fr(a6PtsMission(m,mi))}/4 points à ce stade`:""}</span><h2 style="margin:6px 0 8px">${esc(mi.titre)}</h2><p>${esc(mi.recit)}</p>
       <h3 style="margin:12px 0 4px">Objectifs</h3>${objs}</div>
      <div class="card" id="a6res"><span class="eyebrow">${der?"Résultat de votre dernier essai":"Situation de départ"}</span>${a6Courbe(sDer,der?precDer:null,A6_DISTRIB[(der?der.r:mi.depart).distrib])}${a6Resultats(sDer,der?precDer:null,mi,der?der.r:mi.depart)}
       ${der&&der.pred?`<p class="a4corr">Votre prédiction : ${esc(mi.cle.nom)} allait « ${esc(A6_PRED.find(p=>p[0]===der.pred)[1])} ». ${der.predOk?"<b>Juste.</b>":"<b>Pas tout à fait.</b>"} Il est passé de ${a6f(precDer[mi.cle.k],mi.cle.k==="ch4"?0:2)} à ${a6f(sDer[mi.cle.k],mi.cle.k==="ch4"?0:2)}${mi.cle.u}.</p>`:""}
       ${der?`<div class="a6pourquoi"><b>Pourquoi ?</b><ul>${a6Expliquer(der.r,sDer,precDer).map(x=>`<li>${esc(x)}</li>`).join("")}</ul></div>`:""}
       ${!fini?`<button class="btn pen gros a6refaire" id="a6versRation">${der?"Pas encore réussi : modifier la ration et refaire un essai":"Régler la ration et lancer le premier essai"}</button>`:""}</div>
-     ${fini?`<div class="card a6bilan">${m.ok?`<h3>Mission réussie en ${es.length} essai${es.length>1?"s":""} : ${a6PtsMission(m)}/4 points</h3>`:`<h3>Mission passée : 0/4 point</h3><p>Une solution : ${esc(a6Solution(mi))}.</p>`}<button class="btn pen gros" id="a6suite">${A6_MISSIONS.indexOf(mi)<2?"Mission suivante":"Passer au quiz"}</button></div>`
+     ${fini?`<div class="card a6bilan">${m.ok?`<h3>Mission réussie en ${es.length} essai${es.length>1?"s":""} : ${a6PtsMission(m,mi)}/4 points</h3>`:`<h3>Mission passée : ${fr(a6PtsMission(m,mi))}/4 points gardés</h3><p>Une solution : ${esc(a6Solution(mi))}.</p>`}<button class="btn pen gros" id="a6suite">${A6_MISSIONS.indexOf(mi)<2?"Mission suivante":"Passer au quiz"}</button></div>`
       :`<div class="card" id="a6rationCard"><span class="eyebrow">Votre ration · essai ${es.length+1}</span>${der?`<p class="note" style="margin:4px 0 8px">Modifiez un ou plusieurs réglages, choisissez votre prédiction, puis relancez.</p>`:""}${a6Ration(mi,r,mi.verrou,false)}
        <h3 style="margin:14px 0 6px" id="a6predH">Votre prédiction : avec cette ration, ${esc(mi.cle.nom)} va…</h3><div class="chk">${A6_PRED.map(([id,lab])=>`<button class="chkb ${pred===id?"on":""}" data-a6p="${id}">${pred===id?ico("coche"):""}${lab}</button>`).join("")}</div>
        <p class="note">Par rapport à ${der?"votre dernier essai":"la situation de départ"}.</p>
        <button class="btn pen gros" id="a6lancer">Lancer la simulation</button>${pred?"":`<p class="note" style="margin-top:6px">Choisissez d'abord votre prédiction.</p>`}
-       ${es.length>=3?`<p style="margin-top:10px"><button class="link" id="a6abandon">Passer cette mission (0 point) et voir une solution</button></p>`:""}</div>`}`}
+       ${es.length>=3?`<p style="margin-top:10px"><button class="link" id="a6abandon">Passer cette mission (vous gardez vos points) et voir une solution</button></p>`:""}</div>`}`}
   else if(e==="quiz"){const q=d.quiz||{},fait=d.quizFini;
-    c=`<div class="card"><span class="eyebrow">Quiz final · 8 questions · 4 points</span><h2 style="margin:6px 0 10px">Ce que le rumen vous a appris</h2>
-     ${A6_QUIZ.map((x,i)=>{const sel=fait?q[x.id]:a6Quiz[x.id];return `<div class="a4q"><h3>${i+1}. ${esc(x.t)}</h3><div class="chk">${x.o.map((o,j)=>{const on=sel===j,bon=j===x.b;const cl=fait?(bon&&on?"on bon":on?"faux":bon?"manque":""):on?"on":"";return `<button class="chkb ${cl}" ${fait?"disabled":`data-a6q="${x.id}|${j}"`}>${on||fait&&bon?ico("coche"):""}${esc(o)}</button>`}).join("")}</div>${fait?`<p class="a4corr"><b>${q[x.id]===x.b?"0,5":"0"}/0,5</b> · ${esc(x.e)}</p>`:""}</div>`}).join("")}
+    c=`<div class="card"><span class="eyebrow">Quiz final · 20 questions · 8 points</span><h2 style="margin:6px 0 10px">Ce que le rumen vous a appris</h2>
+     ${A6_QUIZ.map((x,i)=>{const sel=fait?q[x.id]:a6Quiz[x.id];return `<div class="a4q"><h3>${i+1}. ${esc(x.t)}</h3><div class="chk">${x.o.map((o,j)=>{const on=sel===j,bon=j===x.b;const cl=fait?(bon&&on?"on bon":on?"faux":bon?"manque":""):on?"on":"";return `<button class="chkb ${cl}" ${fait?"disabled":`data-a6q="${x.id}|${j}"`}>${on||fait&&bon?ico("coche"):""}${esc(o)}</button>`}).join("")}</div>${fait?`<p class="a4corr"><b>${q[x.id]===x.b?"0,4":"0"}/0,4</b> · ${esc(x.e)}</p>`:""}</div>`}).join("")}
      ${fait?`<button class="btn pen gros" id="a6finir">Voir notre note</button>`:`<button class="btn pen gros" id="a6quizOk">Valider le quiz</button>`}</div>`}
   else{const n=a6Note(d),ng=a6NoteGroupe(g),p=a6Preds(d);
     c=`<div class="card a4fin"><span class="eyebrow">Atelier terminé</span><h2 style="margin:6px 0">Vos trois élevages sont entre de bonnes mains</h2>
      <p>Ce qu'il faut retenir : le pH du rumen dépend de l'équilibre entre l'acidité produite (AGV, surtout avec l'amidon rapide) et le tampon apporté par la salive (fibres longues, rumination). Le concentré nourrit la vache et réduit le méthane, mais au-delà d'environ 50 % de la ration il faut des fibres longues, une céréale lente, des repas fractionnés ou un tampon pour éviter l'acidose.</p>
      <div class="fnote">${fr(n)}<small>/20</small></div>
-     <div class="fdet">${A6_MISSIONS.map((mi,i)=>`<span>Mission ${i+1} · <b>${a6PtsMission(a6M(d,mi.id))}/4</b></span>`).join("")}<span>Prédictions ${p.j}/${p.n} · <b>${fr(a6PtsPred(d))}/4</b></span><span>Quiz · <b>${fr(a6PtsQuiz(d))}/4</b></span></div>
+     <div class="fdet">${A6_MISSIONS.map((mi,i)=>`<span>Mission ${i+1} · <b>${a6PtsMission(a6M(d,mi.id),mi)}/4</b></span>`).join("")}<span>Prédictions justes ${p.j}/${p.n} (sans effet sur la note)</span><span>Quiz · <b>${fr(a6PtsQuiz(d))}/8</b></span></div>
      <p><b>Note du groupe</b> (moyenne des 2 équipes) : ${ng!=null?`<b>${fr(ng)}/20</b>`:"en attente de l'autre équipe"}.</p>
      <button class="btn pen gros" id="retourHub2">Retour aux ateliers</button></div>`}
   return `${tete}<div class="a1form a4 a6" style="max-width:860px;margin:14px auto">${e!=="intro"&&e!=="fin"?barre:""}${c}</div>`}
@@ -2608,7 +2930,7 @@ function brancherA6(){const on=(s,ev,f)=>{const el=$(s);if(el)el.addEventListene
       const ok=a6Ok(mi,s), mm=Object.assign({},m,{essais:es,ok});
       a6Ecrire(t.id,{m:Object.assign({},d.m||{},{[mi.id]:mm})});a6Pred[mi.id]=null;
       if(ok){bip([523,659,784,1047]);setTimeout(confettis,150)}else bip(pred===reel?[523,659]:[392,330]);rendre();const rs=$("#a6res");if(rs)rs.scrollIntoView({block:"start"});else window.scrollTo(0,0)});
-    on("#a6abandon","click",()=>modale("Passer cette mission ?","Vous aurez 0 point pour cette mission, et une solution s'affichera.","Passer",()=>{const d=a6Doc(t.id),m=a6M(d,mi.id);a6Ecrire(t.id,{m:Object.assign({},d.m||{},{[mi.id]:Object.assign({},m,{abandon:true})})});re()},"","Continuer"));
+    on("#a6abandon","click",()=>modale("Passer cette mission ?","Vous gardez les points déjà gagnés sur cette mission (1 point pour avoir essayé, plus les objectifs atteints), et une solution s'affichera.","Passer",()=>{const d=a6Doc(t.id),m=a6M(d,mi.id);a6Ecrire(t.id,{m:Object.assign({},d.m||{},{[mi.id]:Object.assign({},m,{abandon:true})})});re()},"","Continuer"));
     on("#a6suite","click",()=>{const i=A6_MISSIONS.indexOf(mi);go(i<2?A6_MISSIONS[i+1].id:"quiz")})}
   document.querySelectorAll("[data-a6q]").forEach(b=>b.addEventListener("click",()=>{const [q,j]=b.dataset.a6q.split("|");a6Quiz[q]=+j;re()}));
   on("#a6quizOk","click",()=>{const vides=A6_QUIZ.filter(x=>a6Quiz[x.id]==null).length;
@@ -2753,8 +3075,8 @@ function famCriteres(cid){const c=CARTES7[cid],f=famDe(c.f);
   const faux=melange(pool.filter(p=>!c.puces.includes(p))).slice(0,2);return melange([c.puces[Math.floor(Math.random()*c.puces.length)],...faux])}
 function famDemander(cible,cid,critere){const E=famEtat,me=E.tour,c=CARTES7[cid],f=famDe(c.f);
   const quoi=`${f.nom} : ${c.membre.toLowerCase()}`;
-  if(!c.puces.includes(critere)){famEvt({type:"critere",de:me,a:cible,carte:cid,critere},`${famNomDuo(me)} demande « ${quoi} » à ${famNomDuo(cible)}, mais le critère est faux : tour passé.`);famSuivant();famEcrire();return}
-  const i=E.mains[cible].indexOf(cid);
+  if(!c.puces.includes(critere)){famStat("c",f.id,0);famEtat.fx=[...(famEtat.fx||[]),[cid,critere]].slice(-40);famEvt({type:"critere",de:me,a:cible,carte:cid,critere},`${famNomDuo(me)} demande « ${quoi} » à ${famNomDuo(cible)}, mais le critère est faux : tour passé.`);famSuivant();famEcrire();return}
+  famStat("c",f.id,1);const i=E.mains[cible].indexOf(cid);
   if(i>=0){E.mains[cible].splice(i,1);E.mains[me].push(cid);famEvt({type:"donne",de:cible,a:me,carte:cid},`${famNomDuo(cible)} donne « ${quoi} » à ${famNomDuo(me)}, qui rejoue.`);if(!famVerifFin()){}famEcrire();return}
   if(!E.pioche.length){famEvt({type:"pioche_vide",de:cible,a:me,carte:cid},`${famNomDuo(cible)} n'a pas « ${quoi} ». Pioche vide : au suivant.`);famSuivant();famVerifFin();famEcrire();return}
   const pc=E.pioche.shift();E.mains[me].push(pc);
@@ -2782,7 +3104,7 @@ window.addEventListener("message",ev=>{if(!v3d||ev.source!==v3d.f.contentWindow)
   if(d.tp3==="resultat"){const E=famEtat;v3dFermer();if(!E||!E.enValidation||E.enValidation.duo!==famMoi||E.enValidation.fam!==d.fam)return;
     famVote={n:E.enValidation.n,ok:!!d.ok,par:famMoi,t:Date.now()};famAppliquerVote()}});
 function famAppliquerVote(){const E=famEtat;if(!E||!E.enValidation||!famVote||famVote.n!==E.enValidation.n)return;if(E.tour!==famMoi&&!E.test)return;
-  const {duo,fam}=E.enValidation;E.enValidation=null;const f=famDe(fam);
+  const {duo,fam}=E.enValidation;E.enValidation=null;const f=famDe(fam);famStat("v",fam,famVote.ok);
   if(famVote.ok){E.mains[duo]=E.mains[duo].filter(c=>CARTES7[c].f!==fam);E.poses[duo].push(fam);famEvt({type:"validee",a:duo,fam},`Famille ${f.nom} validée sur le modèle 3D : ${famNomDuo(duo)} devient « ${TITRE7[fam]||f.nom} » !`);
     if(!famVerifFin()&&!E.mains[duo].length&&!E.pioche.length)famSuivant()}
   else{const cs=E.mains[duo].filter(c=>CARTES7[c].f===fam);E.mains[duo]=E.mains[duo].filter(c=>CARTES7[c].f!==fam);E.pioche=melange([...E.pioche,...cs]);famEvt({type:"refusee",a:duo,fam},`Famille ${f.nom} non validée sur le modèle 3D : ses cartes retournent dans la pioche.`);famSuivant()}
@@ -2958,7 +3280,7 @@ const PF_BADGES=[
  {id:"a6_creme",at:"a6",ic:"🧈",nom:"Crème de la crème",desc:"Atteindre un taux butyreux d'au moins 4,2 %",ok:c=>pfSims(c.a6).some(x=>x.tb>=4.2)},
  {id:"a6_tetu",at:"a6",ic:"🐂",nom:"Têtu comme un bœuf",desc:"Réussir une mission après au moins 4 essais",ok:c=>A6_MISSIONS.some(mi=>{const m=a6M(c.a6,mi.id);return m.ok&&(m.essais||[]).length>=4})},
  {id:"a6_chef",at:"a6",ic:"👨‍🍳",nom:"Chef étoilé de la ration",desc:"Réussir les 3 missions en 5 essais au total, ou moins",ok:c=>A6_MISSIONS.every(mi=>a6M(c.a6,mi.id).ok)&&pfEssais(c.a6).length<=5},
- {id:"a6_panse",at:"a6",ic:"🎓",nom:"Panse de génie",desc:"8 sur 8 au quiz du Pilote du rumen",ok:c=>!!c.a6.quizFini&&A6_QUIZ.every(x=>(c.a6.quiz||{})[x.id]===x.b)}];
+ {id:"a6_panse",at:"a6",ic:"🎓",nom:"Panse de génie",desc:"Toutes les questions justes au quiz du Pilote du rumen",ok:c=>!!c.a6.quizFini&&A6_QUIZ.every(x=>(c.a6.quiz||{})[x.id]===x.b)}];
 function pfEssais(d){return A6_MISSIONS.flatMap(mi=>a6M(d||{},mi.id).essais||[])}
 function pfSims(d){return pfEssais(d).filter(e=>e.r).map(e=>a6Simuler(e.r))}
 function pfDetail(c,aid){
@@ -2967,7 +3289,7 @@ function pfDetail(c,aid){
   if(aid==="a3"&&c.a3){const r=c.a3.reperage,q=c.a3.quiz;return [r?`Repérage ${r.score}/${r.total}`:"",q?`quiz ${q.score}/${q.total}`:"",c.titres.length?`${c.titres.length} famille${c.titres.length>1?"s":""} au jeu`:""].filter(Boolean).join(" · ")}
   if(aid==="a4"&&c.a4.vuIntro)return `Pièces : ${fr(A4_PIECES.reduce((s,p)=>s+a4PtsPiece(p,c.a4[p.id]),0))}/12`+(c.a4.concl?` · conclusion : ${c.a4.concl.toLowerCase()}`:"");
   if(aid==="a5"&&c.a5&&c.a5.a!=null)return `Puzzle 1 : ${fr(+c.a5.a)}/4 · puzzle 2 : ${fr(+c.a5.b)}/4 · Défi foie : ${fr(+c.a5.c)}/12`;
-  if(aid==="a6"&&c.a6.vuIntro){const ok=A6_MISSIONS.filter(mi=>a6M(c.a6,mi.id).ok).length,p=a6Preds(c.a6);return `Missions réussies ${ok}/3`+(p.n?` · prédictions justes ${p.j}/${p.n}`:"")+(c.a6.quizFini?` · quiz ${A6_QUIZ.filter(x=>(c.a6.quiz||{})[x.id]===x.b).length}/8`:"")}
+  if(aid==="a6"&&c.a6.vuIntro){const ok=A6_MISSIONS.filter(mi=>a6M(c.a6,mi.id).ok).length,p=a6Preds(c.a6);return `Missions réussies ${ok}/3`+(p.n?` · prédictions justes ${p.j}/${p.n}`:"")+(c.a6.quizFini?` · quiz ${A6_QUIZ.filter(x=>(c.a6.quiz||{})[x.id]===x.b).length}/${A6_QUIZ.length}`:"")}
   return ""}
 function pfNiveau(xp){let i=0;PF_NIVEAUX.forEach((n,k)=>{if(xp>=n[0])i=k});const cur=PF_NIVEAUX[i],nxt=PF_NIVEAUX[i+1];return {nom:cur[1],suiv:nxt?nxt[1]:null,pct:nxt?Math.round((xp-cur[0])/(nxt[0]-cur[0])*100):100,reste:nxt?nxt[0]-xp:0}}
 function vProfil(){const g=monGroupe();if(!g){vue="hub";return vHub()}pfChargerFamilles(g);
@@ -3248,7 +3570,7 @@ function vInscriptionBande(){const sid=moiE.sid,s=seances[sid],p=phaseSeance(sid
   const h=new Date(debutSeance(s)).toLocaleTimeString("fr-FR",{hour:"2-digit",minute:"2-digit"});
   const corps=p.phase!=="inscription"?`<div class="card"><h3>Les groupes sont déjà formés</h3><p>Vous arrivez après le tirage au sort : l'application vous place dans le groupe le plus petit.</p><button class="btn pen gros" id="enRetard">Rejoindre un groupe</button></div>`
    :`<div class="card brief"><span class="eyebrow">Présence enregistrée</span><h2 style="margin:4px 0 8px">Bienvenue ${esc((s.etudiants.find(e=>e.id===moiE.eid)||{}).p||"")} !</h2>
-     <p>Les groupes de 10 sont <b>tirés au sort</b> par l'application à <b>${h}</b> (dans <b id="cptRot">${fmt(p.reste)}</b>), parmi les étudiants présents. Ils sont mélangés (filles et garçons). Les équipes et binômes de chaque atelier sont aussi faits d'avance.</p>
+     <p>Les groupes de 10 sont <b>tirés au sort</b> par l'application ${p.manuel?`<b>dès que l'enseignant lance le tirage</b>`:`à <b>${h}</b> (dans <b id="cptRot">${fmt(p.reste)}</b>)`}, parmi les étudiants présents. Ils sont mélangés (filles et garçons). Les équipes et binômes de chaque atelier sont aussi faits d'avance.</p>
      <p class="note">${nb} étudiant${nb>1?"s":""} présent${nb>1?"s":""} pour l'instant. Laissez cette page ouverte : votre groupe s'affichera ici.</p></div>`;
   return `${enteteApp()}<div class="center" style="text-align:left;justify-items:stretch;max-width:780px;gap:14px">
    <div class="row" style="justify-content:space-between"><span class="eyebrow">${esc(s.nom)} · ${esc(moiNom)}</span><button class="link" id="pasMoi">Ce n'est pas moi</button></div>${corps}</div>`}
@@ -3304,14 +3626,14 @@ function vA5(){const g=monGroupe();if(!g){vue="hub";return vHub()}const duos=duo
     <div class="card brief"><span class="eyebrow">Avant de commencer · 30 minutes</span><h2 style="margin:4px 0 10px">Ce qui vous attend</h2>
      <div class="briefetapes">
       <div><b>1</b><span><b>Puzzle 1</b> (6 min) : sur le contour du foie de l'espèce de votre poste, placez les pièces des structures présentes et mettez de côté celles qui n'existent pas chez elle.</span></div>
-      <div><b>2</b><span><b>Correction croisée</b> : vous corrigez le puzzle d'un autre binôme (et un autre binôme corrige le vôtre).</span></div>
+      <div><b>2</b><span><b>Correction croisée</b> : vous échangez les tablettes et vous corrigez le puzzle du binôme suivant sur sa tablette ; le binôme précédent corrige le vôtre sur la vôtre.</span></div>
       <div><b>3</b><span><b>Puzzle 2</b> (6 min) sur l'animal suivant, puis nouvelle correction.</span></div>
       <div><b>4</b><span><b>Défi foie</b> (10 min) : repères sur le foie de six espèces, quiz, « Qui suis-je ? ».</span></div>
-      <div><b>5</b><span><b>Validation</b> : le binôme correcteur reporte votre score et valide votre fiche.</span></div></div>
+      <div><b>5</b><span><b>Note de l'atelier</b> : le score du défi est reporté tout seul, la fiche se valide automatiquement et votre note globale s'affiche, puis elle est envoyée au portail.</span></div></div>
      <p style="margin:10px 0 0"><b>Note sur 20</b> : puzzle 1 (4 pts) + puzzle 2 (4 pts) + Défi foie (12 pts). Le chrono de l'atelier vous guide d'une étape à l'autre.</p></div>
     <div class="card"><h3>Les binômes</h3><div class="duolist">${duos.map(d=>{const n=g.id==="TEST"?((testE.a5||{})[d.id]):(notesA5.find(x=>x.id===d.id)||{}).note;const moiD=t&&t.id===d.id;
       return `<div class="duo ${moiD?"moi":""}"><span class="dn">${d.num}</span><b>${esc(d.noms.join(" & "))}${moiD?" (vous)":""}<small style="display:block;font-weight:500;opacity:.7">corrige le binôme ${corrige(d).num}</small></b>${n!=null?`<span class="chip fait">${ico("coche")} note reçue</span>`:""}</div>`}).join("")}</div></div>
-    <div class="card"><h3>Ouvrir l'atelier</h3><p class="note" style="margin-top:0">Un téléphone par binôme. Votre binôme et celui que vous corrigez sont déjà remplis.</p>
+    <div class="card"><h3>Ouvrir l'atelier</h3><p class="note" style="margin-top:0">Une tablette par binôme : votre binôme et celui qui vous corrige sont déjà remplis. Aux corrections, vous échangez les tablettes.</p>
      <button class="btn pen gros" id="a5ouvrir">Ouvrir le Défi foie</button></div></div>`}
 function brancherA5(){if(vue!=="a5")return;const b=$("#a5ouvrir");if(b)b.addEventListener("click",()=>{const g=monGroupe(),t=monEquipe(g,"a5");location.href=lienA5(g,t?t.id:"")})}
 

@@ -1,6 +1,147 @@
 <!doctype html>
 <html lang="fr">
-<head><script src="../firebase-config.js"></script><script src="../vendor/firebase-app-compat.js"></script><script src="../vendor/firebase-firestore-compat.js"></script><script src="../adapter.js"></script>
+<head><script src="../firebase-config.js"></script><script src="../vendor/firebase-app-compat.js"></script><script src="../vendor/firebase-firestore-compat.js"></script><script src="../adapter.js"></script><script>
+/* Mode local : remplace les services claude.ai (db, user, downloads) quand l'application
+   est ouverte hors de claude.ai (fichier, Moodle, serveur web). Les données sont enregistrées
+   dans le navigateur de l'appareil (localStorage) et partagées entre les pages et onglets
+   du même site, mais pas entre appareils. Sur claude.ai, ce module ne fait rien. */
+(function(){
+  if ((window.claude && window.claude.use) || window.APP_CONFIG) return;
+  var P = "cl-db:", L = "cl-lease:";
+  var ls = (function(){ try{ var k="__cl_t"; localStorage.setItem(k,"1"); localStorage.removeItem(k); return localStorage; }catch(e){ return null; } })();
+  var mem = {};
+  function sget(k){ if(ls){ try{ return ls.getItem(k); }catch(e){} } return Object.prototype.hasOwnProperty.call(mem,k) ? mem[k] : null; }
+  function sset(k,v){ if(ls){ try{ ls.setItem(k,v); return; }catch(e){} } mem[k]=v; }
+  function sdel(k){ if(ls){ try{ ls.removeItem(k); }catch(e){} } delete mem[k]; }
+  function skeys(){ var out=[]; if(ls){ try{ for(var i=0;i<ls.length;i++) out.push(ls.key(i)); }catch(e){} } for(var k in mem) if(out.indexOf(k)<0) out.push(k); return out; }
+
+  function clone(v){ return v===undefined ? undefined : JSON.parse(JSON.stringify(v)); }
+  function deepFreeze(o){ if(o && typeof o==="object"){ Object.freeze(o); Object.keys(o).forEach(function(k){ deepFreeze(o[k]); }); } return o; }
+  function segs(p){ return String(p).replace(/^\/+|\/+$/g,"").split("/").filter(Boolean); }
+  function err(code,msg){ var e=new Error(msg||code); e.code=code; return e; }
+  function readDoc(path){ var r=sget(P+path); if(!r) return null; try{ return JSON.parse(r); }catch(e){ return null; } }
+  function writeDoc(path,data,v){ sset(P+path, JSON.stringify({data:data, v:v})); notify(); }
+  function autoId(){ var c="ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789", s=""; for(var i=0;i<20;i++) s+=c[Math.floor(Math.random()*c.length)]; return s; }
+  function mergeDeep(a,b){ var out=clone(a)||{}; Object.keys(b).forEach(function(k){ var bv=b[k];
+    if(bv && typeof bv==="object" && !Array.isArray(bv) && out[k] && typeof out[k]==="object" && !Array.isArray(out[k])) out[k]=mergeDeep(out[k],bv);
+    else out[k]=clone(bv); }); return out; }
+  function getField(o,f){ return String(f).split(".").reduce(function(x,k){ return x==null?undefined:x[k]; }, o); }
+  function cmp(a,b){ if(a===b) return 0; if(a===undefined||a===null) return -1; if(b===undefined||b===null) return 1; return a<b?-1:a>b?1:0; }
+  function test(v,op,x){
+    switch(op){
+      case "==": case "eq": return JSON.stringify(v)===JSON.stringify(x);
+      case "!=": case "ne": return JSON.stringify(v)!==JSON.stringify(x);
+      case "<": case "lt": return v!==undefined && cmp(v,x)<0;
+      case "<=": case "lte": return v!==undefined && cmp(v,x)<=0;
+      case ">": case "gt": return v!==undefined && cmp(v,x)>0;
+      case ">=": case "gte": return v!==undefined && cmp(v,x)>=0;
+      case "in": return Array.isArray(x) && x.some(function(y){ return JSON.stringify(y)===JSON.stringify(v); });
+      case "not-in": return Array.isArray(x) && !x.some(function(y){ return JSON.stringify(y)===JSON.stringify(v); });
+      case "array-contains": return Array.isArray(v) && v.some(function(y){ return JSON.stringify(y)===JSON.stringify(x); });
+      case "array-contains-any": return Array.isArray(v) && Array.isArray(x) && v.some(function(y){ return x.some(function(z){ return JSON.stringify(y)===JSON.stringify(z); }); });
+    }
+    return false;
+  }
+  var META={fromCache:false, hasPendingWrites:false};
+  function docSnap(path){ var id=segs(path).pop(), r=readDoc(path), d=r?deepFreeze(clone(r.data)):undefined;
+    return {id:id, exists:!!r, data:function(){ return d; }, metadata:META, _v:r?r.v:0}; }
+
+  /* ---- abonnements ---- */
+  var subs=[];
+  var pending=false;
+  function notify(){ if(pending) return; pending=true; setTimeout(function(){ pending=false; subs.slice().forEach(function(s){ try{ s.check(); }catch(e){} }); },0); }
+  window.addEventListener("storage", function(e){ if(!e.key || e.key.indexOf(P)===0) notify(); });
+
+  function docRef(path){
+    var sg=segs(path); if(sg.length%2!==0) throw err("invalid_argument","Chemin de document invalide : "+path);
+    path=sg.join("/");
+    var ref={ id:sg[sg.length-1], path:path,
+      get:function(){ return Promise.resolve(docSnap(path)); },
+      set:function(data){ var r=readDoc(path); writeDoc(path, clone(data)||{}, (r?r.v:0)+1); return Promise.resolve(); },
+      update:function(data){ var r=readDoc(path); if(!r) return Promise.reject(err("invalid_argument","Document absent : "+path)); writeDoc(path, mergeDeep(r.data,data||{}), r.v+1); return Promise.resolve(); },
+      delete:function(){ sdel(P+path); sdel(L+path); notify(); return Promise.resolve(); },
+      collection:function(p){ return colRef(path+"/"+p); },
+      acquire:function(o){ o=o||{}; var ttl=Math.min(600000,Math.max(1000,o.ttlMs||30000)), now=Date.now(), cur=null;
+        try{ cur=JSON.parse(sget(L+path)||"null"); }catch(e){}
+        if(cur && cur.exp>now && cur.holder!==o.holder) return Promise.resolve({acquired:false, expiresAt:new Date(cur.exp).toISOString()});
+        var exp=now+ttl; sset(L+path, JSON.stringify({holder:o.holder, exp:exp}));
+        var r=readDoc(path), v=(r?r.v:0)+1; writeDoc(path, mergeDeep(r?r.data:{}, o.data||{}), v);
+        return Promise.resolve({acquired:true, version:v, expiresAt:new Date(exp).toISOString(), holder:o.holder}); },
+      release:function(o){ var cur=null; try{ cur=JSON.parse(sget(L+path)||"null"); }catch(e){} if(cur && (!o||!o.holder||cur.holder===o.holder)) sdel(L+path); return Promise.resolve(); },
+      onSnapshot:function(next, error){ if(typeof next==="object" && next && next.next){ error=next.error; next=next.next; }
+        var last=null, alive=true;
+        var s={check:function(){ if(!alive) return; var sn=docSnap(path), sig=sn.exists?sn._v+":"+JSON.stringify(sn.data()):"absent"; if(sig===last) return; last=sig; try{ next(sn); }catch(e){ if(error) error(e); } }};
+        subs.push(s); setTimeout(s.check,0);
+        return function(){ alive=false; subs=subs.filter(function(x){ return x!==s; }); }; }
+    };
+    return ref;
+  }
+
+  function colRef(path, q){
+    var sg=segs(path); if(sg.length%2!==1) throw err("invalid_argument","Chemin de collection invalide : "+path);
+    path=sg.join("/"); q=q||{w:[], o:[], l:0};
+    function run(){
+      var pre=P+path+"/", docs=[];
+      skeys().forEach(function(k){ if(k.indexOf(pre)!==0) return; var rest=k.slice(pre.length); if(!rest || rest.indexOf("/")>=0) return; docs.push(docSnap(path+"/"+rest)); });
+      docs=docs.filter(function(d){ return d.exists && q.w.every(function(c){ return test(getField(d.data(),c[0]),c[1],c[2]); }); });
+      if(q.o.length) docs.sort(function(a,b){ for(var i=0;i<q.o.length;i++){ var c=cmp(getField(a.data(),q.o[i][0]),getField(b.data(),q.o[i][0])); if(c) return q.o[i][1]==="desc"?-c:c; } return 0; });
+      else docs.sort(function(a,b){ return a.id<b.id?-1:a.id>b.id?1:0; });
+      if(q.l) docs=docs.slice(0,q.l);
+      return docs;
+    }
+    function qsnap(docs, prev){
+      var changes=docs.map(function(d,i){ var old=prev?prev.findIndex(function(p){ return p.id===d.id; }):-1; return {type:old<0?"added":"modified", doc:d, oldIndex:old, newIndex:i}; });
+      if(prev) prev.forEach(function(p,i){ if(!docs.some(function(d){ return d.id===p.id; })) changes.push({type:"removed", doc:p, oldIndex:i, newIndex:-1}); });
+      return {docs:docs, size:docs.length, empty:!docs.length, docChanges:function(){ return changes; }, metadata:META, forEach:function(f){ docs.forEach(f); }};
+    }
+    var ref={ id:sg[sg.length-1], path:path,
+      doc:function(id){ return docRef(path+"/"+(id||autoId())); },
+      add:function(data){ var d=docRef(path+"/"+autoId()); return d.set(data).then(function(){ return d; }); },
+      where:function(f,op,v){ return colRef(path,{w:q.w.concat([[f,op,v]]), o:q.o, l:q.l}); },
+      orderBy:function(f,dir){ return colRef(path,{w:q.w, o:q.o.concat([[f,dir||"asc"]]), l:q.l}); },
+      limit:function(n){ return colRef(path,{w:q.w, o:q.o, l:n}); },
+      get:function(){ return Promise.resolve(qsnap(run(),null)); },
+      onSnapshot:function(next, error){ if(typeof next==="object" && next && next.next){ error=next.error; next=next.next; }
+        var lastSig=null, lastDocs=null, alive=true;
+        var s={check:function(){ if(!alive) return; var docs=run(), sig=JSON.stringify(docs.map(function(d){ return [d.id,d._v,d.data()]; })); if(sig===lastSig) return;
+          var sn=qsnap(docs,lastDocs); lastSig=sig; lastDocs=docs; try{ next(sn); }catch(e){ if(error) error(e); } }};
+        subs.push(s); setTimeout(s.check,0);
+        return function(){ alive=false; subs=subs.filter(function(x){ return x!==s; }); }; }
+    };
+    return ref;
+  }
+
+  var db={ doc:function(p){ return docRef(p); }, collection:function(p){ return colRef(p); } };
+
+  /* ---- identité de l'appareil ---- */
+  var uid=sget("cl-user-id"); if(!uid){ uid="local-"+autoId().slice(0,12); sset("cl-user-id",uid); }
+  try{ var qs=new URLSearchParams(location.search); if(qs.get("enseignant")==="1") sset("cl-enseignant","1"); if(qs.get("enseignant")==="0") sdel("cl-enseignant"); }catch(e){}
+  function teacher(){ return sget("cl-enseignant")==="1"; }
+  var user={ id:function(){ return Promise.resolve(uid); },
+    me:function(){ return Promise.resolve({id:uid, email:null, name:"", isMe:true, isOwner:teacher(), canEdit:teacher()}); },
+    canEdit:function(){ return Promise.resolve(teacher()); },
+    isOwner:function(){ return Promise.resolve(teacher()); },
+    can:function(){ return Promise.resolve(teacher()); },
+    profiles:function(ids){ var o={}; (ids||[]).forEach(function(i){ o[i]={id:i, name:"", email:null, isMe:i===uid}; }); return Promise.resolve(o); } };
+
+  /* ---- téléchargements ---- */
+  var downloads={ save:function(req){ try{
+      var d=req.data, blob = d instanceof Blob ? d : new Blob([d], {type:req.mimeType||"application/octet-stream"});
+      var a=document.createElement("a"); a.href=URL.createObjectURL(blob); a.download=req.filename||"fichier";
+      document.body.appendChild(a); a.click(); setTimeout(function(){ URL.revokeObjectURL(a.href); a.remove(); },1500);
+      return Promise.resolve({saved:true, filename:a.download});
+    }catch(e){ return Promise.reject(err("failed", String(e))); } } };
+
+  window.claude={ local:true, use:function(name){
+    if(name==="db") return Promise.resolve(db);
+    if(name==="user") return Promise.resolve(user);
+    if(name==="downloads") return Promise.resolve(downloads);
+    return Promise.resolve(null); /* assets, artifact, sample… : indisponibles hors claude.ai */
+  } };
+})();
+
+</script>
+
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 </head>
@@ -128,6 +269,7 @@ fieldset{border:0;margin:0;padding:0;display:flex;flex-direction:column;gap:4px}
 legend{font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin-bottom:4px;padding:0}
 .cochage{display:flex;flex-direction:column;gap:12px}
 .cochage .toggle{font-weight:400;font-size:15px}
+.epreuve.entr{border-style:dashed;margin:6px 0 12px;background:var(--surface)}
 .epreuves{gap:10px}.epreuve{display:flex;flex-direction:column;gap:8px;padding:12px;border:1px solid var(--line);border-radius:10px}
 .cons{display:flex;flex-direction:column;gap:14px}
 .cons section{border:1px solid var(--line);border-radius:12px;padding:14px 16px;display:flex;flex-direction:column;gap:8px}
@@ -1815,6 +1957,8 @@ const BANQUE=[
    Les résultats de chaque binôme sont gardés sur l'appareil (les étudiants n'ont pas de compte) ;
    la fiche affiche un code de résultat que l'enseignante peut importer dans son carnet de notes. */
 const CLE_EVAL='tp-digestif-eval-v1',CLE_CARNET='tp-digestif-carnet-v1';
+/* Mode « à la maison » (paquet Moodle d'entraînement) : partie solo contre l'ordinateur, rien n'est noté, chronomètre facultatif */
+const MAISON=window.__MAISON__===true||/[?&]maison=1/.test(location.search);
 /* Lancement depuis le portail des ateliers : ?duos=[{id,nom}]&duo=<id>&eval=<min> ; ?embed=1 = validation 3D des familles dans le jeu du portail */
 const PORTAIL=(()=>{try{const q=new URLSearchParams(location.search);let duos=null;try{duos=JSON.parse(q.get('duos')||'null');}catch(e){}
   const embed=q.get('embed')==='1';if(!Array.isArray(duos)&&!embed)return null;
@@ -1843,8 +1987,9 @@ function lmsCharger(){const b={id:'moi',nom:lmsNom(),validations:[],quiz:null,fa
 function lmsSauver(){if(!LMS||lmsFini)return;const b=E.binomes.moi;if(!b)return;
   const d={q:b.quiz?[b.quiz.score,b.quiz.total]:0,z:b.quizEnCours?{i:b.quizEnCours.ids,r:b.quizEnCours.rep.map(Number)}:0,r:b.reperage?[b.reperage.score,b.reperage.total]:0,t0:b.evalDebut||0,ef:b.evalFini?1:0,g:{a:b.avatar||'',x:b.xp||0,b:b.badges||[],f:b.familles||[],c:b.echecs||[],e:(b.explores||[]).slice(-25),s:b.speleo?1:0,t:b.tentatives||0,p:b.perseverant?1:0,m:b.serieMax||0},e:b.epreuveEnCours?{i:b.epreuveEnCours.items.map(it=>[it.esp,it.k]),r:b.epreuveEnCours.rep.map(Number)}:0};
   lmsSet('cmi.suspend_data',JSON.stringify(d));
-  const s=stats(b);lmsSet('cmi.core.score.min',0);lmsSet('cmi.core.score.max',20);lmsSet('cmi.core.score.raw',Math.max(0,Math.min(20,Math.round(s.note/(s.max||20)*200)/10)));
-  lmsSet('cmi.core.lesson_status',b.quiz&&b.reperage?'completed':'incomplete');lmsSet('cmi.core.exit','suspend');
+  if(MAISON){lmsSet('cmi.core.lesson_status','completed');}
+  else{const s=stats(b);lmsSet('cmi.core.score.min',0);lmsSet('cmi.core.score.max',20);lmsSet('cmi.core.score.raw',Math.max(0,Math.min(20,Math.round(s.note/(s.max||20)*200)/10)));
+  lmsSet('cmi.core.lesson_status',b.quiz&&b.reperage?'completed':'incomplete');}lmsSet('cmi.core.exit','suspend');
   try{LMS.LMSCommit('');}catch(e){}}
 if(LMS){const fin=()=>{if(lmsFini)return;lmsSauver();lmsFini=true;try{LMS.LMSFinish('');}catch(e){}};addEventListener('pagehide',fin);addEventListener('beforeunload',fin);}
 const N={acces:false,pinErr:'',msg:'',carnet:{},db:null,importMsg:''};
@@ -1909,6 +2054,9 @@ function bindBinome(){const $=id=>document.getElementById(id);
 function candidats(id){const e=ESPECES.find(x=>x.id===id);if(!e)return [];const ex=((S.reperes._exclus||{})[id])||[];
   const org=e.parties?e.parties.map(x=>({k:'L:'+x.id,layer:x.id})):Object.entries(e.calques||{}).filter(([k,v])=>v.organe).map(([k])=>({k:'L:'+k,layer:k}));
   return [...org.filter(o=>!ex.includes(o.layer)),...(S.reperes[id]||[]).map((_,i)=>({k:'P:'+i}))];}
+/* détail des réponses, transmis à l'espace encadrant du portail (synthèse) */
+function detQuiz(z){return z.ids.map((id,i)=>{const Q=BANQUE[id]||{};return {th:Q.th||'',q:Q.q||'',ok:z.rep[i]?1:0,r:Q.t==='vf'?(Q.a?'Vrai':'Faux'):((Q.o||[])[Q.a]||'')};});}
+function detRep(z){return z.items.map((it,i)=>{const q=itemQ(it)||{},e=ESPECES.find(x=>x.id===it.esp)||{};return {esp:e.nom||it.esp,n:q.nom||'',ok:z.rep[i]?1:0};});}
 function itemQ(it){const e=ESPECES.find(x=>x.id===it.esp);if(!e)return null;
   if(it.k.startsWith('P:')){const r=(S.reperes[it.esp]||[])[Number(it.k.slice(2))];return r?{...r}:null;}
   const id=it.k.slice(2);if(e.parties){const p=e.parties.find(x=>x.id===id);return p?{nom:p.nom,membre:p.membre,layer:id,part:true}:null;}
@@ -1926,6 +2074,51 @@ function repondreReperage(p,layer,part){const b=bin(),z=b&&b.epreuveEnCours;if(!
   sauverEval();drawPins();renderPanel();}
 
 /* ---------- Quiz ---------- */
+/* Questions de physiologie très simples (entraînement au quiz, non noté) — bases des cours de physiologie digestive */
+const PHYSIO_FACILE=[
+{t:'qcm',th:'Physiologie',sp:'Comparé',q:'Quel est le rôle principal de la salive au moment de la déglutition ?',o:['Humidifier et lubrifier le bol alimentaire','Digérer les protéines','Absorber les nutriments'],a:0,x:'La salive humidifie le bol alimentaire et le rend glissant pour la déglutition.'},
+{t:'vf',th:'Physiologie',sp:'Ruminants',q:'Chez les ruminants, la salive est très riche en bicarbonate et sert de tampon pour le rumen.',a:true,x:'Une vache produit plus de 100 L de salive par jour : ce bicarbonate tamponne les acides de la fermentation.'},
+{t:'qcm',th:'Physiologie',sp:'Comparé',q:'Comment le bol alimentaire avance-t-il dans l’œsophage ?',o:['Par des contractions en vagues (péristaltisme)','Uniquement par la gravité','Grâce aux cils de la muqueuse'],a:0,x:'Une onde de contraction pousse le bol alimentaire vers l’estomac : c’est le péristaltisme.'},
+{t:'qcm',th:'Physiologie',sp:'Comparé',q:'Quel acide l’estomac sécrète-t-il ?',o:['L’acide chlorhydrique (HCl)','L’acide lactique','L’acide acétique'],a:0,x:'Les cellules pariétales de l’estomac sécrètent de l’acide chlorhydrique.'},
+{t:'vf',th:'Physiologie',sp:'Comparé',q:'Le pH du contenu de l’estomac d’un chien est très acide (proche de 2).',a:true,x:'L’acide chlorhydrique rend le contenu gastrique très acide.'},
+{t:'qcm',th:'Physiologie',sp:'Comparé',q:'Qu’est-ce qui protège la paroi de l’estomac contre son propre acide ?',o:['Une couche de mucus et de bicarbonate','Une couche de graisse','Les poils de la muqueuse'],a:0,x:'Le mucus riche en bicarbonate forme une barrière contre l’acide et la pepsine.'},
+{t:'qcm',th:'Physiologie',sp:'Comparé',q:'Quelle enzyme de l’estomac commence la digestion des protéines ?',o:['La pepsine','L’amylase','La lipase pancréatique'],a:0,x:'La pepsine, activée par l’acidité, coupe les protéines en morceaux plus petits.'},
+{t:'vf',th:'Physiologie',sp:'Cheval',q:'Le cheval vomit très facilement.',a:false,x:'Faux : le cheval ne vomit pratiquement jamais (cardia très serré, angle d’entrée de l’œsophage).'},
+{t:'qcm',th:'Physiologie',sp:'Comparé',q:'Où se fait l’essentiel de l’absorption des nutriments chez le chien ?',o:['Dans l’intestin grêle','Dans l’estomac','Dans le rectum'],a:0,x:'L’intestin grêle, avec ses villosités, est le grand lieu de l’absorption.'},
+{t:'qcm',th:'Physiologie',sp:'Comparé',q:'À quoi servent les villosités de l’intestin grêle ?',o:['À augmenter la surface d’absorption','À broyer les aliments','À stocker la bile'],a:0,x:'Les villosités et les microvillosités multiplient la surface d’échange.'},
+{t:'qcm',th:'Physiologie',sp:'Comparé',q:'Quel organe fabrique la bile ?',o:['Le foie','Le pancréas','La rate'],a:0,x:'La bile est fabriquée par le foie, puis stockée dans la vésicule biliaire quand elle existe.'},
+{t:'qcm',th:'Physiologie',sp:'Comparé',q:'À quoi sert la bile dans la digestion ?',o:['À émulsionner les graisses','À digérer l’amidon','À acidifier l’intestin'],a:0,x:'Les sels biliaires fragmentent les graisses en fines gouttelettes, plus faciles à digérer.'},
+{t:'vf',th:'Physiologie',sp:'Cheval',q:'Le cheval n’a pas de vésicule biliaire : la bile coule en continu dans l’intestin.',a:true,x:'Sans vésicule pour la stocker, la bile s’écoule en permanence dans le duodénum.'},
+{t:'qcm',th:'Physiologie',sp:'Comparé',q:'Quel organe sécrète la plupart des enzymes digestives qui agissent dans l’intestin grêle ?',o:['Le pancréas','La rate','Le cæcum'],a:0,x:'Le suc pancréatique contient des enzymes pour les protéines, les sucres et les graisses.'},
+{t:'qcm',th:'Physiologie',sp:'Comparé',q:'Quel rôle a le bicarbonate du suc pancréatique ?',o:['Neutraliser l’acidité venant de l’estomac','Digérer les fibres','Colorer les selles'],a:0,x:'Le bicarbonate neutralise le chyme acide qui arrive de l’estomac.'},
+{t:'qcm',th:'Physiologie',sp:'Comparé',q:'Quel réseau nerveux, situé dans la paroi du tube digestif, peut commander la motricité même sans le cerveau ?',o:['Le système nerveux entérique','La moelle épinière','Le nerf optique'],a:0,x:'Le système nerveux entérique, parfois appelé « deuxième cerveau », commande localement le tube digestif.'},
+{t:'vf',th:'Physiologie',sp:'Comparé',q:'Le système parasympathique (nerf vague) stimule plutôt la digestion.',a:true,x:'Le parasympathique favorise la motricité et les sécrétions digestives ; le sympathique les freine.'},
+{t:'qcm',th:'Physiologie',sp:'Comparé',q:'Quelle hormone stimule la sécrétion d’acide par l’estomac ?',o:['La gastrine','L’insuline','L’adrénaline'],a:0,x:'La gastrine, produite par l’estomac lui-même, stimule la sécrétion d’acide.'},
+{t:'qcm',th:'Physiologie',sp:'Ruminants',q:'Dans le rumen, qui digère la cellulose ?',o:['Les micro-organismes (bactéries, protozoaires…)','Les enzymes de la vache','L’acide de la caillette'],a:0,x:'La vache ne fabrique pas d’enzyme contre la cellulose : ses microbes la fermentent pour elle.'},
+{t:'qcm',th:'Physiologie',sp:'Ruminants',q:'Quels produits de la fermentation sont la principale source d’énergie du ruminant ?',o:['Les acides gras volatils (AGV)','Le glucose absorbé dans le rumen','L’alcool'],a:0,x:'Acétate, propionate et butyrate sont absorbés par la paroi du rumen.'},
+{t:'vf',th:'Physiologie',sp:'Ruminants',q:'La rumination consiste à remastiquer des aliments remontés du rumen.',a:true,x:'Le bol remonte dans la bouche, est remastiqué puis réavalé : cela réduit les particules et fait saliver.'},
+{t:'qcm',th:'Physiologie',sp:'Ruminants',q:'Quel compartiment de l’estomac du ruminant fonctionne comme l’estomac d’un chien (avec de l’acide) ?',o:['La caillette','Le rumen','Le réseau'],a:0,x:'La caillette est le seul compartiment glandulaire : elle sécrète de l’acide et des enzymes.'},
+{t:'vf',th:'Physiologie',sp:'Ruminants',q:'Chez le veau qui tète, le lait passe directement vers la caillette grâce à la gouttière œsophagienne.',a:true,x:'La gouttière œsophagienne se ferme pendant la tétée : le lait évite le rumen.'},
+{t:'qcm',th:'Physiologie',sp:'Ruminants',q:'Que se passe-t-il quand les gaz de fermentation ne peuvent plus sortir du rumen ?',o:['Une météorisation (rumen gonflé)','Une diarrhée','Une hausse de l’appétit'],a:0,x:'Les gaz s’accumulent et le rumen gonfle, surtout à gauche : c’est la météorisation.'},
+{t:'qcm',th:'Physiologie',sp:'Cheval',q:'Chez le cheval, où les fibres sont-elles surtout fermentées ?',o:['Dans le cæcum et le côlon','Dans l’estomac','Dans l’œsophage'],a:0,x:'Le cheval est un fermenteur « postérieur » : cæcum et gros côlon.'},
+{t:'vf',th:'Physiologie',sp:'Lapin',q:'Le lapin mange certaines de ses crottes molles (cæcotrophes), riches en protéines et en vitamines.',a:true,x:'C’est la cæcotrophie : elle récupère les nutriments fabriqués par les microbes du cæcum.'},
+{t:'qcm',th:'Physiologie',sp:'Comparé',q:'Quel est le rôle principal du côlon ?',o:['Réabsorber l’eau et les électrolytes','Digérer les protéines','Fabriquer la bile'],a:0,x:'Le côlon récupère l’eau et les sels, ce qui forme des selles plus fermes.'},
+{t:'vf',th:'Physiologie',sp:'Comparé',q:'Une diarrhée peut faire perdre beaucoup d’eau et entraîner une déshydratation.',a:true,x:'L’eau et les électrolytes non réabsorbés partent dans les selles : il faut réhydrater l’animal.'},
+{t:'qcm',th:'Physiologie',sp:'Comparé',q:'Qu’appelle-t-on la digestion mécanique ?',o:['Le broyage et le brassage des aliments','L’action des enzymes','L’absorption dans le sang'],a:0,x:'Mastication, contractions de l’estomac et brassage : les aliments sont réduits en petits morceaux.'},
+{t:'qcm',th:'Physiologie',sp:'Comparé',q:'Où passent la plupart des nutriments absorbés par l’intestin avant d’aller au reste du corps ?',o:['Dans le foie, par la veine porte','Directement dans le cerveau','Dans les poumons'],a:0,x:'Le sang de l’intestin passe d’abord par le foie, qui trie et transforme les nutriments.'}];
+/* entraînement au quiz : 10 questions (5 de la banque de l'évaluation, 5 de physiologie), sans note ni chrono */
+function tirerEntrainement(){const m=a=>a.map(x=>[Math.random(),x]).sort((p,q)=>p[0]-q[0]).map(x=>x[1]);
+  return m([...tirerQuestions(5).map(i=>BANQUE[i]),...m(PHYSIO_FACILE).slice(0,5)]).slice(0,10);}
+function renderEntrainement(){const z=S.entr,k=z.i;
+  if(k>=z.qs.length){const n=z.rep.filter(Boolean).length;return `<div class="eyebrow">Entraînement au quiz · non noté</div><h2>${n} bonne${n>1?"s":""} réponse${n>1?"s":""} sur ${z.qs.length}</h2>
+    <p class="muted">Ce score n’est enregistré nulle part. Vous pouvez recommencer avec d’autres questions, ou passer à l’évaluation.</p>
+    <div class="row"><button class="btn" id="en-re">Nouvel entraînement</button><button class="btn secondary" id="en-fin">Revenir à l’évaluation</button></div>`;}
+  const Q=z.qs[k],opts=Q.t==='vf'?['Vrai','Faux']:Q.o,bonne=Q.t==='vf'?(Q.a?0:1):Q.a,rep=z.choix;
+  const dots=z.qs.map((_,i)=>`<span class="dot ${i<z.rep.length?(z.rep[i]?'ok':'ko'):(i===k?'now':'')}"></span>`).join('');
+  let h=`<div class="steps qsteps" aria-label="Question ${k+1} sur ${z.qs.length}">${dots}</div><div class="eyebrow">Entraînement · non noté · question ${k+1} sur ${z.qs.length} · ${esc(Q.th)}</div><p class="qtxt">${esc(Q.q)}</p>
+    <div class="opts">${opts.map((o,i)=>{let cl='opt';if(rep!=null){if(i===bonne)cl+=' juste';else if(i===rep)cl+=' faux';}return `<button class="${cl}" data-eopt="${i}" ${rep!=null?'disabled':''}>${esc(o)}</button>`;}).join('')}</div>`;
+  if(rep!=null)h+=`<p class="fb ${rep===bonne?'ok':'ko'}">${rep===bonne?'Bonne réponse.':'Mauvaise réponse.'} <span style="font-weight:400">${esc(Q.x)}</span></p><button class="btn" id="en-next">${k+1<z.qs.length?'Question suivante':'Voir mon score'}</button>`;
+  return h+`<p><button class="lien" id="en-fin">Arrêter l’entraînement</button></p>`;}
 function tirerQuestions(n){const idx=BANQUE.map((_,i)=>i);
   for(let i=idx.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[idx[i],idx[j]]=[idx[j],idx[i]];}
   // équilibrage : au plus ceil(n/4) questions d'un même thème
@@ -1944,7 +2137,7 @@ function ficheHTML(b){const s=stats(b),c=cfg();
     <p class="muted">${LMS?'Votre note est enregistrée automatiquement dans le carnet de notes Moodle.':'Résultats enregistrés sur cet appareil.'}</p>
   </div>`;}
 function renderQuiz(){const b=bin(),c=cfg();
-  let h=`<div class="eyebrow">Évaluation finale</div><h2>Repérage et quiz</h2>`;
+  let h=MAISON?`<div class="eyebrow">Révisions · non noté</div><h2>Repérage et quiz</h2>`:`<div class="eyebrow">Évaluation finale</div><h2>Repérage et quiz</h2>`;
   h+=binomeUI();
   if(!b||E.nouveau)return h+`<p class="muted">Choisissez votre binôme pour commencer. Les réponses sont enregistrées sur cet appareil.</p>`;
   const rz=b.epreuveEnCours;
@@ -1958,9 +2151,16 @@ function renderQuiz(){const b=bin(),c=cfg();
       <button class="btn" id="rp-next">${rz.rep.length<rz.items.length?'Structure suivante':'Terminer le repérage'}</button>`;
     else h+=`<p class="muted">Tournez le modèle, masquez des calques ou entrez dans l’estomac si besoin, puis touchez la structure une seule fois.</p>`;
     return h;}
+  if(MAISON&&(b.quiz||b.reperage)&&!b.quizEnCours&&!b.epreuveEnCours&&!S.qz&&!S.rp&&!S.entr){h=`<div class="eyebrow">Révisions · non noté</div><h2>Repérage et quiz</h2>`;
+    h+=`<div class="list epreuves"><div class="epreuve"><b>Repérage sur les modèles</b><span class="muted">Dernier essai : ${b.reperage?b.reperage.score+' sur '+b.reperage.total:'pas encore fait'}</span><button class="btn" id="m-rp">${b.reperage?'Recommencer':'Commencer'} le repérage</button></div>
+      <div class="epreuve"><b>Quiz</b><span class="muted">Dernier essai : ${b.quiz?b.quiz.score+' sur '+b.quiz.total:'pas encore fait'}</span><button class="btn" id="m-qz">${b.quiz?'Recommencer':'Commencer'} le quiz</button></div>
+      <div class="epreuve entr"><b>Quiz express</b><span class="muted">10 questions faciles d’anatomie et de physiologie.</span><button class="btn secondary" id="en-go">S’entraîner au quiz</button></div></div>
+      <p class="muted">Rien n’est noté : refaites les épreuves autant de fois que vous voulez.</p>`;return h;}
   if((b.quiz&&b.reperage&&!S.qz)||b.evalFini)return h+ficheHTML(b)+`<p class="muted">${b.evalFini&&!(b.quiz&&b.reperage)?'Temps écoulé : ':''}Chaque épreuve ne peut être faite qu’une fois.</p>`;
+  if(S.entr&&!b.quizEnCours)return renderEntrainement();
   const z=b.quizEnCours;
-  if(!z)return h+`<p class="muted">Deux épreuves, identiques pour tous et indépendantes du jeu. Chacune ne peut être faite qu’une fois. <b>${c.dureeEval} minutes</b> en tout, à partir de la première épreuve commencée${b.evalDebut?` (il reste ${fmt(resteEval(b))})`:''}.</p>
+  if(!z)return h+`<div class="epreuve entr"><b>${MAISON?'Quiz express : 10 questions faciles':'Avant l’évaluation : s’entraîner au quiz'}</b><span class="muted">10 questions faciles (anatomie et physiologie), avec la correction. Non noté, sans chrono, autant de fois que vous voulez.</span><button class="btn secondary" id="en-go">S’entraîner au quiz</button></div>
+    <p class="muted">${MAISON?'Deux épreuves pour réviser, sans chronomètre et sans note : vous pouvez les refaire autant de fois que vous voulez.':`Deux épreuves, identiques pour tous et indépendantes du jeu. Chacune ne peut être faite qu’une fois. <b>${c.dureeEval} minutes</b> en tout, à partir de la première épreuve commencée${b.evalDebut?` (il reste ${fmt(resteEval(b))})`:''}.`}</p>
     <div class="list epreuves">
       <div class="epreuve"><b>1. Repérage sur les modèles</b><span class="muted">${c.nbReperage} structures à toucher, réparties sur les espèces.</span>
         ${b.reperage?`<span class="fb ok">Fait : ${b.reperage.score} sur ${b.reperage.total}</span>`:`<button class="btn" id="rp-go">Commencer le repérage</button>`}</div>
@@ -1981,16 +2181,23 @@ function renderQuiz(){const b=bin(),c=cfg();
     <button class="btn" id="qz-next">${k+1<z.ids.length?'Question suivante':'Terminer le quiz'}</button>`;}
   return h;}
 function bindQuiz(){const $=id=>document.getElementById(id);const b=bin();
-  $('rp-go')?.addEventListener('click',()=>{if(b.evalFini)return;if(!b.evalDebut)b.evalDebut=Date.now();const items=tirerReperage(cfg().nbReperage);if(!items.length)return;b.epreuveEnCours={items,rep:[]};S.rp=null;sauverEval();majVueEval();allerA(items[0].esp);renderPanel();});
+  const enGo=()=>{S.entr={qs:tirerEntrainement(),i:0,rep:[],choix:null};renderPanel();panel.scrollTop=0;};
+  $('en-go')?.addEventListener('click',enGo);$('en-re')?.addEventListener('click',enGo);
+  panel.querySelectorAll('#en-fin').forEach(x=>x.addEventListener('click',()=>{S.entr=null;renderPanel();panel.scrollTop=0;}));
+  panel.querySelectorAll('[data-eopt]').forEach(el=>el.addEventListener('click',()=>{const z=S.entr,Q=z.qs[z.i],bonne=Q.t==='vf'?(Q.a?0:1):Q.a;z.choix=Number(el.dataset.eopt);z.rep.push(z.choix===bonne);renderPanel();}));
+  $('en-next')?.addEventListener('click',()=>{const z=S.entr;z.i++;z.choix=null;renderPanel();panel.scrollTop=0;});
+  $('rp-go')?.addEventListener('click',()=>{if(b.evalFini)return;S.entr=null;if(!b.evalDebut)b.evalDebut=Date.now();const items=tirerReperage(cfg().nbReperage);if(!items.length)return;b.epreuveEnCours={items,rep:[]};S.rp=null;sauverEval();majVueEval();allerA(items[0].esp);renderPanel();});
   $('rp-next')?.addEventListener('click',()=>{const z=b.epreuveEnCours;S.rp=null;surligner(null);
-    if(z.rep.length>=z.items.length){b.reperage={score:z.rep.filter(Boolean).length,total:z.items.length,t:Date.now()};delete b.epreuveEnCours;sauverEval();evFinEpreuve();majVueEval();}
+    if(z.rep.length>=z.items.length){b.reperage={score:z.rep.filter(Boolean).length,total:z.items.length,t:Date.now(),det:detRep(z)};delete b.epreuveEnCours;sauverEval();evFinEpreuve();majVueEval();}
     else allerA(z.items[z.rep.length].esp);
     drawPins();renderPanel();panel.scrollTop=0;});
-  $('qz-go')?.addEventListener('click',()=>{if(b.evalFini)return;if(!b.evalDebut)b.evalDebut=Date.now();b.quizEnCours={ids:tirerQuestions(cfg().nbQuestions),rep:[]};sauverEval();renderPanel();});
+  $('qz-go')?.addEventListener('click',()=>{if(b.evalFini)return;S.entr=null;if(!b.evalDebut)b.evalDebut=Date.now();b.quizEnCours={ids:tirerQuestions(cfg().nbQuestions),rep:[]};sauverEval();renderPanel();});
   panel.querySelectorAll('[data-opt]').forEach(el=>el.addEventListener('click',()=>{const z=b.quizEnCours,k=z.rep.length,Q=BANQUE[z.ids[k]];
     const choix=Number(el.dataset.opt),bonne=Q.t==='vf'?(Q.a?0:1):Q.a;S.qz={k,choix};z.rep.push(choix===bonne);evQuiz(choix===bonne);sauverEval();renderPanel();}));
+  $('m-rp')?.addEventListener('click',()=>{b.reperage=null;b.evalFini=false;delete b.evalDebut;sauverEval();renderPanel();setTimeout(()=>$('rp-go')?.click(),0);});
+  $('m-qz')?.addEventListener('click',()=>{b.quiz=null;b.evalFini=false;delete b.evalDebut;sauverEval();renderPanel();setTimeout(()=>$('qz-go')?.click(),0);});
   $('qz-next')?.addEventListener('click',()=>{const z=b.quizEnCours;S.qz=null;
-    if(z.rep.length>=z.ids.length){b.quiz={score:z.rep.filter(Boolean).length,total:z.ids.length,t:Date.now()};delete b.quizEnCours;sauverEval();evFinEpreuve();}
+    if(z.rep.length>=z.ids.length){b.quiz={score:z.rep.filter(Boolean).length,total:z.ids.length,t:Date.now(),det:detQuiz(z)};delete b.quizEnCours;sauverEval();evFinEpreuve();}
     S.qz=null;
     renderPanel();panel.scrollTop=0;});
 }
@@ -2174,11 +2381,11 @@ function chargerPartie(){try{P=JSON.parse(localStorage.getItem(CLE_PARTIE)||'nul
 function sauverPartie(){try{localStorage.setItem(CLE_PARTIE,JSON.stringify(P));}catch(e){}}
 const melanger=a=>{for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;};
 const norm=s=>s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^a-z0-9]/g,'');
-function resteJeu(){return P?Math.max(0,P.duree*60-(Date.now()-P.debut)/1000):0;}
+function resteJeu(){if(P&&!P.duree)return Infinity;return P?Math.max(0,P.duree*60-(Date.now()-P.debut)/1000):0;}
 function eq(){return P.equipes[P.tour];}
 function membresFamille(f){return CARTES.map((c,i)=>c.f===f?i:-1).filter(i=>i>=0);}
-function nouvellePartie(noms){const avs=melanger([...AVATARS]);
-  P={equipes:noms.map((n,i)=>({nom:n,av:avs[i],main:[],familles:[]})),pioche:melanger(CARTES.map((_,i)=>i)),tour:0,debut:Date.now(),duree:cfg().dureeJeu,phase:'passage',msg:null,dem:null,journal:[]};
+function nouvellePartie(noms,opt){opt=opt||{};const avs=melanger([...AVATARS]);
+  P={equipes:noms.map((n,i)=>({nom:n,av:(opt.avatar&&i===0)?opt.avatar:avs[i],main:[],familles:[],bot:!!(opt.bots&&i>0)})),pioche:melanger(CARTES.map((_,i)=>i)),tour:0,debut:Date.now(),duree:opt.duree===undefined?cfg().dureeJeu:opt.duree,phase:'passage',msg:null,dem:null,journal:[],solo:!!opt.bots};
   for(let k=0;k<6;k++)P.equipes.forEach(e=>{if(P.pioche.length)e.main.push(P.pioche.pop());});
   sauverPartie();}
 function journal(t){P.journal.unshift(t);P.journal=P.journal.slice(0,6);}
@@ -2187,7 +2394,35 @@ function complete(e,f){return membresFamille(f).every(i=>e.main.includes(i));}
 function suivant(){
   if(finPossible())return finir();
   let n=0;do{P.tour=(P.tour+1)%P.equipes.length;n++;}while(n<=P.equipes.length&&!eq().main.length&&!P.pioche.length);
-  P.phase='passage';P.msg=null;P.dem=null;sauverPartie();}
+  P.phase='passage';P.msg=null;P.dem=null;sauverPartie();if(P.solo)jouerOrdinateurs();}
+/* Adversaires ordinateur (mode maison) : ils jouent tout seuls jusqu'au tour du joueur */
+function jouerOrdinateurs(){let garde=0;P.recap=[];
+  while(P.phase==='passage'&&eq().bot&&garde++<20){tourOrdinateur();if(finPossible()){finir();break;}
+    let n=0;do{P.tour=(P.tour+1)%P.equipes.length;n++;}while(n<=P.equipes.length&&!eq().main.length&&!P.pioche.length);}
+  if(P.phase==='passage'&&!eq().bot){debutTour();if(P.recap.length)P.msg={type:'info',txt:'Pendant ce temps : '+P.recap.join(' · ')};}
+  sauverPartie();}
+function tourOrdinateur(){const e=eq(),moi=P.equipes[0];let actions=0;
+  if(!e.main.length&&P.pioche.length)e.main.push(P.pioche.pop());
+  while(actions++<6){
+    const f0=famillesEnMain(e).find(f=>complete(e,f));
+    if(f0){const ids=membresFamille(f0);e.main=e.main.filter(i=>!ids.includes(i));
+      if(Math.random()<0.8){e.familles.push(f0);journal(`${e.av} ${e.nom} pose la famille ${FAMILLES[f0].nom}`);P.recap.push(`${e.nom} pose la famille ${FAMILLES[f0].nom}`);}
+      else{P.pioche=melanger(P.pioche.concat(ids));journal(`${e.av} ${e.nom} rate la validation ${FAMILLES[f0].nom}`);}
+      if(finPossible())return;continue;}
+    const fs=famillesEnMain(e);if(!fs.length)return;
+    const f=fs.sort((a,b)=>e.main.filter(i=>CARTES[i].f===b).length-e.main.filter(i=>CARTES[i].f===a).length)[0];
+    const manque=membresFamille(f).filter(i=>!e.main.includes(i));if(!manque.length)return;
+    const ci=manque[Math.floor(Math.random()*manque.length)];
+    const cibles=P.equipes.map((x,i)=>i).filter(i=>i!==P.tour&&P.equipes[i].main.length);if(!cibles.length)return;
+    const cible=cibles.includes(P.equipes.findIndex(x=>x.main.includes(ci)))&&Math.random()<0.35?P.equipes.findIndex(x=>x.main.includes(ci)):cibles[Math.floor(Math.random()*cibles.length)];
+    const autre=P.equipes[cible];
+    if(Math.random()>0.75){journal(`${e.av} ${e.nom} : critère faux`);return;}
+    const k=autre.main.indexOf(ci);
+    if(k>=0){autre.main.splice(k,1);e.main.push(ci);journal(`${e.av} ${e.nom} prend « ${CARTES[ci].t} » ${FAMILLES[f].nom} à ${autre.av} ${autre.nom}`);
+      if(autre===moi)P.recap.push(`${e.nom} vous a pris « ${CARTES[ci].t} » (${FAMILLES[f].nom})`);continue;}
+    if(!P.pioche.length)return;const p=P.pioche.pop();e.main.push(p);
+    if(p!==ci){journal(`${e.av} ${e.nom} pioche`);const ff=CARTES[p].f;if(complete(e,ff)&&!P.equipes.some(x=>x.familles.includes(ff)))continue;return;}
+    journal(`${e.av} ${e.nom} pioche la bonne carte`);}}
 function finPossible(){return resteJeu()<=0||P.equipes.reduce((s,e)=>s+e.familles.length,0)>=7||P.equipes.every(e=>!e.main.length)&&!P.pioche.length;}
 function finir(){P.phase='fin';P.fin=Date.now();sauverPartie();}
 function debutTour(){const e=eq();P.msg=null;
@@ -2235,25 +2470,32 @@ function scoreboard(){return `<div class="scores">${P.equipes.map((e,i)=>`<div c
   ${e.familles.length?`<span class="fams">${e.familles.map(f=>`<i style="background:${FAMILLES[f].c}" title="${esc(FAMILLES[f].nom)}"></i>`).join('')}</span>`:''}</div>`).join('')}</div>
   <p class="muted">Pioche : ${P.pioche.length} carte(s)</p>`;}
 function renderJeu(){
+  if(!P&&MAISON){return `<div class="eyebrow">Jeu des 7 familles · entraînement · non noté</div><h2>Nouvelle partie contre l’ordinateur</h2>
+    <p class="muted">Vous jouez contre des adversaires virtuels. Quand vous complétez une famille, validez-la sur le modèle 3D. Rien n’est noté.</p>
+    <label for="j-bots">Adversaires<select id="j-bots">${[1,2,3,4].map(k=>`<option value="${k}" ${k===3?'selected':''}>${k} ordinateur${k>1?'s':''}</option>`).join('')}</select></label>
+    <label for="j-duree">Chronomètre<select id="j-duree"><option value="0" selected>Sans chronomètre</option><option value="10">10 minutes</option><option value="15">15 minutes (comme en TP)</option><option value="20">20 minutes</option></select></label>
+    <button class="btn" id="j-solo">Distribuer les cartes</button>
+    <button class="lien" data-aller="consignes">Lire les règles</button>`;}
   if(!P){const n=5;return `<div class="eyebrow">Jeu des 7 familles · non noté</div><h2>Nouvelle partie</h2>
     <p class="muted">Une tablette pour la table, que l’on se passe. ${cfg().dureeJeu} minutes de jeu, puis l’évaluation sur l’appareil de chacun.</p>
     <label for="j-n">Nombre de binômes<select id="j-n">${[2,3,4,5].map(k=>`<option ${k===n?'selected':''}>${k}</option>`).join('')}</select></label>
     <div class="grille" id="j-noms">${[1,2,3,4,5].map(k=>`<label for="j-nom${k}" ${k>n?'hidden':''}>Binôme ${k}<input type="text" id="j-nom${k}" autocomplete="off" placeholder="Ex. Léa et Hugo"></label>`).join('')}</div>
     <button class="btn" id="j-go">Distribuer les cartes et lancer le minuteur</button>
     <button class="lien" data-aller="consignes">Lire les règles</button>`;}
-  const e=eq(),r=resteJeu();let h=`<div class="eyebrow">Jeu des 7 familles · ${P.phase==='fin'?'partie terminée':Math.floor(r/60)+' min '+String(Math.floor(r%60)).padStart(2,'0')+' restantes'}</div>`;
+  const e=eq(),r=resteJeu();let h=`<div class="eyebrow">Jeu des 7 familles · ${P.phase==='fin'?'partie terminée':!P.duree?'sans chronomètre':Math.floor(r/60)+' min '+String(Math.floor(r%60)).padStart(2,'0')+' restantes'}</div>`;
   if(P.phase==='fin'){const cl=[...P.equipes].sort((a,b)=>b.familles.length-a.familles.length);const top=cl[0].familles.length;
     h+=`<h2>${top?'Victoire de '+cl.filter(x=>x.familles.length===top).map(x=>x.av+' '+esc(x.nom)).join(' et '):'Aucune famille posée'}</h2>
       <ol class="classement">${cl.map(x=>`<li><span class="scav">${x.av}</span><div><b>${esc(x.nom)}</b> — ${x.familles.length} famille(s)${x.familles.length?`<small>${x.familles.map(f=>esc(TITRE_FAMILLE[f])).join(' · ')}</small>`:''}</div></li>`).join('')}</ol>
-      <p>Le jeu ne compte pas dans la note. Passez maintenant à l’évaluation, chacun sur son appareil.</p>
-      <div class="row"><button class="btn" data-aller="quiz">Aller à l’évaluation</button><button class="btn secondary" id="j-reset">Nouvelle partie</button></div>`;return h;}
+      <p>${MAISON?'Bravo ! Continuez vos révisions avec le repérage et le quiz, ou rejouez une partie.':'Le jeu ne compte pas dans la note. Passez maintenant à l’évaluation, chacun sur son appareil.'}</p>
+      <div class="row"><button class="btn" data-aller="quiz">${MAISON?'Réviser : repérage et quiz':'Aller à l’évaluation'}</button><button class="btn secondary" id="j-reset">Nouvelle partie</button></div>`;return h;}
+  if(P.phase==='passage'&&P.solo){if(!eq().bot)debutTour();else jouerOrdinateurs();return renderJeu();}
   if(P.phase==='passage'){return h+`<div class="passage"><span class="pav">${e.av}</span><h2>Au tour de ${esc(e.nom)}</h2><p class="muted">Les autres binômes ne regardent pas l’écran.</p>
       <button class="btn" id="j-voir">Voir notre main</button></div>${scoreboard()}${P.journal.length?`<ul class="journal">${P.journal.map(t=>`<li>${esc(t)}</li>`).join('')}</ul>`:''}`;}
   if(P.phase==='validation')return h+`<p>Validation en cours sur le modèle 3D…</p><button class="btn" id="j-reval">Reprendre la validation</button>`;
   h+=`<h2>${e.av} ${esc(e.nom)}</h2>`;
   if(P.msg)h+=`<div class="fb ${P.msg.type==='ok'?'ok':P.msg.type==='ko'?'ko':''}" style="${P.msg.type==='info'?'background:var(--bg)':''}">${esc(P.msg.txt)}${P.msg.bonne?`<small style="display:block;font-weight:400">Le bon critère était : ${esc(P.msg.bonne)}</small>`:''}</div>
     ${P.msg.carte!==undefined?`<div class="jcarte">${carteHTML(CARTES[P.msg.carte],false)}</div>`:''}`;
-  if(P.phase==='resultat')return h+`<button class="btn" id="j-suite">Passer la tablette au binôme suivant</button>`;
+  if(P.phase==='resultat')return h+`<button class="btn" id="j-suite">${P.solo?'Fin de mon tour : l’ordinateur joue':'Passer la tablette au binôme suivant'}</button>`;
   if(P.phase==='complete'){const f=P.dem.f;return h+`<div class="complete" style="--c:${FAMILLES[f].c};--t:${FAMILLES[f].t}"><b>Famille ${esc(FAMILLES[f].nom)} complète !</b><span>Validez-la : touchez les 2 structures demandées sur le modèle 3D. Réussite = famille posée et titre « ${esc(TITRE_FAMILLE[f])} ».</span></div>
     <button class="btn" id="j-valider">Valider la famille sur le modèle 3D</button>`;}
   // phase main : demande en 3 étapes
@@ -2270,6 +2512,8 @@ function renderJeu(){
   return h;}
 function bindJeu(){const $=id=>document.getElementById(id);
   $('j-n')?.addEventListener('change',ev=>{const n=Number(ev.target.value);for(let k=1;k<=5;k++)document.querySelector(`label[for="j-nom${k}"]`).hidden=k>n;});
+  $('j-solo')?.addEventListener('click',()=>{const nb=Number($('j-bots').value),d=Number($('j-duree').value),b=bin();
+    const noms=[(b&&b.nom)||'Vous',...['Ordinateur 1','Ordinateur 2','Ordinateur 3','Ordinateur 4'].slice(0,nb)];nouvellePartie(noms,{bots:true,duree:d||0,avatar:b&&b.avatar});P.tour=0;debutTour();sauverEval();renderPanel();});
   $('j-go')?.addEventListener('click',()=>{const n=Number($('j-n').value);const noms=[];for(let k=1;k<=n;k++)noms.push($('j-nom'+k).value.trim().replace(/\s+/g,' ')||'Binôme '+k);nouvellePartie(noms);renderPanel();});
   $('j-voir')?.addEventListener('click',()=>{debutTour();renderPanel();});
   $('j-suite')?.addEventListener('click',()=>{suivant();renderPanel();});
@@ -2286,15 +2530,17 @@ function bindJeu(){const $=id=>document.getElementById(id);
 /* ---------- Minuteurs (jeu et évaluation) ---------- */
 function majChrono(){const el=document.getElementById('chrono');if(!el)return;let txt='',cl='';
   const b=bin(),re=resteEval(b);
-  if(S.mode==='quiz'&&b&&b.evalDebut&&!b.evalFini){txt='Évaluation '+fmt(re);cl=re<120?'urgent':'';if(re<=0){finaliserEval(b);renderPanel();}}
+  if(MAISON&&P&&!P.duree&&P.phase!=='fin'&&['jeu','valider'].includes(S.mode)){txt='Partie '+fmt((Date.now()-P.debut)/1000);}
+  else if(MAISON&&S.mode==='quiz'){}
+  else if(S.mode==='quiz'&&b&&b.evalDebut&&!b.evalFini){txt='Évaluation '+fmt(re);cl=re<120?'urgent':'';if(re<=0){finaliserEval(b);renderPanel();}}
   else if(P&&P.phase!=='fin'&&['jeu','valider'].includes(S.mode)){const r=resteJeu();txt='Jeu '+fmt(r);cl=r<120?'urgent':'';
     if(r<=0&&P.phase!=='validation'){finir();if(S.mode==='jeu')renderPanel();}}
   el.hidden=!txt;el.textContent='⏱ '+txt;el.className='chrono '+cl;}
 const fmt=s=>Math.floor(s/60)+':'+String(Math.floor(s%60)).padStart(2,'0');
 function resteEval(b){return b&&b.evalDebut?Math.max(0,cfg().dureeEval*60-(Date.now()-b.evalDebut)/1000):cfg().dureeEval*60;}
 function finaliserEval(b){if(!b||b.evalFini)return;
-  if(b.epreuveEnCours){const z=b.epreuveEnCours;b.reperage={score:z.rep.filter(Boolean).length,total:z.items.length,t:Date.now()};delete b.epreuveEnCours;}
-  if(b.quizEnCours){const z=b.quizEnCours;b.quiz={score:z.rep.filter(Boolean).length,total:z.ids.length,t:Date.now()};delete b.quizEnCours;}
+  if(b.epreuveEnCours){const z=b.epreuveEnCours;b.reperage={score:z.rep.filter(Boolean).length,total:z.items.length,t:Date.now(),det:detRep(z)};delete b.epreuveEnCours;}
+  if(b.quizEnCours){const z=b.quizEnCours;b.quiz={score:z.rep.filter(Boolean).length,total:z.ids.length,t:Date.now(),det:detQuiz(z)};delete b.quizEnCours;}
   if(!b.reperage)b.reperage={score:0,total:cfg().nbReperage,t:Date.now()};
   if(!b.quiz)b.quiz={score:0,total:cfg().nbQuestions,t:Date.now()};
   b.evalFini=true;S.rp=null;S.qz=null;surligner(null);sauverEval();majVueEval();verifierBadges();toast('⏰','Temps écoulé','L’évaluation est terminée et enregistrée.');}
@@ -2302,6 +2548,19 @@ setInterval(majChrono,1000);
 
 /* ---------- Consignes ---------- */
 function renderConsignes(){const c=cfg(),P=c.poids;
+  if(MAISON)return `<div class="cons"><div><div class="eyebrow">Entraînement à la maison · rien n’est noté</div><h2>Le jeu des 7 familles digestives</h2></div>
+  <section><h3><span class="n">1</span>Jouer contre l’ordinateur <span class="tag-ng">non noté</span></h3><ul>
+    <li>Onglet <b>Jeu</b> : choisissez de 1 à 4 adversaires virtuels et, si vous le souhaitez, un chronomètre (10, 15 ou 20 minutes). Sans chronomètre, la partie dure jusqu’à ce que les 7 familles soient posées.</li>
+    <li>À votre tour : choisissez une famille dont vous avez déjà une carte, la carte qui vous manque, l’adversaire à qui la demander, puis le bon <b>critère de reconnaissance</b> parmi 3. Critère faux : vous passez votre tour.</li>
+    <li>L’adversaire a la carte : elle arrive dans votre main, lisez son « Le saviez-vous ? » et rejouez. Sinon : « Pioche ! ».</li>
+    <li><b>Famille complète :</b> validez-la sur le modèle 3D en touchant 2 structures. Réussi : la famille est à vous, avec son titre (« Maître du rumen »…). Raté : les cartes retournent dans la pioche.</li>
+    <li>Les ordinateurs jouent tout seuls : un résumé de ce qu’ils ont fait s’affiche au début de votre tour.</li></ul>
+    <button class="lien" data-aller="jeu">Aller au jeu</button></section>
+  <section><h3><span class="n">2</span>S’entraîner sur les modèles 3D</h3><ul><li>Touchez n’importe quelle zone d’un modèle pour savoir quelle structure s’y trouve. Tournez, zoomez, masquez les calques.</li></ul>
+    <button class="lien" data-aller="explorer">Aller à l’onglet S’entraîner</button></section>
+  <section><h3><span class="n">3</span>Réviser : repérage et quiz <span class="tag-ng">non noté</span></h3><ul><li>Les mêmes épreuves qu’en TP, sans chronomètre : refaites-les autant de fois que vous voulez. Un quiz express de 10 questions faciles est aussi proposé.</li></ul>
+    <button class="lien" data-aller="quiz">Aller aux révisions</button></section>
+  <section><h3><span class="n">★</span>Votre profil</h3><ul><li>Touchez votre avatar en haut de l’écran : avatar, niveau, badges et album des cartes. Ils sont gardés dans Moodle d’une séance à l’autre.</li></ul></section></div>`;
   const ident=LMS?'Chaque étudiant ouvre l’activité avec son propre compte Moodle : la note est enregistrée à son nom.'
     :PORTAIL?'Votre duo est reconnu automatiquement par le portail des ateliers : la note s’enregistre toute seule dans le portail, aucun enseignant n’a besoin de la saisir.'
     :'Choisissez ou créez votre binôme en haut de l’écran Évaluation avant de commencer.';
@@ -2379,6 +2638,7 @@ document.getElementById('tab-notes').onclick=()=>setMode('notes');
 function loop(){requestAnimationFrame(loop);controls.update();sun.position.copy(camera.position);renderer.render(scene,camera);updateLabels();}
 async function boot(){
   chargerEval();if(!PORTAIL)chargerPartie();S.mode=PORTAIL&&PORTAIL.embed?'attente':'consignes';
+  if(MAISON){document.getElementById('tab-quiz').textContent='Révisions';const h1=document.querySelector('header h1');if(h1)h1.textContent='7 familles digestives';}
   if(PORTAIL){document.getElementById('tab-jeu').hidden=true;document.body.dataset.portail='1';
     if(PORTAIL.embed)document.body.dataset.jeuval=document.body.dataset.embed='1';
     else{const r=document.getElementById('portail-retour');r.hidden=false;r.onclick=()=>{try{if(document.referrer&&new URL(document.referrer).origin===location.origin&&history.length>1){history.back();return;}}catch(e){}location.href='../';};}}if(P&&P.phase==='validation'){P.phase='complete';sauverPartie();}
@@ -2416,7 +2676,7 @@ boot();
     function poser(l){try{localStorage.setItem(FILE,JSON.stringify(l))}catch(e){}}
     function preparer(){var d;try{d=JSON.parse(localStorage.getItem(K)||"null")}catch(e){}if(!d||!d.binomes)return;var l=file(),ids=duos.map(function(x){return x.id});
       Object.keys(d.binomes).forEach(function(id){if(ids.indexOf(id)<0)return;var b=d.binomes[id];
-        var prog={reperage:b.reperage&&b.reperage.total?{score:b.reperage.score,total:b.reperage.total}:null,quiz:b.quiz&&b.quiz.total&&b.quiz.score!=null?{score:b.quiz.score,total:b.quiz.total}:null};
+        var prog={reperage:b.reperage&&b.reperage.total?{score:b.reperage.score,total:b.reperage.total,det:b.reperage.det||null}:null,quiz:b.quiz&&b.quiz.total&&b.quiz.score!=null?{score:b.quiz.score,total:b.quiz.total,det:b.quiz.det||null}:null};
         var cle=JSON.stringify(prog);if(envoyes[id]===cle||(!prog.reperage&&!prog.quiz))return;envoyes[id]=cle;
         l=l.filter(function(x){return x.id!==id});l.push({id:id,prog:prog,note:noteDe(b),t:Date.now()})});poser(l)}
     var dbP=null;function base(){if(!dbP)dbP=(window.claude&&window.claude.use?window.claude.use("db"):Promise.resolve(null)).catch(function(){return null});return dbP}
@@ -2427,5 +2687,6 @@ boot();
     var orig=Storage.prototype.setItem;Storage.prototype.setItem=function(k,v){orig.apply(this,arguments);if(k===K)setTimeout(function(){preparer();vider()},50)};
     setInterval(function(){preparer();vider()},15000);window.addEventListener("online",vider);setTimeout(vider,2000)}
 })();</script>
+
 </body>
 </html>
