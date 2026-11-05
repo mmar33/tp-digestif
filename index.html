@@ -2,6 +2,14 @@
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#2f7a4a"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-capable" content="yes">
 <link rel="manifest" href="manifest.webmanifest"><link rel="icon" href="icone-192.png"><link rel="apple-touch-icon" href="icone-192.png">
+<script>/* remise à zéro des téléphones : quand RAZ change, chaque appareil efface tout ce qu'il gardait (cache, identité, file d'envoi, base locale) puis recharge. Ne pas changer RAZ pendant une séance. */
+(function(){var RAZ="1";try{if(localStorage.getItem("__raz")===RAZ)return;}catch(e){return}
+var fin=function(){try{localStorage.clear();sessionStorage.clear();localStorage.setItem("__raz",RAZ)}catch(e){}location.reload()};
+try{localStorage.clear();sessionStorage.clear()}catch(e){}try{window.stop()}catch(e){}document.documentElement.style.visibility="hidden";
+var p=[];try{if(navigator.serviceWorker)p.push(navigator.serviceWorker.getRegistrations().then(function(r){return Promise.all(r.map(function(x){return x.unregister()}))}))}catch(e){}
+try{if(window.caches)p.push(caches.keys().then(function(k){return Promise.all(k.map(function(x){return caches.delete(x)}))}))}catch(e){}
+try{if(indexedDB.databases)p.push(indexedDB.databases().then(function(d){d.forEach(function(x){if(x.name)indexedDB.deleteDatabase(x.name)})}))}catch(e){}
+Promise.all(p).then(fin,fin);setTimeout(fin,3000)})();</script>
 <script src="firebase-config.js"></script><script src="vendor/firebase-app-compat.js"></script><script src="vendor/firebase-firestore-compat.js"></script><script src="vendor/qrcode.js"></script><script src="adapter.js"></script>
 <script>
 /* Mode local : remplace les services claude.ai (db, user, downloads) quand l'application
