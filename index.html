@@ -3065,8 +3065,9 @@ async function ouvrirFamilles(){const g=monGroupe();if(!g)return;const t=monEqui
     if(L.acquired){try{sn=await ref.get()}catch(e){}if(!sn||!sn.exists){const d={groupe:g.id,seance:g.seance,statut:"attente",duos,ordre:[],mains:{},poses:{},pioche:[],tour:null,evt:{n:0},journal:[],duree:famDuree(g),cree:Date.now()};famEtat=d;await ref.set(d)}}
     else await new Promise(r=>setTimeout(r,1200))}
   db.collection("famj").doc(famId+"-"+famMoi).set({jeu:famId,duo:famMoi,t:Date.now()}).catch(()=>{});
-  famUnsub.push(ref.onSnapshot(s=>{if(!s.exists)return;famEtat=Object.assign({id:famId},s.data());famMaj()},()=>{}));
+  famUnsub.push(ref.onSnapshot(s=>{if(!s.exists)return;famEtat=Object.assign({id:famId},s.data());setTimeout(famRejoindreEnCours,0);famMaj()},()=>{}));
   famUnsub.push(db.collection("famj").where("jeu","==",famId).onSnapshot(s=>{famPres={};s.docs.forEach(d=>famPres[d.data().duo]=1);if(famEtat&&famEtat.statut==="attente")famMaj()},()=>{}));
+  setTimeout(famRejoindreEnCours,1500);setTimeout(famRejoindreEnCours,5000);
   famUnsub.push(db.collection("famvote").doc(famId).onSnapshot(s=>{famVote=s.exists?s.data():null;famAppliquerVote()},()=>{}));
   vue="fam";rendre();window.scrollTo(0,0)}
 function famQuitter(){v3dDetruire();famUnsub.forEach(u=>u());famUnsub=[];clearTimeout(famBotT);famEtat=null;famId=null;vue="a3";rendre();window.scrollTo(0,0)}
@@ -3079,6 +3080,15 @@ const melange=a=>{a=[...a];for(let i=a.length-1;i>0;i--){const j=Math.floor(Math
 const famNb=(main,f)=>main.filter(c=>CARTES7[c].f===f).length;
 const famCompletes=main=>FAMILLES.filter(f=>famNb(main,f.id)===6).map(f=>f.id);
 function famEvt(o,log){famEtat.evt=Object.assign({n:(famEtat.evt.n||0)+1,t:Date.now()},o);if(log){famEtat.journal=[log,...(famEtat.journal||[])].slice(0,8)}}
+/* un duo arrivé après le début de la partie la rejoint : il reçoit 6 cartes de la pioche et joue après les autres */
+let famRejoint=null;
+function famDistribuerRetard(E,id){if(!E||E.statut!=="en_cours"||!id||(E.ordre||[]).includes(id))return false;if(!(E.duos||[]).some(d=>d.id===id))return false;
+  E.pioche=E.pioche||[];E.mains=E.mains||{};E.poses=E.poses||{};E.mains[id]=E.pioche.splice(0,Math.min(6,E.pioche.length));E.poses[id]=E.poses[id]||[];E.ordre=[...E.ordre,id];return true}
+async function famRejoindreEnCours(){const E=famEtat;if(!E||E.test||E.statut!=="en_cours"||!famMoi||(E.ordre||[]).includes(famMoi)||famRejoint===famId+famMoi)return;
+  famRejoint=famId+famMoi;let L={acquired:true};try{L=await db.collection("config").doc("famjoin-"+famId).acquire({holder:DEVICE,ttlMs:5000})}catch(e){}
+  if(!L.acquired){setTimeout(()=>{famRejoint=null;famRejoindreEnCours()},1500);return}
+  try{const sn=await db.collection("familles").doc(famId).get();if(sn&&sn.exists)famEtat=Object.assign({id:famId},sn.data())}catch(e){}
+  if(famDistribuerRetard(famEtat,famMoi)){famEvt({type:"arrivee"},famNomDuo(famMoi)+" rejoint la partie avec "+famEtat.mains[famMoi].length+" cartes.");await famEcrire();toast("Vous rejoignez la partie en cours : voici vos cartes")}}
 function famCommencer(){const E=famEtat;E.duree=E.duree||15*60e3;E.ordre=E.test?E.duos.map(d=>d.id):E.duos.map(d=>d.id).filter(id=>famPres[id]);
   if(E.ordre.length<2){toast("Il faut au moins 2 duos connectés");return}
   const p=melange(Object.keys(CARTES7));E.mains={};E.poses={};E.ordre.forEach(id=>{E.mains[id]=p.splice(0,6);E.poses[id]=[]});E.pioche=p;
