@@ -3785,6 +3785,14 @@ setInterval(()=>{const els=document.querySelectorAll(".cptProf");if(!els.length)
    Les fiches validées avant reçoivent la valeur d'une question (0,6 point), sans dépasser 12 au défi ni 20 au total. */
 const A5_CORR_AVANT=1793957100000;
 function noteA5Corrigee(n){let v=+n.note;if(!(+n.maj)||+n.maj>=A5_CORR_AVANT||!(v>0))return v;const c=+n.c||0;if(c>=12)return v;return Math.min(20,Math.round((v+Math.min(0.6,12-c))*10)/10)}
+/* chronomètre de la rotation, toujours visible pendant les ateliers (coin de l'écran) */
+setInterval(()=>{let el=document.getElementById("chronoAt");const g=(typeof monGroupe==="function")?monGroupe():null;
+  const ok=g&&g.id!=="TEST"&&["hub","a1","a3","a4","a5","a6","fam","m1","m2","attente","salle","fin"].includes(vue);
+  const p=ok&&seances[g.seance]?phaseSeance(g.seance):null;
+  if(!p||(p.phase!=="rot"&&p.phase!=="pause")){if(el)el.remove();return}
+  if(!el){el=document.createElement("div");el.id="chronoAt";el.setAttribute("aria-live","off");el.style.cssText="position:fixed;right:12px;bottom:12px;z-index:9000;background:var(--ink);color:var(--paper);border-radius:999px;padding:8px 14px;font:700 18px/1.1 ui-monospace,monospace;box-shadow:0 4px 14px rgba(0,0,0,.25);pointer-events:none";document.body.appendChild(el)}
+  const r=p.reste||0;el.style.background=p.phase==="pause"?"var(--warn)":r<5*60e3?"var(--pen)":"var(--ink)";
+  el.textContent=(p.phase==="pause"?"☕ Pause ":"⏱ Atelier : ")+fmt(r)},1000);
 /* question retirée de l'atelier 3 (« le côlon dorsal gauche du cheval est lisse… ») : comptée juste pour tout le monde */
 function noteA3Corrigee(n){let v=+n.note;const q=n.quiz||{},det=q.det||[];if(!det.length||!q.total)return v;
   const rate=det.filter(x=>!x.ok&&/dorsal gauche du cheval est lisse/.test(x.q||"")).length;if(!rate)return v;
