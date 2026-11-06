@@ -1316,20 +1316,22 @@ body.enc .auto-val{display:none}
     /* la meilleure fiche du binôme est gardée : une fiche moins bonne (autre tablette, fiche vide) ne l'écrase jamais */
     var marquer=function(){var f=file();f.forEach(function(y){if(y.id===x.id&&y.t===x.t)y.ok=1});poser(f)};
     var ref=db.collection("notes_a5").doc(x.id);
-    ref.get().then(function(s){if(s&&s.exists){var d=s.data()||{};if(d.note!=null&&+d.note>=+x.note&&d.maj!==x.t){marquer();return}}
-      return ref.set({note:x.note,a:x.a,b:x.b,c:x.c,correcteur:x.correcteur||"",maj:x.t}).then(marquer)}).catch(function(){})})})}
+    razDe(x.id).then(function(rz){if(rz&&x.t<rz){marquer();return}return ref.get().then(function(s){if(s&&s.exists){var d=s.data()||{};if(d.note!=null&&+d.note>=+x.note&&d.maj!==x.t&&!(rz&&+d.maj<rz)){marquer();return}}
+      return ref.set({note:x.note,a:x.a,b:x.b,c:x.c,correcteur:x.correcteur||"",maj:x.t}).then(marquer)})}).catch(function(){})})})}
   Storage.prototype.setItem=function(k,v){orig.apply(this,arguments);if(k!==K||!duos)return;
     try{var list=JSON.parse(v||"[]"),r=list[list.length-1];if(!r)return;var d=trouver(r.noted)||moiDuo();if(!d)return;
       var f=file().filter(function(x){return x.id!==d.id});f.push({id:d.id,note:r.total,a:r.a,b:r.b,c:r.c,correcteur:r.corrector||"",t:Date.now()});poser(f);window.__a5enCours=true;setTimeout(vider,50)}catch(e){}};
   setInterval(vider,15000);window.addEventListener("online",vider);setTimeout(vider,2000);
 
   /* remise à zéro demandée par un encadrant pour tout un groupe : tablette vidée (chrono, fiches) puis rechargée */
+  window.__a5razP=base().then(function(db){if(!db)return {};return db.collection("config").doc("a5raz").get().then(function(s){return s&&s.exists?(s.data()||{}):{}}).catch(function(){return {}})});
+  function razDe(id){return window.__a5razP.then(function(d){return +d[String(id).replace(/-a5-e\d+$/,"")]||0})}
   (function(){if(!duos||!moi||String(moi).indexOf("TEST")===0)return;var gid=String(moi).replace(/-a5-e\d+$/,"");
-    base().then(function(db){if(!db)return;db.collection("config").doc("a5raz").get().then(function(s){var d=s&&s.exists?s.data():null;var ts=d&&+d[gid];if(!ts)return;
+    window.__a5razP.then(function(d){var ts=d&&+d[gid];if(!ts)return;
       var k="a5-raz-vu-"+moi;if(+localStorage.getItem(k)>=ts)return;
       ["chrono-foie","corr-en-cours","defi-foie-score","binome-note","binome-info","correction-foie-recap"].forEach(function(x){localStorage.removeItem(x)});
       try{poser(file().filter(function(x){return String(x.id).indexOf(gid+"-a5-")!==0}))}catch(e){}
-      orig.call(localStorage,k,String(ts));location.reload()}).catch(function(){})})})();
+      orig.call(localStorage,k,String(ts));location.reload()})})();
   /* atelier déjà terminé pour ce binôme (note enregistrée, ici ou dans la base) : on bloque, même après un rechargement */
   function verrouiller(n){if(document.getElementById("a5fini"))return;var o=document.createElement("div");o.id="a5fini";
     o.style.cssText="position:fixed;inset:0;z-index:99999;background:rgba(20,22,20,.94);color:#fff;display:flex;align-items:center;justify-content:center;padding:20px;font-family:system-ui,sans-serif";
@@ -1338,8 +1340,9 @@ body.enc .auto-val{display:none}
       '<p style="font-size:16px;opacity:.85;margin:0 0 18px">L’atelier ne peut pas être refait.</p><a href="../index.html" style="display:inline-block;background:#fff;color:#1d1f1c;padding:12px 22px;border-radius:12px;font-weight:700;text-decoration:none">Retour au portail des ateliers</a></div>';
     document.body.appendChild(o)}
   function verifierFini(){if(!duos||!moi||String(moi).indexOf("TEST")===0)return;
-    var loc=file().filter(function(x){return x.id===moi&&+x.note>0})[0];if(loc&&!window.__a5enCours){verrouiller(loc);return}
-    base().then(function(db){if(!db)return;db.collection("notes_a5").doc(moi).get().then(function(s){if(s&&s.exists&&+(s.data()||{}).note>0&&!window.__a5enCours)verrouiller(s.data())}).catch(function(){})})}
+    razDe(moi).then(function(rz){
+    var loc=file().filter(function(x){return x.id===moi&&+x.note>0&&!(rz&&x.t<rz)})[0];if(loc&&!window.__a5enCours){verrouiller(loc);return}
+    base().then(function(db){if(!db)return;db.collection("notes_a5").doc(moi).get().then(function(s){var d=s&&s.exists?(s.data()||{}):null;if(d&&+d.note>0&&!(rz&&+d.maj<rz)&&!window.__a5enCours)verrouiller(d)}).catch(function(){})})})}
   verifierFini();
 
   /* lien de retour vers le portail */

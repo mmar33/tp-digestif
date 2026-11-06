@@ -3737,8 +3737,8 @@ function vA5(){const g=monGroupe();if(!g){vue="hub";return vHub()}const duos=duo
      <p style="margin:10px 0 0"><b>Note sur 20</b> : puzzle 1 (4 pts) + puzzle 2 (4 pts) + Défi foie (12 pts). Le chrono de l'atelier vous guide d'une étape à l'autre.</p></div>
     <div class="card"><h3>Les binômes</h3><div class="duolist">${duos.map(d=>{const n=g.id==="TEST"?((testE.a5||{})[d.id]):(notesA5.find(x=>x.id===d.id)||{}).note;const moiD=t&&t.id===d.id;
       return `<div class="duo ${moiD?"moi":""}"><span class="dn">${d.num}</span><b>${esc(d.noms.join(" & "))}${moiD?" (vous)":""}<small style="display:block;font-weight:500;opacity:.7">corrige le binôme ${corrige(d).num}</small></b>${n!=null?`<span class="chip fait">${ico("coche")} note reçue</span>`:""}</div>`}).join("")}</div></div>
-    ${(()=>{const n=t&&g.id!=="TEST"?notesA5.find(x=>x.id===t.id&&+x.note>0):null;return n?`<div class="card" style="border-left:6px solid var(--ok)"><h3 style="margin-top:0">Atelier terminé ✓</h3><p style="margin:0">Votre fiche est validée et votre note est enregistrée : <b>${fr(+n.note||0)} / 20</b> (puzzle 1 : ${fr(+n.a||0)}/4 · puzzle 2 : ${fr(+n.b||0)}/4 · défi : ${fr(+n.c||0)}/12). L'atelier ne peut pas être refait.</p></div>`:""})()}
-    ${t&&g.id!=="TEST"&&notesA5.find(x=>x.id===t.id&&+x.note>0)?"":`<div class="card"><h3>Ouvrir l'atelier</h3><p class="note" style="margin-top:0">Une tablette par binôme : votre binôme et celui qui vous corrige sont déjà remplis. Aux corrections, vous échangez les tablettes.</p>
+    ${(()=>{const n=t&&g.id!=="TEST"?notesA5.find(x=>x.id===t.id&&+x.note>0&&a5Valide(x)):null;return n?`<div class="card" style="border-left:6px solid var(--ok)"><h3 style="margin-top:0">Atelier terminé ✓</h3><p style="margin:0">Votre fiche est validée et votre note est enregistrée : <b>${fr(+n.note||0)} / 20</b> (puzzle 1 : ${fr(+n.a||0)}/4 · puzzle 2 : ${fr(+n.b||0)}/4 · défi : ${fr(+n.c||0)}/12). L'atelier ne peut pas être refait.</p></div>`:""})()}
+    ${t&&g.id!=="TEST"&&notesA5.find(x=>x.id===t.id&&+x.note>0&&a5Valide(x))?"":`<div class="card"><h3>Ouvrir l'atelier</h3><p class="note" style="margin-top:0">Une tablette par binôme : votre binôme et celui qui vous corrige sont déjà remplis. Aux corrections, vous échangez les tablettes.</p>
      <button class="btn pen gros" id="a5ouvrir">Ouvrir le Défi foie</button></div>`}</div>`}
 function brancherA5(){if(vue!=="a5")return;const b=$("#a5ouvrir");if(b)b.addEventListener("click",()=>{const g=monGroupe(),t=monEquipe(g,"a5");location.href=lienA5(g,t?t.id:"")})}
 
@@ -3792,6 +3792,9 @@ setInterval(()=>{document.querySelectorAll(".cptPauseEc").forEach(el=>el.textCon
 setInterval(()=>{const els=document.querySelectorAll(".cptProf");if(!els.length)return;const sid=profSeance||seanceSel;const p=sid&&seances[sid]?phaseSeance(sid):null;if(!p||p.phase!=="rot")return;els.forEach(el=>el.textContent=fmt(p.reste||0))},1000);
 /* Défi foie, 6/11 : le corrigé de la question « position du foie » (chien / porc) était inversé jusqu'à 10 h 25.
    Les fiches validées avant reçoivent la valeur d'une question (0,6 point), sans dépasser 12 au défi ni 20 au total. */
+let a5Raz={};function chargerA5Raz(){if(!db)return;db.collection("config").doc("a5raz").get().then(x=>{a5Raz=x&&x.exists?(x.data()||{}):{};rendrePortail()}).catch(()=>{})}
+setInterval(chargerA5Raz,30000);setTimeout(chargerA5Raz,3000);
+const a5Valide=n=>!!n&&!(+a5Raz[String(n.id).replace(/-a5-e\d+$/,"")]&&+n.maj<+a5Raz[String(n.id).replace(/-a5-e\d+$/,"")]);
 const A5_CORR_AVANT=1793957100000;
 function noteA5Corrigee(n){let v=+n.note;if(!(+n.maj)||+n.maj>=A5_CORR_AVANT||!(v>0))return v;const c=+n.c||0;if(c>=12)return v;return Math.min(20,Math.round((v+Math.min(0.6,12-c))*10)/10)}
 /* chronomètre de la rotation, toujours visible pendant les ateliers (coin de l'écran) */
@@ -3819,7 +3822,7 @@ function noteEtuCalc(g,eid,aid){const sd=subsDe(g.id,aid);if(!sd)return null;con
   if(aid==="a4")return a4Note(g.id==="TEST"?((testE&&testE.a4)||{})[tid]:a4docs[tid]);
   if(aid==="a3"){if(g.id==="TEST")return testE&&testE.a3&&testE.a3[tid]!=null?testE.a3[tid]:null;const n=notesA3.find(x=>x.id===tid);return n?noteA3Corrigee(n):null}
   if(aid==="a6")return a6NoteGroupe(g);
-  if(aid==="a5"){if(g.id==="TEST")return testE&&testE.a5&&testE.a5[tid]!=null?testE.a5[tid]:null;const n=notesA5.find(x=>x.id===tid);return n?noteA5Corrigee(n):null}
+  if(aid==="a5"){if(g.id==="TEST")return testE&&testE.a5&&testE.a5[tid]!=null?testE.a5[tid]:null;const n=notesA5.find(x=>x.id===tid&&a5Valide(x));return n?noteA5Corrigee(n):null}
   return null}
 function groupeAFini(g,aid){if(!atelierActif(aid))return false;const sd=subsDe(g.id,aid);if(!sd)return false;
   return sd.equipes.every((m,i)=>{const tid=g.id+"-"+aid+"-e"+(i+1);
