@@ -2276,6 +2276,23 @@ function phaseSeance(sid){const s=seances[sid],d=deroules[sid],H0=debutSeance(s)
   if(!H0&&tirageManuel(s))return {phase:"inscription",reste:null,manuel:true};
   if(H0&&Date.now()<H0)return {phase:"inscription",reste:H0-Date.now()};
   return {phase:"formation"}}
+/* après une pause : l'équipe choisit de reprendre où elle en était (par défaut) ou de recommencer l'atelier à zéro */
+function choixApresPause(g,a){const d=deroules[g.seance];if(!d||!d.pauseJusqu||d.r!==phaseSeance(g.seance).r||Date.now()>d.pauseJusqu+10*60e3||g.id==="TEST")return "";
+  const t=monEquipe(g,a.id);if(!t)return "";const cle="reprise_"+t.id+"_"+d.pauseJusqu,fait=LS.get(cle,null);
+  const remise={a3:"le jeu des 7 familles repart de zéro pour tout le groupe (nouvelle distribution)",a4:"votre enquête repart de la première pièce",a6:"vos missions et votre quiz repartent de zéro"}[a.id];
+  const guide={a1:"Reprenez votre maquette là où vous l'aviez laissée (ou recommencez-la si vous préférez : rien n'est enregistré tant qu'elle n'est pas terminée).",a2:"Le duel reprend là où il en était.",a5:"Sur la tablette, l'animateur peut remettre le chrono à 30 minutes avec le bouton « Réinitialiser », ou le laisser où il en était."}[a.id];
+  if(fait)return `<p class="note" style="margin:12px 0 0">Après la pause : ${fait==="zero"?"atelier recommencé à zéro":"vous reprenez où vous en étiez"}.</p>`;
+  return `<div class="ecran" style="margin-top:14px;border-style:solid;border-color:var(--warn)"><b>Après la pause : reprendre ou recommencer ?</b>
+    ${remise?`<p style="margin:6px 0 10px">Vous pouvez reprendre là où vous en étiez, ou recommencer l'atelier à zéro (${remise}).</p><div class="row" style="gap:8px;flex-wrap:wrap"><button class="btn blue" data-reprise="garder" data-tid="${t.id}" data-aid="${a.id}" data-cle="${cle}">Reprendre où nous en étions</button><button class="btn ghost" data-reprise="zero" data-tid="${t.id}" data-aid="${a.id}" data-cle="${cle}">Recommencer à zéro</button></div>`:`<p style="margin:6px 0 0">${guide||""}</p>`}</div>`}
+document.addEventListener("click",ev=>{const b=ev.target.closest&&ev.target.closest("[data-reprise]");if(!b)return;const {reprise,tid,aid,cle}=b.dataset;
+  if(reprise==="garder"){LS.set(cle,"garder");rendre();toast("Vous reprenez où vous en étiez");return}
+  modale("Recommencer l'atelier à zéro ?","Tout ce que votre "+(aid==="a3"?"groupe a fait au jeu des 7 familles":"équipe a fait dans cet atelier")+" depuis le début de cette rotation sera effacé. Ce choix est définitif.","Oui, recommencer",async()=>{
+    try{const g=monGroupe();
+      if(aid==="a4"){a4docs[tid]={};await ecrire("a4",tid,{maj:Date.now()},"set");a4Etape=null;a4Sel={}}
+      if(aid==="a6"){a6docs[tid]={};await ecrire("a6",tid,{maj:Date.now()},"set");a6Etape=null;a6Brouillon={};a6Pred={};a6Quiz={}}
+      if(aid==="a3"&&g){const p=phaseSeance(g.seance),fid=(g.id+"-fam-R"+(p.r!=null?p.r:0)).replace(/[^A-Za-z0-9-]/g,"");const duos=duosA3(g).map(d=>({id:d.id,nom:d.nom}));
+        await db.collection("familles").doc(fid).set({groupe:g.id,seance:g.seance,statut:"attente",duos,ordre:[],mains:{},poses:{},pioche:[],tour:null,evt:{n:0},journal:[],duree:famDuree(g),cree:Date.now()})}
+      LS.set(cle,"zero");rendre();toast("Atelier remis à zéro")}catch(e){toast("Remise à zéro impossible, réessayez")}},"","Annuler")});
 /* consigne « changer d'écran » affichée sous l'atelier en cours */
 function aideEcranBase(a){return aideEcran(Object.assign({},a,{id:"_"+a.id}))}
 function aideEcran(a){if(!a)return "";const risque=a.id==="a3"?"<b>Un seul téléphone ou tablette par duo</b> pour tout l'atelier (jeu et évaluation), de préférence le plus grand écran du duo. Si vous voulez changer d'écran, faites-le avant de commencer l'évaluation 3D ou après l'avoir validée, jamais pendant.":a.id==="a5"?"Pendant le <b>Défi foie</b>, ne changez pas d'appareil en cours d'étape : votre progression serait perdue. Changez avant de commencer ou après avoir validé votre fiche.":"";
@@ -2426,7 +2443,7 @@ function vHub(){
   else if(p.phase==="pause"&&!test){const a=atelierDe(g.k,p.r),rep=new Date(Date.now()+p.reste).toLocaleTimeString("fr-FR",{hour:"2-digit",minute:"2-digit"});
     centre=`<div class="maint" style="--c:${g.couleur}"><span class="eyebrow">Pause</span><h2>☕ Pause : reprise à ${rep}</h2>
       <p style="font-size:20px;margin:6px 0">Reprise dans <b class="cptPause num">${fmt(p.reste)}</b></p>
-      <p class="note" style="margin:0">Ensuite : <b>atelier ${a.n} · ${esc(titreAt(a))}</b> (rotation ${p.r+1} sur ${NB_ROT}). Ne commencez pas avant la fin de la pause.</p></div>`}
+      <p class="note" style="margin:0">Ensuite : <b>atelier ${a.n} · ${esc(titreAt(a))}</b> (rotation ${p.r+1} sur ${NB_ROT}). Ne commencez pas avant la fin de la pause.</p>${choixApresPause(g,a)}</div>`}
   else if(p.phase==="rot"){const a=test?null:atelierDe(g.k,p.r);
     if(!test){const app=AVEC_CONTENU.includes(a.id)&&atelierActif(a.id), e=etatAt(g,a.id), sd=subsDe(g.id,a.id), t=monEquipe(g,a.id), pret=!!p.prets[g.id], gs=groupesDe(g.seance);
       centre=`<div class="maint" style="--c:${g.couleur}"><span class="eyebrow">Maintenant · rotation ${p.r+1} sur ${NB_ROT}</span>
@@ -2434,7 +2451,7 @@ function vHub(){
        ${app?(sd?`<p style="margin:12px 0 4px">Vous êtes dans <b>${esc(t?t.nom.split(" · ")[0]:"?")}</b> : ${t?t.membres.map(m=>esc(nomCourt(g.seance,m))).join(", "):""}.</p><button class="btn pen gros" data-at="${a.id}">${e.st==="fait"?"Revoir l'atelier":"Ouvrir l'atelier"}</button>`
          :`<p style="margin:12px 0 4px">Cet atelier se fait en <b>${BESOIN[a.id].titre}</b>.</p><button class="btn pen gros" id="repartir" data-ra="${a.id}">Former les ${BESOIN[a.id].type==="duos"?"duos":"équipes"}</button>`)
          :`<p class="note" style="margin-top:10px">Cet atelier se déroule hors de l'application : suivez les consignes sur la table.</p>`}
-       ${aideEcran(a)}<div class="pretbox"><span>Changement au plus tard dans <b id="cptRot">${fmt(p.reste)}</b> · ${gs.filter(x=>p.prets[x.id]).length}/${gs.length} groupes prêts</span>
+       ${choixApresPause(g,a)}${aideEcran(a)}<div class="pretbox"><span>Changement au plus tard dans <b id="cptRot">${fmt(p.reste)}</b> · ${gs.filter(x=>p.prets[x.id]).length}/${gs.length} groupes prêts</span>
        <button class="btn ${pret?"ghost":"blue"}" id="pretChanger" ${pret?"disabled":""}>${pret?"Prêts à changer ✓":"Atelier terminé : prêts à changer"}</button></div></div>`}}
   else if(p.phase==="fin")centre=`<div class="maint"><span class="eyebrow">Séance terminée</span><h2>Fin des ateliers</h2><p>${pendEq?"<b>Dernière mission : évaluez une maquette (atelier 1). Elle compte dans votre note !</b>":b.complet?"Toutes vos notes sont prêtes.":"Les dernières notes arrivent dès que toutes les évaluations sont faites."}</p></div>`;
   else centre=`<div class="maint"><h2>Formation des groupes…</h2></div>`;
