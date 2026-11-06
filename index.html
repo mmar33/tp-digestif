@@ -2337,7 +2337,7 @@ function noteEtuCalc(g,eid,aid){const sd=subsDe(g.id,aid);if(!sd)return null;con
   if(aid==="a2"){if(g.id==="TEST")return testE&&testE.a2!=null?testE.a2:null;const r=resultats.find(x=>x.groupe===tid);return r?+r.note:null}
   if(aid==="a4")return a4Note(g.id==="TEST"?((testE&&testE.a4)||{})[tid]:a4docs[tid]);
   if(aid==="a6")return a6NoteGroupe(g);
-  if(aid==="a3"){if(g.id==="TEST")return testE&&testE.a3&&testE.a3[tid]!=null?testE.a3[tid]:null;const n=notesA3.find(x=>x.id===tid);return n?+n.note:null}
+  if(aid==="a3"){if(g.id==="TEST")return testE&&testE.a3&&testE.a3[tid]!=null?testE.a3[tid]:null;const n=notesA3.find(x=>x.id===tid);return n?noteA3Corrigee(n):null}
   return null}
 function noteEtudiant(g,eid){const out={};ATELIERS_APP().forEach(a=>out[a.id]=noteEtu(g,eid,a.id));const v=Object.values(out);const ok=v.length&&v.every(x=>x!=null);
   return {par:out,finale:ok?Math.round(v.reduce((s,x)=>s+x,0)/v.length*10)/10:null}}
@@ -3713,13 +3713,17 @@ function sousGroupes(g,aid){const B=BESOIN[aid],m=g.membres||[],N=m.length;if(!N
   if(reste.length%2){const s=reste[reste.length-1];if(duos.length)duos[Math.floor(Math.random()*duos.length)].push(s);else duos.push([s])}
   return shuffle(duos)}
 
+/* question retirée de l'atelier 3 (« le côlon dorsal gauche du cheval est lisse… ») : comptée juste pour tout le monde */
+function noteA3Corrigee(n){let v=+n.note;const q=n.quiz||{},det=q.det||[];if(!det.length||!q.total)return v;
+  const rate=det.filter(x=>!x.ok&&/dorsal gauche du cheval est lisse/.test(x.q||"")).length;if(!rate)return v;
+  return Math.min(20,Math.round((v+rate*10/q.total)*10)/10)}
 /* ----- notes et fin d'atelier (ateliers 2 et 5) ----- */
 function noteEtuCalc(g,eid,aid){const sd=subsDe(g.id,aid);if(!sd)return null;const i=sd.equipes.findIndex(e=>e.includes(eid));if(i<0)return null;const tid=g.id+"-"+aid+"-e"+(i+1);
   if(aid==="a1")return noteA1Equipe(tid);
   if(aid==="a2"){if(g.id==="TEST")return testE&&testE.a2!=null?testE.a2:null;const parDuel={};resA2(tid).forEach(r=>parDuel[r.duel]=+r.note);const v=Object.values(parDuel);
     if(!v.length)return null;if(v.length<2&&!atelierPasse(g,"a2"))return null;return Math.max(...v)}
   if(aid==="a4")return a4Note(g.id==="TEST"?((testE&&testE.a4)||{})[tid]:a4docs[tid]);
-  if(aid==="a3"){if(g.id==="TEST")return testE&&testE.a3&&testE.a3[tid]!=null?testE.a3[tid]:null;const n=notesA3.find(x=>x.id===tid);return n?+n.note:null}
+  if(aid==="a3"){if(g.id==="TEST")return testE&&testE.a3&&testE.a3[tid]!=null?testE.a3[tid]:null;const n=notesA3.find(x=>x.id===tid);return n?noteA3Corrigee(n):null}
   if(aid==="a6")return a6NoteGroupe(g);
   if(aid==="a5"){if(g.id==="TEST")return testE&&testE.a5&&testE.a5[tid]!=null?testE.a5[tid]:null;const n=notesA5.find(x=>x.id===tid);return n?+n.note:null}
   return null}
