@@ -1637,7 +1637,7 @@ function vProf(){
   const sous=SOUS_AT[ongletProf]?`<div class="sousnav">${SOUS_AT[ongletProf].map(([x,l])=>`<button data-sousat="${x}" aria-pressed="${sousAt[ongletProf]===x}">${l}</button>`).join("")}</div>`:ongletProf==="a2"?`<div class="sousnav">${[["notes","Notes"],["synthese","Synthèse"],["corrige","Corrigés des planches"],["questions","Questions"],["test","Essayer une planche"]].map(([x,l])=>`<button data-sous="${x}" aria-pressed="${sousA2===x}">${l}</button>`).join("")}</div>`:"";
   return `<div style="display:grid;gap:18px;padding-top:20px">
    <div class="row" style="justify-content:space-between"><h2 style="font-size:34px">Espace encadrants</h2><button class="btn ghost" id="retour">Retour à l'accueil</button></div>
-   ${bandeauTirage()}${chronoProf()}
+   ${bandeauTirage()}${chronoProf()}${carteRelance()}
    <button class="testbig" id="testEtudiant">${ico("main")}<span><b>Tester les ateliers comme un étudiant</b><span>Un groupe fictif, sur cette tablette. Rien n'est enregistré ni compté.</span></span></button>
    <div class="tabs nav4">${[["seance","Suivi de la séance"],["a1","Atelier 1 · maquettes"],["a2","Atelier 2 · duel"],["a3","Atelier 3 · 7 familles"],["a4","Atelier 4 · enquête"],["a5","Atelier 5 · défi foie"],["a6","Atelier 6 · rumen"],["reglages","Réglages et QR code"]].filter(([x])=>!/^a\d$/.test(x)||atelierActif(x)).map(([x,l])=>`<button data-tab="${x}" aria-pressed="${ongletProf===x}">${l}</button>`).join("")}</div>
    ${sous}${corps}</div>`;
@@ -2453,7 +2453,7 @@ function vHub(){
        ${app?(sd?`<p style="margin:12px 0 4px">Vous êtes dans <b>${esc(t?t.nom.split(" · ")[0]:"?")}</b> : ${t?t.membres.map(m=>esc(nomCourt(g.seance,m))).join(", "):""}.</p><button class="btn pen gros" data-at="${a.id}">${e.st==="fait"?"Revoir l'atelier":"Ouvrir l'atelier"}</button>`
          :`<p style="margin:12px 0 4px">Cet atelier se fait en <b>${BESOIN[a.id].titre}</b>.</p><button class="btn pen gros" id="repartir" data-ra="${a.id}">Former les ${BESOIN[a.id].type==="duos"?"duos":"équipes"}</button>`)
          :`<p class="note" style="margin-top:10px">Cet atelier se déroule hors de l'application : suivez les consignes sur la table.</p>`}
-       ${choixApresPause(g,a)}${aideEcran(a)}<div class="pretbox"><span>Changement au plus tard dans <b id="cptRot">${fmt(p.reste)}</b> · ${gs.filter(x=>p.prets[x.id]).length}/${gs.length} groupes prêts</span>
+       ${choixApresPause(g,a)}${aideEcran(a)}${t&&g.id!=="TEST"?`<p class="note" style="margin:10px 0 0">Code de votre ${(BESOIN[a.id]||{}).type==="duos"?"binôme":"équipe"} (à donner à l'enseignant si vous devez refaire l'atelier) : <b>${codeEquipe(t.id)}</b></p>`:""}<div class="pretbox"><span>Changement au plus tard dans <b id="cptRot">${fmt(p.reste)}</b> · ${gs.filter(x=>p.prets[x.id]).length}/${gs.length} groupes prêts</span>
        <button class="btn ${pret?"ghost":"blue"}" id="pretChanger" ${pret?"disabled":""}>${pret?"Prêts à changer ✓":"Atelier terminé : prêts à changer"}</button></div></div>`}}
   else if(p.phase==="fin")centre=`<div class="maint"><span class="eyebrow">Séance terminée</span><h2>Fin des ateliers</h2><p>${pendEq?"<b>Dernière mission : évaluez une maquette (atelier 1). Elle compte dans votre note !</b>":b.complet?"Toutes vos notes sont prêtes.":"Les dernières notes arrivent dès que toutes les évaluations sont faites."}</p></div>`;
   else centre=`<div class="maint"><h2>Formation des groupes…</h2></div>`;
@@ -3663,9 +3663,11 @@ function ouvrirAtelier(aid){const g=monGroupe();if(!g)return;
   const t=monEquipe(g,aid);if(!t){toast("Vous n'êtes dans aucune équipe de cet atelier");return}
   /* atelier terminé pour le groupe (sa rotation est passée) : plus personne ne peut le relancer.
      Seule exception : l'atelier 1 pour une équipe qui doit encore évaluer une maquette (premier groupe, évaluation en fin de séance). */
-  if(g.id!=="TEST"&&moiE&&atelierPasse(g,aid)&&!(aid==="a1"&&!evals.some(e=>e.evaluateur===t.id&&e.statut==="envoyee"))){
+  if(g.id!=="TEST"&&moiE&&!relancesOk[t.id]&&atelierPasse(g,aid)&&!(aid==="a1"&&!evals.some(e=>e.evaluateur===t.id&&e.statut==="envoyee"))){
     const n=noteEtu(g,moiE.eid,aid);const at=ATELIERS.find(x=>x.id===aid)||{n:"",titre:""};
-    modale("Atelier terminé",`L'atelier ${at.n} · ${esc(titreAt(at))} est terminé pour votre groupe${n!=null?` : votre note est <b>${fr(n)} / 20</b>`:""}. Il ne peut pas être relancé.`,"Compris",()=>{},"","Fermer");return}
+    const go=()=>modale("Atelier terminé",`L'atelier ${at.n} · ${esc(titreAt(at))} est terminé pour votre groupe${n!=null?` : votre note est <b>${fr(n)} / 20</b>`:""}. Il ne peut pas être relancé.<br><br>Si l'enseignant vous autorise à le refaire, donnez-lui ce code : <b style="font-size:22px;letter-spacing:1px">${codeEquipe(t.id)}</b>`,"Compris",()=>{},"","Fermer");
+    /* relance autorisée par un encadrant pour cette équipe : on laisse passer */
+    if(db){db.collection("config").doc("relances").get().then(x=>{const r=x&&x.exists?(x.data()||{}):{};if(r[t.id]){relancesOk[t.id]=1;ouvrirAtelier(aid)}else go()}).catch(go)}else go();return}
   if(aid==="a1"){ctxEquipe=t;vue="a1";a1Form=null;a1Photo=null;if(!(a1docs[t.id]||{}).debut){a1docs[t.id]=Object.assign({},a1docs[t.id],{debut:Date.now()});ecrire("a1",t.id,{debut:Date.now()},"set")}rendre();window.scrollTo(0,0);return}
   if(aid==="a2"){if(duelsFaits(g,t.id)>=2){toast("Les deux duels sont joués");return}proposerDemoA2(g,t);return}
   if(aid==="a3"){vue="a3";rendre();window.scrollTo(0,0)}
@@ -3794,7 +3796,8 @@ setInterval(()=>{const els=document.querySelectorAll(".cptProf");if(!els.length)
    Les fiches validées avant reçoivent la valeur d'une question (0,6 point), sans dépasser 12 au défi ni 20 au total. */
 let a5Raz={};function chargerA5Raz(){if(!db)return;db.collection("config").doc("a5raz").get().then(x=>{a5Raz=x&&x.exists?(x.data()||{}):{};rendrePortail()}).catch(()=>{})}
 setInterval(chargerA5Raz,30000);setTimeout(chargerA5Raz,3000);
-const a5Valide=n=>!!n&&!(+a5Raz[String(n.id).replace(/-a5-e\d+$/,"")]&&+n.maj<+a5Raz[String(n.id).replace(/-a5-e\d+$/,"")]);
+const a5RazDe=id=>Math.max(+a5Raz[String(id).replace(/-a5-e\d+$/,"")]||0,+a5Raz[id]||0);
+const a5Valide=n=>!!n&&!(a5RazDe(n.id)&&+n.maj<a5RazDe(n.id));
 const A5_CORR_AVANT=1793957100000;
 function noteA5Corrigee(n){let v=+n.note;if(!(+n.maj)||+n.maj>=A5_CORR_AVANT||!(v>0))return v;const c=+n.c||0;if(c>=12)return v;return Math.min(20,Math.round((v+Math.min(0.6,12-c))*10)/10)}
 /* chronomètre de la rotation, toujours visible pendant les ateliers (coin de l'écran) */
@@ -3810,6 +3813,41 @@ setInterval(()=>{let el=document.getElementById("chronoAt");const g=(typeof monG
   if(p.phase==="pause"&&vue!=="hub"){if(!v){v=document.createElement("div");v.id="voilePause";v.style.cssText="position:fixed;inset:0;z-index:8999;background:rgba(20,22,20,.92);color:#fff;display:flex;align-items:center;justify-content:center;text-align:center;padding:20px;font-family:system-ui,sans-serif";document.body.appendChild(v)}
     v.innerHTML='<div><div style="font-size:54px">'+(manu?"⏸":"☕")+'</div><h2 style="font-size:28px;margin:8px 0">Pause</h2><p style="font-size:19px;margin:0">'+(manu?"Attendez que l'enseignant relance les ateliers.":"Reprise dans "+fmt(r)+".")+'</p><p style="opacity:.8;margin:10px 0 0">Votre travail est enregistré : vous reprendrez là où vous en étiez.</p></div>'}
   else if(v)v.remove()},1000);
+/* ----- code d'équipe et relance d'un atelier (tout ou partie) par un encadrant ----- */
+const relancesOk={};
+const codeEquipe=tid=>String(tid).replace(/^[^-]*-/,"").toUpperCase();
+function tidDeCode(code,sid){const m=String(code||"").trim().toUpperCase().replace(/[\s·.]+/g,"-").match(/^G(\d+)-A(\d)-E(\d+)$/);if(!m)return null;return sid+"-G"+m[1]+"-a"+m[2]+"-e"+m[3]}
+const PARTIES_RELANCE={
+  a1:[["maquette","La maquette (refaite, puis réévaluée par une autre équipe)"],["evaluation","L'évaluation que l'équipe a faite d'une autre maquette"]],
+  a3:[["tout","L'évaluation 3D complète (repérage et quiz)"]],
+  a4:[["tout","Toute l'enquête"],["p1","La pièce 1 (puis réunion, carte et conclusion)"],["p2","La pièce 2 (puis réunion, carte et conclusion)"],["p3","La pièce 3 (puis réunion, carte et conclusion)"],["concl","La carte surprise et la conclusion"]],
+  a5:[["tout","Le Défi foie complet du binôme (puzzles, corrections et défi)"]],
+  a6:[["tout","Tout l'atelier"],["m1","La mission 1"],["m2","La mission 2"],["m3","La mission 3"],["quiz","Le quiz final"]]};
+let relanceSel=null;
+function carteRelance(){const sid=profSeance||seanceSel;if(!sid)return "";const tid=relanceSel&&tidDeCode(relanceSel,sid);
+  let res="";if(relanceSel){if(!tid)res=`<p class="note" style="margin:8px 0 0">Code non reconnu. Il ressemble à <b>G1-A5-E2</b> (groupe, atelier, équipe ou binôme).</p>`;
+    else{const m=tid.match(/-G(\d+)-a(\d)-e(\d+)$/),gid=sid+"-G"+m[1],aid="a"+m[2],g=grp(gid),sd=subsDe(gid,aid),mem=sd&&sd.equipes[+m[3]-1];
+      const parts=PARTIES_RELANCE[aid];const n=g&&mem&&mem.length?noteEtu(g,mem[0],aid):null;
+      res=!g||!mem?`<p class="note" style="margin:8px 0 0">Équipe introuvable dans cette séance.</p>`:!parts?`<p class="note" style="margin:8px 0 0">Le duel du Barone ne se relance pas équipe par équipe (il faut l'autre équipe) : mettez une note à la main si besoin.</p>`:
+       `<div style="margin-top:10px"><p style="margin:0 0 6px"><b>${esc(g.nom)} · atelier ${m[2]} · ${((BESOIN[aid]||{}).type==="duos"?"binôme ":"équipe ")+m[3]}</b> : ${mem.map(x=>esc(nomCourt(sid,x))).join(", ")} · note actuelle ${n!=null?fr(n)+"/20":"–"}</p>
+        <p class="note" style="margin:0 0 8px">Ce qui est relancé est effacé ; l'équipe peut ensuite rouvrir l'atelier (même après sa rotation) et sa note se met à jour avec la nouvelle tentative.</p>
+        <div class="row" style="gap:8px;flex-wrap:wrap">${parts.map(([k,l])=>`<button class="btn ghost sm" data-relance="${k}" data-rtid="${tid}">${esc(l)}</button>`).join("")}</div></div>`}}
+  return `<details class="card" style="margin:12px 0" ${relanceSel?"open":""}><summary><b>Relancer un atelier pour une équipe</b> <span class="note">(avec le code affiché sur son écran)</span></summary>
+    <form class="row" id="relanceForm" style="gap:8px;margin-top:10px;align-items:end"><label class="field" for="relanceCode">Code de l'équipe<input id="relanceCode" placeholder="G1-A5-E2" value="${esc(relanceSel||"")}" style="text-transform:uppercase"></label><button class="btn" type="submit">Chercher</button></form>${res}</details>`}
+document.addEventListener("submit",e=>{if(e.target&&e.target.id==="relanceForm"){e.preventDefault();relanceSel=($("#relanceCode")||{}).value||"";rendre()}});
+document.addEventListener("click",ev=>{const b=ev.target.closest&&ev.target.closest("[data-relance]");if(!b||!db)return;const part=b.dataset.relance,tid=b.dataset.rtid,aid=tid.match(/-(a\d)-e\d+$/)[1];
+  modale("Relancer ?",`${esc(b.textContent)} : ce qui a été fait sera effacé, puis l'équipe pourra recommencer cette partie. Sa note se mettra à jour avec la nouvelle tentative.`,"Oui, relancer",async()=>{
+    try{const now=Date.now(),col=n=>db.collection(n);
+      if(aid==="a1"){if(part==="maquette"){for(const e of evals.filter(x=>x.cible===tid)){await col("a1eval").doc(e.id).delete()}evals=evals.filter(x=>x.cible!==tid);a1docs[tid]={debut:now};await col("a1").doc(tid).set({debut:now})}
+        else{for(const e of evals.filter(x=>x.evaluateur===tid)){await col("a1eval").doc(e.id).delete()}evals=evals.filter(x=>x.evaluateur!==tid)}}
+      if(aid==="a3"){await col("notes_a3").doc(tid).delete();await col("a3prog").doc(tid).delete();await col("config").doc("a3raz").set({[tid]:now},{merge:true});notesA3=notesA3.filter(x=>x.id!==tid);delete a3prog[tid]}
+      if(aid==="a4"){const d=Object.assign({},a4docs[tid]||{});let nd;if(part==="tout")nd={maj:now};else{nd=Object.assign({},d);delete nd.fini;delete nd.note;delete nd.concl;delete nd.carte;if(part!=="concl")delete nd[part];nd.maj=now}
+        a4docs[tid]=nd;await col("a4").doc(tid).set(nd)}
+      if(aid==="a5"){await col("notes_a5").doc(tid).delete();await col("config").doc("a5raz").set({[tid]:now},{merge:true});notesA5=notesA5.filter(x=>x.id!==tid);a5Raz[tid]=now}
+      if(aid==="a6"){const d=JSON.parse(JSON.stringify(a6docs[tid]||{}));let nd;if(part==="tout")nd={maj:now};else{nd=d;delete nd.fini;delete nd.note;if(part==="quiz"){nd.quiz={};delete nd.quizFini}else{nd.m=nd.m||{};nd.m[part]={}}nd.maj=now}
+        a6docs[tid]=nd;await col("a6").doc(tid).set(nd)}
+      await col("config").doc("relances").set({[tid]:now},{merge:true});
+      toast("Relancé : l'équipe peut rouvrir l'atelier");rendre()}catch(e){toast("Relance impossible : "+(e&&e.message||"erreur"))}},"","Annuler")});
 /* question retirée de l'atelier 3 (« le côlon dorsal gauche du cheval est lisse… ») : comptée juste pour tout le monde */
 function noteA3Corrigee(n){let v=+n.note;const q=n.quiz||{},det=q.det||[];if(!det.length||!q.total)return v;
   const rate=det.filter(x=>!x.ok&&/dorsal gauche du cheval est lisse/.test(x.q||"")).length;if(!rate)return v;

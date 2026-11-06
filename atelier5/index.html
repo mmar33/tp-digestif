@@ -1325,19 +1325,19 @@ body.enc .auto-val{display:none}
 
   /* remise à zéro demandée par un encadrant pour tout un groupe : tablette vidée (chrono, fiches) puis rechargée */
   window.__a5razP=base().then(function(db){if(!db)return {};return db.collection("config").doc("a5raz").get().then(function(s){return s&&s.exists?(s.data()||{}):{}}).catch(function(){return {}})});
-  function razDe(id){return window.__a5razP.then(function(d){return +d[String(id).replace(/-a5-e\d+$/,"")]||0})}
+  function razDe(id){return window.__a5razP.then(function(d){return Math.max(+d[String(id).replace(/-a5-e\d+$/,"")]||0,+d[id]||0)})}
   (function(){if(!duos||!moi||String(moi).indexOf("TEST")===0)return;var gid=String(moi).replace(/-a5-e\d+$/,"");
-    window.__a5razP.then(function(d){var ts=d&&+d[gid];if(!ts)return;
+    window.__a5razP.then(function(d){var ts=d&&Math.max(+d[gid]||0,+d[moi]||0);if(!ts)return;
       var k="a5-raz-vu-"+moi;if(+localStorage.getItem(k)>=ts)return;
       ["chrono-foie","corr-en-cours","defi-foie-score","binome-note","binome-info","correction-foie-recap"].forEach(function(x){localStorage.removeItem(x)});
-      try{poser(file().filter(function(x){return String(x.id).indexOf(gid+"-a5-")!==0}))}catch(e){}
+      try{poser(file().filter(function(x){return +d[moi]>=+d[gid]||!d[gid]?x.id!==moi:String(x.id).indexOf(gid+"-a5-")!==0}))}catch(e){}
       orig.call(localStorage,k,String(ts));location.reload()})})();
   /* atelier déjà terminé pour ce binôme (note enregistrée, ici ou dans la base) : on bloque, même après un rechargement */
   function verrouiller(n){if(document.getElementById("a5fini"))return;var o=document.createElement("div");o.id="a5fini";
     o.style.cssText="position:fixed;inset:0;z-index:99999;background:rgba(20,22,20,.94);color:#fff;display:flex;align-items:center;justify-content:center;padding:20px;font-family:system-ui,sans-serif";
     var d=moiDuo();o.innerHTML='<div style="max-width:520px;text-align:center"><div style="font-size:52px">✓</div><h2 style="margin:6px 0 10px;font-size:26px">Atelier terminé'+(d?' pour le '+d.nom:'')+'</h2>'+
       '<p style="font-size:18px;line-height:1.45;margin:0 0 8px">Votre fiche est validée et votre note est enregistrée'+(n&&n.note!=null?' : <b>'+String(n.note).replace(".",",")+' / 20</b>':'')+'.</p>'+
-      '<p style="font-size:16px;opacity:.85;margin:0 0 18px">L’atelier ne peut pas être refait.</p><a href="../index.html" style="display:inline-block;background:#fff;color:#1d1f1c;padding:12px 22px;border-radius:12px;font-weight:700;text-decoration:none">Retour au portail des ateliers</a></div>';
+      '<p style="font-size:16px;opacity:.85;margin:0 0 18px">L’atelier ne peut pas être refait. Si l’enseignant vous y autorise, donnez-lui ce code : <b style="font-size:20px">'+String(moi).replace(/^[^-]*-/,"").toUpperCase()+'</b></p><a href="../index.html" style="display:inline-block;background:#fff;color:#1d1f1c;padding:12px 22px;border-radius:12px;font-weight:700;text-decoration:none">Retour au portail des ateliers</a></div>';
     document.body.appendChild(o)}
   function verifierFini(){if(!duos||!moi||String(moi).indexOf("TEST")===0)return;
     razDe(moi).then(function(rz){
