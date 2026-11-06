@@ -2263,6 +2263,9 @@ const tirageManuel=s=>!!s&&s.manuel!==false;
 function debutSeance(s){if(!s)return null;if(tirageManuel(s))return s.tirageDemande||null;const t=Date.parse(s.debut||(s.date+"T08:10"));return isNaN(t)?null:t}
 const dureeRot=s=>((s&&+s.dureeRot)||30)*60e3;
 const groupesDe=sid=>groupes.filter(g=>g.seance===sid).sort((a,b)=>(a.k||0)-(b.k||0));
+/* passage à la rotation r : après 3 ateliers terminés, pause obligatoire de 15 minutes pour tout le monde (la rotation 4 démarre à la fin de la pause) */
+const PAUSE_APRES=3, PAUSE_MIN=15;
+function rotSuivanteDoc(r){const now=Date.now();if(r===PAUSE_APRES&&r<NB_ROT){const e=now+PAUSE_MIN*60e3;return {r,t:e,pauseJusqu:e}}return {r,t:now}}
 function phaseSeance(sid){const s=seances[sid],d=deroules[sid],H0=debutSeance(s);
   if(d&&d.r>=NB_ROT)return {phase:"fin"};
   /* pause décidée par un encadrant : la rotation d.r démarre à la fin de la pause */
@@ -2322,7 +2325,7 @@ async function assurerAvance(sid){if(!db||avEnCours||!sid)return;const p=phaseSe
   avEnCours=true;
   try{const L=await db.collection("config").doc("av-"+sid+"-"+d.r).acquire({holder:DEVICE,ttlMs:10000});
     if(L.acquired){if(p.phase==="rot"&&p.reste>0)toast("Tous les groupes ont fini : on change d'atelier sans attendre");const snap=await db.collection("deroule").doc(sid).get();const cur=snap.exists?snap.data():d;
-      if(cur.r===d.r){const nd={r:d.r+1,t:Date.now()};deroules[sid]=nd;await db.collection("deroule").doc(sid).set(nd)}}}catch(e){}
+      if(cur.r===d.r){const nd=rotSuivanteDoc(d.r+1);deroules[sid]=nd;await db.collection("deroule").doc(sid).set(nd)}}}catch(e){}
   avEnCours=false}
 async function rejoindreEnRetard(){const sid=moiE.sid,gs=groupesDe(sid);if(!gs.length){toast("Connexion en cours, réessayez dans quelques secondes");reabonner();return}
   const g=gs.reduce((a,b)=>(a.membres||[]).length<=(b.membres||[]).length?a:b);
@@ -3761,6 +3764,10 @@ setInterval(()=>{const els=document.querySelectorAll(".cptPause");if(!els.length
 document.addEventListener("click",e=>{const b=e.target.closest&&e.target.closest("#finPause");if(!b||!db)return;const sid=profSeance||seanceSel,d=deroules[sid];if(!d)return;
   modale("Reprendre maintenant ?","La pause s'arrête et la rotation suivante démarre tout de suite, avec sa durée complète.","Oui, reprendre",()=>{const nd={r:d.r,t:Date.now()};deroules[sid]=nd;ecrire("deroule",sid,nd,"set");rendre()},"","Non")});
 setInterval(()=>{const els=document.querySelectorAll(".cptProf");if(!els.length)return;const sid=profSeance||seanceSel;const p=sid&&seances[sid]?phaseSeance(sid):null;if(!p||p.phase!=="rot")return;els.forEach(el=>el.textContent=fmt(p.reste||0))},1000);
+/* Défi foie, 6/11 : le corrigé de la question « position du foie » (chien / porc) était inversé jusqu'à 10 h 25.
+   Les fiches validées avant reçoivent la valeur d'une question (0,6 point), sans dépasser 12 au défi ni 20 au total. */
+const A5_CORR_AVANT=1793957100000;
+function noteA5Corrigee(n){let v=+n.note;if(!(+n.maj)||+n.maj>=A5_CORR_AVANT||!(v>0))return v;const c=+n.c||0;if(c>=12)return v;return Math.min(20,Math.round((v+Math.min(0.6,12-c))*10)/10)}
 /* question retirée de l'atelier 3 (« le côlon dorsal gauche du cheval est lisse… ») : comptée juste pour tout le monde */
 function noteA3Corrigee(n){let v=+n.note;const q=n.quiz||{},det=q.det||[];if(!det.length||!q.total)return v;
   const rate=det.filter(x=>!x.ok&&/dorsal gauche du cheval est lisse/.test(x.q||"")).length;if(!rate)return v;
@@ -3773,7 +3780,7 @@ function noteEtuCalc(g,eid,aid){const sd=subsDe(g.id,aid);if(!sd)return null;con
   if(aid==="a4")return a4Note(g.id==="TEST"?((testE&&testE.a4)||{})[tid]:a4docs[tid]);
   if(aid==="a3"){if(g.id==="TEST")return testE&&testE.a3&&testE.a3[tid]!=null?testE.a3[tid]:null;const n=notesA3.find(x=>x.id===tid);return n?noteA3Corrigee(n):null}
   if(aid==="a6")return a6NoteGroupe(g);
-  if(aid==="a5"){if(g.id==="TEST")return testE&&testE.a5&&testE.a5[tid]!=null?testE.a5[tid]:null;const n=notesA5.find(x=>x.id===tid);return n?+n.note:null}
+  if(aid==="a5"){if(g.id==="TEST")return testE&&testE.a5&&testE.a5[tid]!=null?testE.a5[tid]:null;const n=notesA5.find(x=>x.id===tid);return n?noteA5Corrigee(n):null}
   return null}
 function groupeAFini(g,aid){if(!atelierActif(aid))return false;const sd=subsDe(g.id,aid);if(!sd)return false;
   return sd.equipes.every((m,i)=>{const tid=g.id+"-"+aid+"-e"+(i+1);
@@ -3816,7 +3823,7 @@ document.addEventListener("click",e=>{if(e.target.closest&&e.target.closest("#la
 /* commandes de secours de l'encadrant : +5 min, passer à l'atelier suivant */
 document.addEventListener("click",e=>{const t=e.target.closest&&e.target.closest("#rotPlus5,#rotSuivante");if(!t||!db)return;const sid=profSeance||seanceSel,d=deroules[sid];if(!d)return;
   if(t.id==="rotPlus5"){const nd={r:d.r,t:d.t+5*60e3};deroules[sid]=nd;ecrire("deroule",sid,nd,"set");toast("5 minutes de plus pour tous les groupes");rendre();return}
-  modale(d.r<0?"Démarrer les ateliers ?":"Passer à l'atelier suivant ?",d.r<0?"Tous les groupes partent vers leur premier atelier.":"Tous les groupes changent d'atelier maintenant. Les notes déjà enregistrées sont gardées ; un atelier non terminé sera noté avec ce qui a été fait.","Oui",()=>{const nd={r:d.r+1,t:Date.now()};deroules[sid]=nd;ecrire("deroule",sid,nd,"set");rendre()},"","Annuler")});
+  modale(d.r<0?"Démarrer les ateliers ?":"Passer à l'atelier suivant ?",d.r<0?"Tous les groupes partent vers leur premier atelier.":"Tous les groupes changent d'atelier maintenant. Les notes déjà enregistrées sont gardées ; un atelier non terminé sera noté avec ce qui a été fait.","Oui",()=>{const nd=rotSuivanteDoc(d.r+1);deroules[sid]=nd;ecrire("deroule",sid,nd,"set");rendre()},"","Annuler")});
 </script>
 
 <script>if("serviceWorker" in navigator)window.addEventListener("load",()=>navigator.serviceWorker.register("sw.js").catch(()=>{}));</script>
