@@ -1312,8 +1312,20 @@ body.enc .auto-val{display:none}
     db.collection("notes_a5").doc(x.id).set({note:x.note,a:x.a,b:x.b,c:x.c,correcteur:x.correcteur||"",maj:x.t}).then(function(){var f=file();f.forEach(function(y){if(y.id===x.id&&y.t===x.t)y.ok=1});poser(f)}).catch(function(){})})})}
   Storage.prototype.setItem=function(k,v){orig.apply(this,arguments);if(k!==K||!duos)return;
     try{var list=JSON.parse(v||"[]"),r=list[list.length-1];if(!r)return;var d=trouver(r.noted)||moiDuo();if(!d)return;
-      var f=file().filter(function(x){return x.id!==d.id});f.push({id:d.id,note:r.total,a:r.a,b:r.b,c:r.c,correcteur:r.corrector||"",t:Date.now()});poser(f);setTimeout(vider,50)}catch(e){}};
+      var f=file().filter(function(x){return x.id!==d.id});f.push({id:d.id,note:r.total,a:r.a,b:r.b,c:r.c,correcteur:r.corrector||"",t:Date.now()});poser(f);window.__a5enCours=true;setTimeout(vider,50)}catch(e){}};
   setInterval(vider,15000);window.addEventListener("online",vider);setTimeout(vider,2000);
+
+  /* atelier déjà terminé pour ce binôme (note enregistrée, ici ou dans la base) : on bloque, même après un rechargement */
+  function verrouiller(n){if(document.getElementById("a5fini"))return;var o=document.createElement("div");o.id="a5fini";
+    o.style.cssText="position:fixed;inset:0;z-index:99999;background:rgba(20,22,20,.94);color:#fff;display:flex;align-items:center;justify-content:center;padding:20px;font-family:system-ui,sans-serif";
+    var d=moiDuo();o.innerHTML='<div style="max-width:520px;text-align:center"><div style="font-size:52px">✓</div><h2 style="margin:6px 0 10px;font-size:26px">Atelier terminé'+(d?' pour le '+d.nom:'')+'</h2>'+
+      '<p style="font-size:18px;line-height:1.45;margin:0 0 8px">Votre fiche est validée et votre note est enregistrée'+(n&&n.note!=null?' : <b>'+String(n.note).replace(".",",")+' / 20</b>':'')+'.</p>'+
+      '<p style="font-size:16px;opacity:.85;margin:0 0 18px">L’atelier ne peut pas être refait.</p><a href="../index.html" style="display:inline-block;background:#fff;color:#1d1f1c;padding:12px 22px;border-radius:12px;font-weight:700;text-decoration:none">Retour au portail des ateliers</a></div>';
+    document.body.appendChild(o)}
+  function verifierFini(){if(!duos||!moi||String(moi).indexOf("TEST")===0)return;
+    var loc=file().filter(function(x){return x.id===moi})[0];if(loc&&!window.__a5enCours){verrouiller(loc);return}
+    base().then(function(db){if(!db)return;db.collection("notes_a5").doc(moi).get().then(function(s){if(s&&s.exists&&!window.__a5enCours)verrouiller(s.data())}).catch(function(){})})}
+  verifierFini();
 
   /* lien de retour vers le portail */
   var back=document.createElement("p");back.style.cssText="text-align:center;margin:.4rem 0 0";

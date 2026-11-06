@@ -1149,6 +1149,7 @@ function vEquipeGroupe(){const g=grp(duel["groupe"+moi]), coul=moi==="A"?"var(--
   const opts=v=>`<option value="">Choisir…</option>${((g&&g.membres)||[]).map(m=>{const n=etu(g.seance,m);return `<option ${v===n?"selected":""}>${esc(n)}</option>`}).join("")}`;
   return `<div class="center" style="text-align:left;justify-items:stretch;max-width:680px">
    <div class="eyebrow">Avant de commencer · ${esc(equipeNom(moi))}</div>
+   <p class="ecran att" style="margin:0;font-size:17px">📺 <b>Utilisez l’écran le plus grand du groupe</b> (une tablette de préférence) : tout le monde doit bien voir la planche et les questions.</p>
    <div class="card" style="border-width:2px;border-color:${coul};padding:24px;display:grid;gap:16px">
     <div class="row">${equipeIcone(moi,64)}<h2 style="font-size:26px;margin:0">${esc(equipeNom(moi))}</h2></div>
     <div><h2 style="font-size:22px;margin-bottom:4px">Répartissez les rôles</h2><p class="note" style="margin:0 0 8px">Le pilote est le seul à toucher la tablette ; le lecteur est le seul à ouvrir le Barone. Les autres réfléchissent et conseillent.</p>
@@ -1159,6 +1160,7 @@ function vEquipeGroupe(){const g=grp(duel["groupe"+moi]), coul=moi==="A"?"var(--
 function vEquipe(){if(duel.groupeA)return vEquipeGroupe();const coul=moi==="A"?"var(--teamA)":"var(--teamB)", prise=duel["mascotte"+autre(moi)];
   return `<div class="center" style="text-align:left;justify-items:stretch;max-width:680px">
    <div class="eyebrow">Avant de commencer · ${esc(duel.equipes[moi])}</div>
+   <p class="ecran att" style="margin:0;font-size:17px">📺 <b>Utilisez l’écran le plus grand du groupe</b> (une tablette de préférence) : tout le monde doit bien voir la planche et les questions.</p>
    <div class="card" style="border-width:2px;border-color:${coul};padding:24px;display:grid;gap:16px">
     <div><h2 style="font-size:26px;margin-bottom:8px">Choisissez votre mascotte</h2>
      <div class="masc">${MASCOTTES.map(m=>`<button class="mascbtn ${jeu.mascotte===m?"sel":""}" data-masc="${m}" ${prise===m?"disabled title=\"Déjà prise par l'autre équipe\"":""} style="${jeu.mascotte===m?`border-color:${coul};color:${coul}`:""}">${mascSVG(m,46)}<span>Les ${m}</span></button>`).join("")}</div></div>
@@ -2251,7 +2253,9 @@ function phaseSeance(sid){const s=seances[sid],d=deroules[sid],H0=debutSeance(s)
   if(H0&&Date.now()<H0)return {phase:"inscription",reste:H0-Date.now()};
   return {phase:"formation"}}
 /* consigne « changer d'écran » affichée sous l'atelier en cours */
+function aideEcranBase(a){return aideEcran(Object.assign({},a,{id:"_"+a.id}))}
 function aideEcran(a){if(!a)return "";const risque=a.id==="a3"?"<b>Un seul téléphone ou tablette par duo</b> pour tout l'atelier (jeu et évaluation), de préférence le plus grand écran du duo. Si vous voulez changer d'écran, faites-le avant de commencer l'évaluation 3D ou après l'avoir validée, jamais pendant.":a.id==="a5"?"Pendant le <b>Défi foie</b>, ne changez pas d'appareil en cours d'étape : votre progression serait perdue. Changez avant de commencer ou après avoir validé votre fiche.":"";
+  if(a.id==="a2")return `<p class="ecran att" style="margin-top:14px;font-size:17px">📺 <b>Atelier 2 : utilisez l’écran le plus grand du groupe</b> (une tablette de préférence) avant de commencer le duel : tout le monde doit bien voir la planche.</p>`+aideEcranBase(a);
   const duo=a.id==="a3"?`<p class="ecran att" style="margin-top:14px;font-size:17px">⚠️ <b>Atelier 3 : un seul téléphone ou tablette par duo</b>, du début à la fin (jeu et évaluation). Choisissez maintenant le plus grand écran du duo et travaillez tous les deux dessus.</p>`:"";
   return duo+`<details class="ecran"><summary>Vous voyez mal ? Continuer sur un autre écran</summary><ol><li>Sur l'autre téléphone ou la tablette, scannez le QR code du TP.</li><li>Choisissez <b>votre propre nom</b>.</li><li>Vous retrouvez votre groupe, votre équipe et cet atelier : touchez « Ouvrir l'atelier ». Plusieurs étudiants peuvent le faire sur le même grand écran.</li></ol>${risque?`<p class="att">${risque}</p>`:`<p class="ok">Dans cet atelier, vous pouvez changer d'écran à tout moment : votre travail est enregistré en ligne.</p>`}</details>`}
 const atelierDe=(k,r)=>ATELIERS[((k||0)+r)%NB_ROT];
@@ -3640,16 +3644,17 @@ function vA5(){const g=monGroupe();if(!g){vue="hub";return vHub()}const duos=duo
    <div class="a1form" style="max-width:860px;margin:14px auto">
     <div class="card brief"><span class="eyebrow">Avant de commencer · 30 minutes</span><h2 style="margin:4px 0 10px">Ce qui vous attend</h2>
      <div class="briefetapes">
-      <div><b>1</b><span><b>Puzzle 1</b> (6 min) : sur le contour du foie de l'espèce de votre poste, placez les pièces des structures présentes et mettez de côté celles qui n'existent pas chez elle.</span></div>
+      <div><b>1</b><span><b>Puzzle 1</b> (4 min 30) : sur le contour du foie de l'espèce de votre poste, placez les pièces des structures présentes et mettez de côté celles qui n'existent pas chez elle.</span></div>
       <div><b>2</b><span><b>Correction croisée</b> : vous échangez les tablettes et vous corrigez le puzzle du binôme suivant sur sa tablette ; le binôme précédent corrige le vôtre sur la vôtre.</span></div>
-      <div><b>3</b><span><b>Puzzle 2</b> (6 min) sur l'animal suivant, puis nouvelle correction.</span></div>
+      <div><b>3</b><span><b>Puzzle 2</b> (5 min 30) sur l'animal suivant, puis nouvelle correction (2 min 30 pour chaque correction).</span></div>
       <div><b>4</b><span><b>Défi foie</b> (10 min) : repères sur le foie de six espèces, quiz, « Qui suis-je ? ».</span></div>
       <div><b>5</b><span><b>Note de l'atelier</b> : le score du défi est reporté tout seul, la fiche se valide automatiquement et votre note globale s'affiche, puis elle est envoyée au portail.</span></div></div>
      <p style="margin:10px 0 0"><b>Note sur 20</b> : puzzle 1 (4 pts) + puzzle 2 (4 pts) + Défi foie (12 pts). Le chrono de l'atelier vous guide d'une étape à l'autre.</p></div>
     <div class="card"><h3>Les binômes</h3><div class="duolist">${duos.map(d=>{const n=g.id==="TEST"?((testE.a5||{})[d.id]):(notesA5.find(x=>x.id===d.id)||{}).note;const moiD=t&&t.id===d.id;
       return `<div class="duo ${moiD?"moi":""}"><span class="dn">${d.num}</span><b>${esc(d.noms.join(" & "))}${moiD?" (vous)":""}<small style="display:block;font-weight:500;opacity:.7">corrige le binôme ${corrige(d).num}</small></b>${n!=null?`<span class="chip fait">${ico("coche")} note reçue</span>`:""}</div>`}).join("")}</div></div>
-    <div class="card"><h3>Ouvrir l'atelier</h3><p class="note" style="margin-top:0">Une tablette par binôme : votre binôme et celui qui vous corrige sont déjà remplis. Aux corrections, vous échangez les tablettes.</p>
-     <button class="btn pen gros" id="a5ouvrir">Ouvrir le Défi foie</button></div></div>`}
+    ${(()=>{const n=t&&g.id!=="TEST"?notesA5.find(x=>x.id===t.id):null;return n?`<div class="card" style="border-left:6px solid var(--ok)"><h3 style="margin-top:0">Atelier terminé ✓</h3><p style="margin:0">Votre fiche est validée et votre note est enregistrée : <b>${fr(+n.note||0)} / 20</b> (puzzle 1 : ${fr(+n.a||0)}/4 · puzzle 2 : ${fr(+n.b||0)}/4 · défi : ${fr(+n.c||0)}/12). L'atelier ne peut pas être refait.</p></div>`:""})()}
+    ${t&&g.id!=="TEST"&&notesA5.find(x=>x.id===t.id)?"":`<div class="card"><h3>Ouvrir l'atelier</h3><p class="note" style="margin-top:0">Une tablette par binôme : votre binôme et celui qui vous corrige sont déjà remplis. Aux corrections, vous échangez les tablettes.</p>
+     <button class="btn pen gros" id="a5ouvrir">Ouvrir le Défi foie</button></div>`}</div>`}
 function brancherA5(){if(vue!=="a5")return;const b=$("#a5ouvrir");if(b)b.addEventListener("click",()=>{const g=monGroupe(),t=monEquipe(g,"a5");location.href=lienA5(g,t?t.id:"")})}
 
 /* ----- affichage des groupes en grand (vidéoprojecteur, espace encadrants) ----- */
