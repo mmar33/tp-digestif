@@ -941,13 +941,14 @@ body.enc .auto-val{display:none}
 (function(){
   var STEPS=[
     {t:"Lancement",d:3,c:"Lisez les consignes ci-dessous, formez les binômes, prenez un numéro et repérez sur la fiche de route votre premier poste et le binôme que vous corrigez."},
-    {t:"Puzzle 1",d:6,c:"Placez les pièces des structures présentes chez l’espèce de votre poste ; mettez les autres de côté."},
-    {t:"Correction du puzzle 1",d:1,c:"Échangez les tablettes : prenez celle du binôme que vous corrigez, allez à son poste et notez son puzzle. Rendez la tablette, puis défaites le puzzle."},
-    {t:"Puzzle 2",d:6,c:"Avec votre tablette, passez à l’animal suivant (poste qui suit celui que vous avez corrigé, voir la fiche de route) et réalisez votre puzzle 2."},
-    {t:"Correction du puzzle 2",d:2,c:"Échangez les tablettes : prenez celle du binôme que vous corrigez, allez au poste de son puzzle 2 et notez-le sans valider la fiche. Rendez la tablette, puis défaites et rangez le puzzle."},
+    {t:"Puzzle 1",d:4.5,c:"Placez les pièces des structures présentes chez l’espèce de votre poste ; mettez les autres de côté."},
+    {t:"Correction du puzzle 1",d:2.5,c:"Échangez les tablettes : prenez celle du binôme que vous corrigez, allez à son poste et notez son puzzle. Rendez la tablette, puis défaites le puzzle."},
+    {t:"Puzzle 2",d:5.5,c:"Avec votre tablette, passez à l’animal suivant (poste qui suit celui que vous avez corrigé, voir la fiche de route) et réalisez votre puzzle 2."},
+    {t:"Correction du puzzle 2",d:2.5,c:"Échangez les tablettes : prenez celle du binôme que vous corrigez, allez au poste de son puzzle 2 et notez-le sans valider la fiche. Rendez la tablette, puis défaites et rangez le puzzle."},
     {t:"Défi foie",d:10,c:"Jouez au Défi foie sur votre propre tablette. Seul le premier essai compte pour la note."},
     {t:"Note de l’atelier",d:2,c:"La fiche est validée automatiquement avec le score du défi. Découvrez votre note globale, puis remettez la table en état."}
   ];
+  function dlab(d){ return d%1 ? Math.floor(d)+" min 30" : d+" min"; }
   var TOTAL=STEPS.reduce(function(a,x){return a+x.d*60000;},0);
   var bounds=[], acc=0; STEPS.forEach(function(x){ bounds.push(acc); acc+=x.d*60000; });
   var $=function(id){return document.getElementById(id)};
@@ -974,7 +975,7 @@ body.enc .auto-val{display:none}
   }
 
   var list=$("chronoList");
-  list.innerHTML=STEPS.map(function(x,i){ return '<li data-i="'+i+'"><span>'+(i+1)+'. '+x.t+'</span><span>'+x.d+' min</span></li>'; }).join("");
+  list.innerHTML=STEPS.map(function(x,i){ return '<li data-i="'+i+'"><span>'+(i+1)+'. '+x.t+'</span><span>'+dlab(x.d)+'</span></li>'; }).join("");
   var lastIdx=null, lastDone=false, launchIdx=null;
   var DEFI=5;
   var ACTIONS=[null,null,"A",null,"B","defi","C"];
@@ -1001,7 +1002,7 @@ body.enc .auto-val{display:none}
   function render(){
     var e=elapsed(), done=e>=TOTAL, i=done?STEPS.length-1:idxAt(e);
     var stepLeft=done?0:bounds[i]+STEPS[i].d*60000-e;
-    $("chronoStepNum").textContent = done ? "Atelier terminé" : "Étape "+(i+1)+" sur "+STEPS.length+" · "+STEPS[i].d+" min";
+    $("chronoStepNum").textContent = done ? "Atelier terminé" : "Étape "+(i+1)+" sur "+STEPS.length+" · "+dlab(STEPS[i].d);
     $("chronoStep").textContent = done ? "Fin de l’atelier" : STEPS[i].t;
     $("chronoIntro").classList.toggle("hidden", done || i!==0);
     $("go").classList.toggle("hidden", !(st.started && !done && i===DEFI));
