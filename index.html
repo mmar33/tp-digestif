@@ -3733,13 +3733,15 @@ function sousGroupes(g,aid){const B=BESOIN[aid],m=g.membres||[],N=m.length;if(!N
 /* espace encadrants : chronomètre de la rotation en cours, visible dans tous les onglets, et où en est chaque atelier */
 function chronoProf(){const sid=profSeance||seanceSel;if(!sid||!seances[sid])return "";const p=phaseSeance(sid);if(p.phase!=="rot")return "";
   const gs=groupesDe(sid),fin=new Date(Date.now()+(p.reste||0)).toLocaleTimeString("fr-FR",{hour:"2-digit",minute:"2-digit"}),k=ongletProf;
-  const lignes=ATELIERS.map(a=>{const g=gs.find(x=>atelierDe(x.k,p.r).id===a.id);if(!g)return "";let fini=false;try{fini=groupeAFini(g,a.id)}catch(e){}
-    const pret=!!(p.prets||{})[g.id];const ici=k===a.id;
-    return `<span style="display:inline-flex;align-items:center;gap:6px;padding:5px 10px;border-radius:999px;border:${ici?"2px solid var(--ink)":"1px solid var(--rule)"};background:var(--sheet);font-size:14px"><b>Atelier ${a.n}</b> ${esc(g.nom)} ${pret?"<span style='color:var(--ok)'>· prêt à changer ✓</span>":fini?"<span style='color:var(--ok)'>· terminé ✓</span>":"<span class='note'>· en cours</span>"}</span>`}).join("");
+  const tuiles=ATELIERS.map(a=>{const g=gs.find(x=>atelierDe(x.k,p.r).id===a.id);if(!g)return "";let fini=false;try{fini=groupeAFini(g,a.id)}catch(e){}
+    const pret=!!(p.prets||{})[g.id],ici=k===a.id;
+    return `<div style="border:${ici?"3px solid var(--ink)":"1px solid var(--rule)"};border-left:8px solid ${g.couleur};border-radius:14px;padding:10px 12px;background:var(--sheet);display:grid;gap:2px">
+      <span style="font-size:14px"><b>Atelier ${a.n}</b> · ${esc(titreAt(a).replace(/\s*\(.*\)\s*$/,""))}</span><span style="font-size:14px;color:${g.couleur};font-weight:700">${esc(g.nom)}</span>
+      <b class="cptProf num" style="font-size:44px;line-height:1.05">${fmt(p.reste||0)}</b>
+      <span style="font-size:13px">${pret?"<span style='color:var(--ok)'>prêt à changer ✓</span>":fini?"<span style='color:var(--ok)'>atelier terminé ✓</span>":"<span class='note'>en cours</span>"}</span></div>`}).join("");
   return `<div class="card" style="margin:12px 0;padding:14px 16px;display:grid;gap:10px">
-    <div class="row" style="justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px"><span><span class="eyebrow">Rotation ${p.r+1} sur ${NB_ROT}</span><br><span class="note">Changement au plus tard à ${fin} · ${gs.filter(x=>(p.prets||{})[x.id]).length}/${gs.length} groupes prêts</span></span>
-    <b class="cptProf num" style="font-size:40px;line-height:1">${fmt(p.reste||0)}</b></div>
-    <div class="row" style="flex-wrap:wrap;gap:6px">${lignes}</div></div>`}
+    <div class="row" style="justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px"><span class="eyebrow">Rotation ${p.r+1} sur ${NB_ROT} · temps restant par atelier</span><span class="note">Changement au plus tard à ${fin} · ${gs.filter(x=>(p.prets||{})[x.id]).length}/${gs.length} groupes prêts</span></div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:10px">${tuiles}</div></div>`}
 setInterval(()=>{const els=document.querySelectorAll(".cptProf");if(!els.length)return;const sid=profSeance||seanceSel;const p=sid&&seances[sid]?phaseSeance(sid):null;if(!p||p.phase!=="rot")return;els.forEach(el=>el.textContent=fmt(p.reste||0))},1000);
 /* question retirée de l'atelier 3 (« le côlon dorsal gauche du cheval est lisse… ») : comptée juste pour tout le monde */
 function noteA3Corrigee(n){let v=+n.note;const q=n.quiz||{},det=q.det||[];if(!det.length||!q.total)return v;
