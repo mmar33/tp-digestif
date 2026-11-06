@@ -1637,7 +1637,7 @@ function vProf(){
   const sous=SOUS_AT[ongletProf]?`<div class="sousnav">${SOUS_AT[ongletProf].map(([x,l])=>`<button data-sousat="${x}" aria-pressed="${sousAt[ongletProf]===x}">${l}</button>`).join("")}</div>`:ongletProf==="a2"?`<div class="sousnav">${[["notes","Notes"],["synthese","Synthèse"],["corrige","Corrigés des planches"],["questions","Questions"],["test","Essayer une planche"]].map(([x,l])=>`<button data-sous="${x}" aria-pressed="${sousA2===x}">${l}</button>`).join("")}</div>`:"";
   return `<div style="display:grid;gap:18px;padding-top:20px">
    <div class="row" style="justify-content:space-between"><h2 style="font-size:34px">Espace encadrants</h2><button class="btn ghost" id="retour">Retour à l'accueil</button></div>
-   ${bandeauTirage()}${chronoProf()}${carteRelance()}
+   ${bandeauTirage()}${(()=>{const sid=profSeance||seanceSel,b=sid&&seances[sid]?progressionTP(sid):"";return b?`<div class="card" style="margin:12px 0;padding:12px 16px">${b}</div>`:""})()}${chronoProf()}${carteRelance()}
    <button class="testbig" id="testEtudiant">${ico("main")}<span><b>Tester les ateliers comme un étudiant</b><span>Un groupe fictif, sur cette tablette. Rien n'est enregistré ni compté.</span></span></button>
    <div class="tabs nav4">${[["seance","Suivi de la séance"],["a1","Atelier 1 · maquettes"],["a2","Atelier 2 · duel"],["a3","Atelier 3 · 7 familles"],["a4","Atelier 4 · enquête"],["a5","Atelier 5 · défi foie"],["a6","Atelier 6 · rumen"],["reglages","Réglages et QR code"]].filter(([x])=>!/^a\d$/.test(x)||atelierActif(x)).map(([x,l])=>`<button data-tab="${x}" aria-pressed="${ongletProf===x}">${l}</button>`).join("")}</div>
    ${sous}${corps}</div>`;
@@ -2505,12 +2505,21 @@ async function attribuerEval(t){
   if(enTest()){const id=t.id+"__TESTFICTIF",doc={evaluateur:t.id,cible:"TESTFICTIF",seance:"TEST",statut:"attribuee",t:Date.now()};evals.push(Object.assign({id},doc));await ecrire("a1eval",id,doc);rendre();return}
   try{await db.collection("config").doc("a1verrou").acquire({holder:DEVICE,ttlMs:5000})}catch(e){}
   await chargerA1(t.seance);
+  /* séances suivantes : chaque groupe note la maquette du groupe passé juste avant lui à l'atelier 1 (même numéro d'équipe) ; le premier groupe note celle du dernier, en fin de séance (boucle) */
+  if(t.seance!=="s20261106"){const cible=cibleBoucleA1(t);if(cible){
+    if(!(a1docs[cible.tid]||{}).maquette){modale("Maquette pas encore prête",cible.premier?"Votre groupe est le premier à l'atelier 1 : vous évaluerez la maquette du <b>dernier groupe</b>, à la fin de la séance (un bandeau vous préviendra). Elle compte dans votre note.":"La maquette du groupe passé juste avant vous (« "+esc((grp(cible.gid)||{}).nom||"")+" ») n'est pas encore terminée. Revenez dans quelques minutes.","Compris",()=>{ctxEquipe=null;vue="hub";rendre()},"","Rester ici");return}
+    if(!evals.some(e=>e.cible===cible.tid)){const id=t.id+"__"+cible.tid,doc={evaluateur:t.id,cible:cible.tid,seance:t.seance,statut:"attribuee",t:Date.now()};evals.push(Object.assign({id},doc));rendre();await ecrire("a1eval",id,doc);return}}}
   const cand=Object.keys(a1docs).filter(id=>id.startsWith(t.seance+"-G")&&!id.startsWith(t.groupe+"-")&&a1docs[id].maquette&&!evals.some(e=>e.cible===id)&&!evals.some(e=>e.evaluateur===id&&e.cible===t.id));
   if(!cand.length){const fin=phaseSeance(t.seance).phase==="fin";
     modale(fin?"Plus aucune maquette à évaluer":"Pas encore de maquette à évaluer",fin?"Toutes les maquettes ont déjà un évaluateur.":"Aucune maquette d'un groupe précédent n'attend d'évaluation : vous êtes sans doute le premier groupe de cet atelier. <b>Votre évaluation se fera à la fin de la séance</b> (un bandeau vous préviendra). Elle compte dans votre note.","Compris",()=>{ctxEquipe=null;vue="hub";rendre()},"","Rester ici");return}
   cand.sort((a,b)=>a1docs[b].maquette-a1docs[a].maquette);
   const c=cand[0], id=t.id+"__"+c, doc={evaluateur:t.id,cible:c,seance:t.seance,statut:"attribuee",t:Date.now()};
   evals.push(Object.assign({id},doc)); rendre(); await ecrire("a1eval",id,doc)}
+function cibleBoucleA1(t){const gid=t.groupe||String(t.id).replace(/-a1-e\d+$/,""),gs=groupesDe(t.seance);if(gs.length<2)return null;
+  const rotA1=g=>{for(let r=0;r<NB_ROT;r++)if(atelierDe(g.k,r).id==="a1")return r;return 99};
+  const ord=[...gs].sort((a,b)=>rotA1(a)-rotA1(b)),i=ord.findIndex(g=>g.id===gid);if(i<0)return null;
+  const prev=ord[(i-1+ord.length)%ord.length],n=(String(t.id).match(/-a1-e(\d+)$/)||[])[1]||"1";
+  const num=a1docs[prev.id+"-a1-e"+n]||!a1docs[prev.id+"-a1-e1"]?n:"1";return {gid:prev.id,tid:prev.id+"-a1-e"+num,premier:i===0}}
 let a1FinCharge=0;
 setInterval(async()=>{if(!db||!moiE)return;const g=monGroupe();if(!g||g.id==="TEST"||ctxEquipe)return;if(phaseSeance(g.seance).phase!=="fin"||(g.k||0)!==0)return;
   if(Date.now()-a1FinCharge>30000){a1FinCharge=Date.now();await chargerA1(g.seance)}
@@ -3768,6 +3777,13 @@ function sousGroupes(g,aid){const B=BESOIN[aid],m=g.membres||[],N=m.length;if(!N
   return shuffle(duos)}
 
 /* espace encadrants : chronomètre de la rotation en cours, visible dans tous les onglets, et où en est chaque atelier */
+function progressionTP(sid){const p=phaseSeance(sid),R=dureeRot(seances[sid]);let f=0;
+  if(p.phase==="fin")f=1;else if(p.phase==="rot")f=(p.r+Math.min(1,(R-(p.reste||0))/R))/NB_ROT;else if(p.phase==="pause")f=p.r/NB_ROT;else return "";
+  const restant=p.phase==="fin"?0:(p.phase==="rot"?(p.reste||0):(p.reste||0)+R)+Math.max(0,NB_ROT-1-p.r)*R+(sid!=="s20261106"&&p.r<PAUSE_APRES&&p.phase!=="pause"?PAUSE_MIN*60e3:0);
+  const fin=new Date(Date.now()+restant).toLocaleTimeString("fr-FR",{hour:"2-digit",minute:"2-digit"}),pc=Math.round(f*100);
+  const marques=[...Array(NB_ROT)].map((_,i)=>`<i style="position:absolute;left:${(i+1)/NB_ROT*100}%;top:0;bottom:0;width:2px;background:var(--sheet)"></i>`).join("");
+  return `<div style="display:grid;gap:4px"><div class="row" style="justify-content:space-between;flex-wrap:wrap;gap:6px"><b>Avancement du TP : ${pc} %</b><span class="note">${p.phase==="fin"?"TP terminé":`Rotation ${Math.min(p.r+1,NB_ROT)} sur ${NB_ROT} · fin prévue vers ${fin}`}</span></div>
+    <div style="position:relative;height:14px;border-radius:999px;background:var(--rule);overflow:hidden"><span style="position:absolute;left:0;top:0;bottom:0;width:${pc}%;background:var(--ok);border-radius:999px"></span>${marques}</div></div>`}
 function chronoProf(){const sid=profSeance||seanceSel;if(!sid||!seances[sid])return "";const p=phaseSeance(sid);
   if(p.phase==="pause"){const d=deroules[sid]||{};if(d.pauseManu){const ec=Date.now()-(d.pauseDebut||Date.now());
       return `<div class="card" style="margin:12px 0;padding:14px 16px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;border-left:8px solid var(--warn)"><span><span class="eyebrow">Pause en cours · tout est bloqué</span><br><b>Les étudiants attendent votre reprise.</b> <span class="note">À la reprise, la rotation ${p.r+1} continue avec ${fmt(d.resteAvant||0)} restantes.</span></span><span class="row" style="gap:12px;align-items:center"><span><span class="note">Pause depuis</span><br><b class="cptPauseEc num" data-debut="${d.pauseDebut||Date.now()}" style="font-size:40px">${fmt(ec)}</b></span><button class="btn pen gros" id="finPause">Tout le monde est prêt : reprendre</button></span></div>`}
