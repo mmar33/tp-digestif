@@ -554,14 +554,15 @@ body.enc .auto-val{display:none}
   var POSD = {
     boeuf:"Entièrement à droite de la ligne médiane",
     miroir:"Entièrement à gauche de la ligne médiane",
-    chien:"De part et d’autre de la ligne médiane (schéma du chien)",
-    porc:"De part et d’autre de la ligne médiane (schéma du porc)",
+    chien:"De part et d’autre de la ligne médiane (schéma du porc)",
+    porc:"De part et d’autre de la ligne médiane (schéma du chien)",
     cheval:"De part et d’autre de la ligne médiane (schéma du cheval)"
   };
   function posFig(k){
     return '<div class="posfig"><span class="side">G</span><img src="'+POSIMG[k]+'" alt="'+POSD[k]+'"><span class="side">D</span></div>';
   }
-  var POS_ID = [{k:"chien",a:"Chien"},{k:"porc",a:"Porc"},{k:"cheval",a:"Cheval"}];
+  /* corrigé le 6/11 : les deux schémas étaient inversés (le schéma « chien » montre le porc et inversement) */
+  var POS_ID = [{k:"chien",a:"Porc"},{k:"porc",a:"Chien"},{k:"cheval",a:"Cheval"}];
 
   var QUIZ = [
     {q:"Où se situe le foie ?", a:"Entre le diaphragme et l’estomac", o:["Entre l’estomac et le côlon transverse","Caudalement aux reins","Dans la cavité pelvienne"]},
