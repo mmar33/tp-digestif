@@ -3459,9 +3459,12 @@ function celluleNote(g,eid,aid){const i=noteEtuInfo(g,eid,aid);const t={manuelle
   return `<td class="num"><button class="cellnote ${i.src}" data-manu="${g.seance}~${eid}~${aid}" title="${t}">${i.v!=null?fr(i.v):"–"}${i.src?`<sup>${i.src==="manuelle"?"M":i.src==="repli"?"R":"S"}</sup>`:""}</button></td>`}
 function brancherSurete(){const on=(s,ev,f)=>{const el=$(s);if(el)el.addEventListener(ev,f)};
   on("#secoursImp","click",async()=>{const l=$("#secoursTxt").value.split(/\s+/).filter(Boolean);if(!l.length)return;const r=await importerSecours(l);toast(r.ok+" importé(s)"+(r.ko?" · "+r.ko+" illisible(s)":""));rendre()});
-  document.querySelectorAll("[data-manu]").forEach(b=>b.addEventListener("click",()=>{const k=b.dataset.manu,[sid,eid,aid]=k.split("~"),m=notesManu[k];
+  /* la page se redessine à chaque mise à jour de la base : on ouvre la fenêtre dès l'appui (délégation, une seule fois) pour que le clic ne se perde pas */
+  if(window.__manuDeleg)return;window.__manuDeleg=1;
+  document.addEventListener("pointerdown",ev=>{const b=ev.target.closest&&ev.target.closest("[data-manu]");if(!b||document.querySelector(".modale"))return;ev.preventDefault();ouvrirNoteManu(b.dataset.manu)})}
+function ouvrirNoteManu(k){{const [sid,eid,aid]=k.split("~"),m=notesManu[k];
     modale("Note à la main",`${esc(etu(sid,eid))} · atelier ${aid.slice(1)}<br><br>À n'utiliser qu'en dernier recours (note perdue, situation particulière). Elle remplace la note calculée.<br><br><input id="manuVal" type="number" min="0" max="20" step="0.5" value="${m&&m.note!=null?m.note:""}" style="font-size:22px;width:120px;padding:6px" placeholder="/20"> /20<br><span class="note">Laissez vide pour revenir à la note calculée.</span>`,"Enregistrer",()=>{
-      const v=($("#manuVal")||{}).value;const note=v===""?null:Math.max(0,Math.min(20,+v));notesManu[k]={note,t:Date.now()};ecrireBase("notes_manuelles",k,{note,t:Date.now()});rendre()},"","Annuler")}))}
+      const v=($("#manuVal")||{}).value;const note=v===""?null:Math.max(0,Math.min(20,+v));notesManu[k]={note,t:Date.now()};ecrireBase("notes_manuelles",k,{note,t:Date.now()});rendre()},"","Annuler")}}
 /* =========================================================
    ÉCONOMIE DE LECTURES (quota gratuit de Firebase)
    Chaque téléphone d'étudiant n'écoute que sa séance et son groupe.
