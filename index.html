@@ -1915,6 +1915,9 @@ function vA1(){
      <p class="note">L'objectif n'est pas une maquette miniature parfaite, mais une organisation anatomique juste. Document d'anatomie de référence autorisé.</p></div>
     <div class="card"><h3>Comment vous serez notés</h3><p class="note" style="margin-top:0">Un autre groupe évaluera votre maquette avec ce barème (sur 20). À la fin, vous verrez dans l'application qui a noté votre maquette, avec la photo et le détail des points.</p>
      <ol class="bar">${CRITERES.map(c=>`<li><span>${esc(c.titre)}</span><b>${c.max} pt${c.max>1?"s":""}</b></li>`).join("")}</ol>
+     <div style="margin-top:14px"><h3 style="margin:0 0 6px">${ico("photo","mini")} Photo de votre côlon *</h3><p class="note" style="margin:0 0 8px">Quand votre maquette est finie, prenez-la en photo vous-mêmes : c'est cette photo que verront le groupe qui vous notera et les enseignants.</p>
+      <label class="photo ${a1Photo?"ok":""}" for="photoIn">${a1Photo?`<img src="${a1Photo.url}" alt="Photo de votre maquette">`:`${ico("photo")}<span>Touchez ici pour prendre la photo de votre côlon</span>`}</label>
+      <input id="photoIn" type="file" accept="image/*" capture="environment" hidden></div>
      <button class="btn pen gros" id="maquetteFinie" style="width:100%;margin-top:12px">Notre maquette est terminée</button></div></div>`;
   else if(etape===2)corps=`<div class="card center" style="max-width:640px;margin:0 auto">${ico("main","big")}<h2>Maquette terminée !</h2>
      <div style="margin:14px 0;padding:14px 16px;border:3px solid #c0262d;border-radius:14px;background:var(--pen-soft);color:#c0262d;text-align:left;font-size:18px;line-height:1.4"><b style="font-size:20px">⚠️ IMPORTANT : posez votre côlon À PART sur la table prévue</b>, avec un papier portant le nom de votre équipe : <b>« ${esc(g.nom)} · les ${esc(g.mascotte)} »</b>. Les groupes suivants doivent pouvoir le retrouver et l'évaluer. Ensuite, ne le touchez plus.</div>
@@ -1924,14 +1927,15 @@ function vA1(){
   return `<div class="bar a1bar" style="--team:${g.couleur}"><span class="tag" style="background:${g.couleur};color:#fff">ATELIER 1</span><b style="font-size:18px">Le côlon en pâte à modeler</b><span class="sp"></span><button class="btn ghost sm" id="retourHub">Retour aux ateliers</button></div>
    <div class="pas-row">${pas}</div>${corps}`;
 }
+function photoEquipeA1(tid){const a=a1docs[tid]||{};return a.photoId||a.photoData?{photoId:a.photoId,photoData:a.photoData}:null}
 function formEval(g,ev){
-  const c=grp(ev.cible)||{nom:"?",mascotte:""};
+  const c=grp(ev.cible)||{nom:"?",mascotte:""};const pe=photoEquipeA1(ev.cible);
   if(!a1Form||a1Form.id!==ev.id)a1Form={id:ev.id,portions:[],pts:{},coms:{},final:""};
   const f=a1Form, tot=totalEval(f);
-  return `<div class="card cible" style="--c:${c.couleur||"#888"}">${mascSVG(c.mascotte,64)}<div><span class="eyebrow">Maquette à évaluer</span><h2>Groupe « ${esc(c.nom)} » · les ${esc(c.mascotte)}</h2><p class="note" style="margin:0">Allez voir leur maquette (elle porte le nom du groupe). Votre évaluation est anonyme : ils ne sauront pas qui les a notés.</p></div></div>
-   <div class="card"><h3>${ico("photo","mini")} Photo de la maquette *</h3>
+  return `<div class="card cible" style="--c:${c.couleur||"#888"}">${mascSVG(c.mascotte,64)}<div><span class="eyebrow">Maquette à évaluer</span><h2>Groupe « ${esc(c.nom)} » · les ${esc(c.mascotte)}</h2><p class="note" style="margin:0">Allez voir leur maquette (elle porte le nom du groupe). L'équipe notée verra vos noms, vos points et vos commentaires.</p></div></div>
+   ${pe?`<div class="card"><h3>${ico("photo","mini")} Photo prise par l'équipe</h3><img src="${photoSrc(pe)}" alt="Photo de la maquette à évaluer" style="max-width:100%;border-radius:12px"><p class="note" style="margin:6px 0 0">Vérifiez que c'est bien la maquette posée sur la table, avec le nom de l'équipe.</p></div>`:`<div class="card"><h3>${ico("photo","mini")} Photo de la maquette *</h3>
     <label class="photo ${a1Photo?"ok":""}" for="photoIn">${a1Photo?`<img src="${a1Photo.url}" alt="Photo de la maquette évaluée">`:`${ico("photo")}<span>Touchez ici pour prendre la photo de la maquette que vous évaluez</span>`}</label>
-    <input id="photoIn" type="file" accept="image/*" capture="environment" hidden></div>
+    <input id="photoIn" type="file" accept="image/*" capture="environment" hidden></div>`}
    ${CRITERES.map((cr,i)=>{const v=cr.liste?f.portions.length:f.pts[cr.id];const besoin=v!=null&&v<cr.max;
      return `<div class="card crit"><div class="row" style="justify-content:space-between;align-items:baseline"><h3><span class="cn">${i+1}</span>${esc(cr.titre)}</h3><span class="ptsv">${v==null?"–":v} / ${cr.max}</span></div>
       <p class="note" style="margin:2px 0 10px">${esc(cr.aide)}</p>
@@ -1961,14 +1965,14 @@ async function photoChoisie(file){if(!file)return;
   }catch(e){toast("Photo illisible, réessayez")}
   lireForm();rendre()}
 function envoyerEval(){lireForm();const f=a1Form, g=monGroupe(), ev=evals.find(e=>e.id===f.id);if(!ev)return;
-  if(!a1Photo){toast("Prenez d'abord la photo de la maquette");return}
+  const pe=photoEquipeA1(ev.cible);if(!a1Photo&&!pe){toast("Prenez d'abord la photo de la maquette");return}
   for(const cr of CRITERES){const v=cr.liste?f.portions.length:f.pts[cr.id];if(!cr.liste&&v==null){toast("Donnez une note au critère « "+cr.titre+" »");return}
     if(v<cr.max&&!(f.coms[cr.id]||"").trim()){toast("Expliquez la note du critère « "+cr.titre+" »");return}}
   if(!f.final.trim()){toast("Écrivez un commentaire final");return}
   const tot=totalEval(f);
   modale("Envoyer l'évaluation ?",`Vous donnez <b>${tot} / 20</b> à la maquette du groupe « ${esc((grp(ev.cible)||{}).nom)} ». <b>L'envoi est définitif</b> : vous ne pourrez plus modifier vos points ni vos commentaires.`,"Oui, envoyer",async()=>{
-    let photo={};if(!enTest())try{const as=await window.claude.use("assets");if(as){const r=await avecDelai(as.upload(a1Photo.blob),20000);photo={photoId:r.id}}}catch(e){}
-    if(!photo.photoId)photo={photoData:a1Photo.dataSmall};
+    let photo={};if(pe){photo=pe.photoId?{photoId:pe.photoId}:{photoData:pe.photoData}}else{if(!enTest())try{const as=await window.claude.use("assets");if(as){const r=await avecDelai(as.upload(a1Photo.blob),20000);photo={photoId:r.id}}}catch(e){}
+    if(!photo.photoId)photo={photoData:a1Photo.dataSmall}}
     const pts={};CRITERES.forEach(c=>pts[c.id]=c.liste?f.portions.length:f.pts[c.id]);
     const doc=Object.assign({evaluateur:ev.evaluateur,cible:ev.cible,seance:ev.seance,statut:"envoyee",t:ev.t,envoi:Date.now(),pts,portions:f.portions,coms:f.coms,final:f.final.trim(),total:tot},photo);
     Object.assign(ev,doc); a1Form=null; a1Photo=null; rendre(); feter("Évaluation envoyée !","Atelier 1 validé"); confettis();
@@ -2209,7 +2213,10 @@ function brancherPortail(){
   all("[data-at]",b=>ouvrirAtelier(b.dataset.at));
   on("#changerGroupe","click",()=>modale("Changer de groupe ?","Cette tablette n'affichera plus votre groupe. Rien n'est effacé : vous pourrez le reprendre à tout moment depuis l'accueil.","Oui, changer",()=>{monGid=null;LS.set("monGroupe",null);rendre()},"","Non"));
   document.querySelectorAll("#retourHub").forEach(b=>b.addEventListener("click",()=>{lireForm();vue="hub";rendre();window.scrollTo(0,0)}));
-  on("#maquetteFinie","click",()=>modale("Votre maquette est terminée ?","Après validation, <b>ne touchez plus votre maquette</b> : un autre groupe va l'évaluer. Posez à côté un papier avec le nom de votre groupe.","Oui, elle est terminée",async()=>{const g=monGroupe();a1docs[g.id]=Object.assign({},a1docs[g.id],{maquette:Date.now()});rendre();await ecrire("a1",g.id,{debut:(a1docs[g.id]||{}).debut||Date.now(),maquette:Date.now()},"set")},"","Pas encore"));
+  on("#maquetteFinie","click",()=>{if(!a1Photo){toast("Prenez d'abord la photo de votre côlon");const l=document.querySelector("label.photo");if(l)l.scrollIntoView({behavior:"smooth",block:"center"});return}modale("Votre maquette est terminée ?","Après validation, <b>ne touchez plus votre maquette</b> : un autre groupe va l'évaluer. Posez à côté un papier avec le nom de votre groupe.","Oui, elle est terminée",async()=>{const g=monGroupe();a1docs[g.id]=Object.assign({},a1docs[g.id],{maquette:Date.now()});rendre();await ecrire("a1",g.id,{debut:(a1docs[g.id]||{}).debut||Date.now(),maquette:Date.now()},"set");
+    /* photo de l'équipe : envoyée après la validation (sans bloquer), comme pour l'évaluation */
+    const ph=a1Photo;a1Photo=null;let photo={};if(ph&&!enTest()){try{const as=await window.claude.use("assets");if(as){const r=await avecDelai(as.upload(ph.blob),20000);photo={photoId:r.id}}}catch(e){}if(!photo.photoId)photo={photoData:ph.dataSmall};
+      a1docs[g.id]=Object.assign({},a1docs[g.id],photo);await ecrire("a1",g.id,Object.assign({},a1docs[g.id]),"set");rendre()}},"","Pas encore")});
   on("#recevoirEval","click",()=>attribuerEval(monGroupe()));
   on("#photoIn","change",e=>photoChoisie(e.target.files[0]));
   all("[data-por]",b=>{lireForm();const k=+b.dataset.por,p=a1Form.portions;const i=p.indexOf(k);i>=0?p.splice(i,1):p.push(k);const y=window.scrollY;rendre();window.scrollTo(0,y)});
