@@ -1323,6 +1323,13 @@ body.enc .auto-val{display:none}
       var f=file().filter(function(x){return x.id!==d.id});f.push({id:d.id,note:r.total,a:r.a,b:r.b,c:r.c,correcteur:r.corrector||"",t:Date.now()});poser(f);window.__a5enCours=true;setTimeout(vider,50)}catch(e){}};
   setInterval(vider,15000);window.addEventListener("online",vider);setTimeout(vider,2000);
 
+  /* remise à zéro demandée par un encadrant pour tout un groupe : tablette vidée (chrono, fiches) puis rechargée */
+  (function(){if(!duos||!moi||String(moi).indexOf("TEST")===0)return;var gid=String(moi).replace(/-a5-e\d+$/,"");
+    base().then(function(db){if(!db)return;db.collection("config").doc("a5raz").get().then(function(s){var d=s&&s.exists?s.data():null;var ts=d&&+d[gid];if(!ts)return;
+      var k="a5-raz-vu-"+moi;if(+localStorage.getItem(k)>=ts)return;
+      ["chrono-foie","corr-en-cours","defi-foie-score","binome-note","binome-info","correction-foie-recap"].forEach(function(x){localStorage.removeItem(x)});
+      try{poser(file().filter(function(x){return String(x.id).indexOf(gid+"-a5-")!==0}))}catch(e){}
+      orig.call(localStorage,k,String(ts));location.reload()}).catch(function(){})})})();
   /* atelier déjà terminé pour ce binôme (note enregistrée, ici ou dans la base) : on bloque, même après un rechargement */
   function verrouiller(n){if(document.getElementById("a5fini"))return;var o=document.createElement("div");o.id="a5fini";
     o.style.cssText="position:fixed;inset:0;z-index:99999;background:rgba(20,22,20,.94);color:#fff;display:flex;align-items:center;justify-content:center;padding:20px;font-family:system-ui,sans-serif";
