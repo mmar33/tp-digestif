@@ -1664,7 +1664,11 @@ function brancher(){
   on("#demo","click",demarrerDemo); on("#quitdemo","click",finDemo); on("#findemo","click",finDemo);
   on("#prof","click",()=>{vue="prof";rendre()});
   on("#retour","click",()=>{vue="hub";projeter=false;grpEdit=null;rendre()}); on("#versHub","click",()=>{vue="hub";rendre()});
-  on("#pin","submit",e=>{e.preventDefault();if($("#code").value===PIN){profOK=true;rendre()}else toast("Code incorrect")});
+  on("#pin","submit",e=>{e.preventDefault();const v=($("#code").value||"").trim().toUpperCase();if($("#code").value===PIN){profOK=true;rendre()}
+    /* code étudiant du 6/11 : ouvre seulement le mode test (ateliers sur l'appareil, sans la base), valable jusqu'à 12 h 30 */
+    else if(v==="ATELIER6"&&Date.now()<1793964600000){profOK=false;demarrerTestEtudiant()}
+    else if(v==="ATELIER6")toast("Ce code n'est plus valable")
+    else toast("Code incorrect")});
   on("#stage","click",clicPlanche);
   on("#zp","click",()=>{zoom=Math.min(2.5,(zoom||1)+.25);LS.set("zoomDuel3",zoom);rendre()}); on("#zfit","click",()=>{zoom=0;LS.set("zoomDuel3",0);rendre()});
   on("#zm","click",()=>{zoom=zoom<=1?0:zoom-.25;LS.set("zoomDuel3",zoom);rendre()});
