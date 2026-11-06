@@ -2928,9 +2928,10 @@ function vA6(){const g=monGroupe();if(!g){vue="hub";return vHub()}const t=monEqu
   else{const n=a6Note(d),ng=a6NoteGroupe(g),p=a6Preds(d);
     c=`<div class="card a4fin"><span class="eyebrow">Atelier terminé</span><h2 style="margin:6px 0">Vos trois élevages sont entre de bonnes mains</h2>
      <p>Ce qu'il faut retenir : le pH du rumen dépend de l'équilibre entre l'acidité produite (AGV, surtout avec l'amidon rapide) et le tampon apporté par la salive (fibres longues, rumination). Le concentré nourrit la vache et réduit le méthane, mais au-delà d'environ 50 % de la ration il faut des fibres longues, une céréale lente, des repas fractionnés ou un tampon pour éviter l'acidose.</p>
+     <p style="margin:10px 0 0"><b>Note de votre équipe</b></p>
      <div class="fnote">${fr(n)}<small>/20</small></div>
      <div class="fdet">${A6_MISSIONS.map((mi,i)=>`<span>Mission ${i+1} · <b>${a6PtsMission(a6M(d,mi.id),mi)}/4</b></span>`).join("")}<span>Prédictions justes ${p.j}/${p.n} (sans effet sur la note)</span><span>Quiz · <b>${fr(a6PtsQuiz(d))}/8</b></span></div>
-     <p><b>Note du groupe</b> (moyenne des 2 équipes) : ${ng!=null?`<b>${fr(ng)}/20</b>`:"en attente de l'autre équipe"}.</p>
+     <div style="margin:12px 0;padding:12px 14px;border:2px solid var(--blue);border-radius:12px;background:var(--blue-soft)"><b>Note de l'atelier pour chacun de vous : ${ng!=null?`${fr(ng)}/20`:(()=>{const v=a6NoteGroupe(g,true);return v!=null?`${fr(v)}/20 (provisoire : l'autre équipe n'a pas encore terminé, sa note partielle est comptée)`:"en attente de l'autre équipe"})()}</b><br><span class="note">C'est la moyenne des notes des 2 équipes de votre groupe : c'est elle qui apparaît dans « Mon relevé de notes ».</span></div>
      <button class="btn pen gros" id="retourHub2">Retour aux ateliers</button></div>`}
   return `${tete}<div class="a1form a4 a6" style="max-width:860px;margin:14px auto">${e!=="intro"&&e!=="fin"?barre:""}${c}</div>`}
 function a6Solution(mi){const sol={m1:"foin long, 50 % de concentré à base de maïs, en ration complète",m2:"foin long, 55 % de concentré à base de maïs, en 4 repas ou en ration complète, avec bicarbonate",m3:"ensilage d'herbe, 55 % de concentré à base de maïs, en 4 repas ou en ration complète, avec bicarbonate"};return sol[mi.id]}
@@ -3319,7 +3320,7 @@ function pfDetail(c,aid){
   if(aid==="a3"&&c.a3){const r=c.a3.reperage,q=c.a3.quiz;return [r?`Repérage ${r.score}/${r.total}`:"",q?`quiz ${q.score}/${q.total}`:"",c.titres.length?`${c.titres.length} famille${c.titres.length>1?"s":""} au jeu`:""].filter(Boolean).join(" · ")}
   if(aid==="a4"&&c.a4.vuIntro)return `Pièces : ${fr(A4_PIECES.reduce((s,p)=>s+a4PtsPiece(p,c.a4[p.id]),0))}/12`+(c.a4.concl?` · conclusion : ${c.a4.concl.toLowerCase()}`:"");
   if(aid==="a5"&&c.a5&&c.a5.a!=null)return `Puzzle 1 : ${fr(+c.a5.a)}/4 · puzzle 2 : ${fr(+c.a5.b)}/4 · Défi foie : ${fr(+c.a5.c)}/12`;
-  if(aid==="a6"&&c.a6.vuIntro){const ok=A6_MISSIONS.filter(mi=>a6M(c.a6,mi.id).ok).length,p=a6Preds(c.a6);return `Missions réussies ${ok}/3`+(p.n?` · prédictions justes ${p.j}/${p.n}`:"")+(c.a6.quizFini?` · quiz ${A6_QUIZ.filter(x=>(c.a6.quiz||{})[x.id]===x.b).length}/${A6_QUIZ.length}`:"")}
+  if(aid==="a6"&&c.a6.vuIntro){const ok=A6_MISSIONS.filter(mi=>a6M(c.a6,mi.id).ok).length,ne=a6Note(c.a6);return `Note du groupe = moyenne des 2 équipes du groupe`+(ne!=null?` · votre équipe : ${fr(ne)}/20`:"")+` · missions réussies ${ok}/3`+(c.a6.quizFini?` · quiz ${A6_QUIZ.filter(x=>(c.a6.quiz||{})[x.id]===x.b).length}/${A6_QUIZ.length}`:"")}
   return ""}
 function pfNiveau(xp){let i=0;PF_NIVEAUX.forEach((n,k)=>{if(xp>=n[0])i=k});const cur=PF_NIVEAUX[i],nxt=PF_NIVEAUX[i+1];return {nom:cur[1],suiv:nxt?nxt[1]:null,pct:nxt?Math.round((xp-cur[0])/(nxt[0]-cur[0])*100):100,reste:nxt?nxt[0]-xp:0}}
 function vProfil(){const g=monGroupe();if(!g){vue="hub";return vHub()}pfChargerFamilles(g);
