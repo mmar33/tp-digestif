@@ -2265,6 +2265,8 @@ const dureeRot=s=>((s&&+s.dureeRot)||30)*60e3;
 const groupesDe=sid=>groupes.filter(g=>g.seance===sid).sort((a,b)=>(a.k||0)-(b.k||0));
 function phaseSeance(sid){const s=seances[sid],d=deroules[sid],H0=debutSeance(s);
   if(d&&d.r>=NB_ROT)return {phase:"fin"};
+  /* pause décidée par un encadrant : la rotation d.r démarre à la fin de la pause */
+  if(d&&d.pauseJusqu&&Date.now()<d.pauseJusqu)return {phase:"pause",r:d.r,reste:d.pauseJusqu-Date.now(),prets:{}};
   const prets={};groupesDe(sid).forEach(g=>{if(d&&(g.pret===d.r||(d.r>=0&&d.r<NB_ROT&&groupeAFini(g,atelierDe(g.k,d.r).id))))prets[g.id]=1});
   if(d&&d.r>=0){const R=dureeRot(s);return {phase:"rot",r:d.r,reste:Math.max(0,R-(Date.now()-d.t)),prets}}
   if(groupesDe(sid).length)return {phase:"prepa",prets};
@@ -2418,6 +2420,10 @@ function vHub(){
      ${g.perso?`<p>Nom, mascotte et couleur choisis.</p>`:`<div class="perso"><input id="pNom" class="gros" maxlength="28" placeholder="Nom du groupe" value="${esc(g.nom)}"><div class="masc">${MASCOTTES.map(m=>`<button class="mascbtn ${g.mascotte===m?"sel":""}" data-pmasc="${m}">${mascSVG(m,40)}<span>${m}</span></button>`).join("")}</div><div class="coul">${COULEURS.map(([n,c])=>`<button class="coulbtn ${g.couleur===c?"sel":""}" data-pcoul="${c}" style="--c:${c}"><i></i>${n}</button>`).join("")}</div><button class="btn ghost" id="pSave">Enregistrer</button></div>`}
      <button class="btn pen gros" id="pret" ${pret?"disabled":""} style="margin-top:12px">${pret?"Groupe prêt ✓":"Nous sommes prêts à commencer"}</button>
      <p class="note">Les ateliers démarrent dès que les ${gs.length} groupes sont prêts (${gs.filter(x=>p.prets[x.id]).length}/${gs.length}).</p></div>`}
+  else if(p.phase==="pause"&&!test){const a=atelierDe(g.k,p.r),rep=new Date(Date.now()+p.reste).toLocaleTimeString("fr-FR",{hour:"2-digit",minute:"2-digit"});
+    centre=`<div class="maint" style="--c:${g.couleur}"><span class="eyebrow">Pause</span><h2>☕ Pause : reprise à ${rep}</h2>
+      <p style="font-size:20px;margin:6px 0">Reprise dans <b class="cptPause num">${fmt(p.reste)}</b></p>
+      <p class="note" style="margin:0">Ensuite : <b>atelier ${a.n} · ${esc(titreAt(a))}</b> (rotation ${p.r+1} sur ${NB_ROT}). Ne commencez pas avant la fin de la pause.</p></div>`}
   else if(p.phase==="rot"){const a=test?null:atelierDe(g.k,p.r);
     if(!test){const app=AVEC_CONTENU.includes(a.id)&&atelierActif(a.id), e=etatAt(g,a.id), sd=subsDe(g.id,a.id), t=monEquipe(g,a.id), pret=!!p.prets[g.id], gs=groupesDe(g.seance);
       centre=`<div class="maint" style="--c:${g.couleur}"><span class="eyebrow">Maintenant · rotation ${p.r+1} sur ${NB_ROT}</span>
@@ -3420,7 +3426,7 @@ const notesEnAttente=()=>journalNotes.filter(x=>!x.ok).length;
 function majSurete(){const el=document.getElementById("sureteEtat");if(el)el.outerHTML=blocEtatEnvoi()}
 
 /* ----- repli quand un atelier n'a pas pu être fini ----- */
-function atelierPasse(g,aid){if(!g||g.id==="TEST")return false;const p=phaseSeance(g.seance);if(p.phase==="fin")return true;if(p.phase!=="rot")return false;
+function atelierPasse(g,aid){if(!g||g.id==="TEST")return false;const p=phaseSeance(g.seance);if(p.phase==="fin")return true;if(p.phase!=="rot"&&p.phase!=="pause")return false;
   for(let r=0;r<p.r;r++)if(atelierDe(g.k,r).id===aid)return true;return false}
 function noteEtuInfo(g,eid,aid){
   const m=notesManu[g.seance+"~"+eid+"~"+aid];if(m&&m.note!=null&&m.note!=="")return {v:+m.note,src:"manuelle"};
@@ -3738,7 +3744,9 @@ function sousGroupes(g,aid){const B=BESOIN[aid],m=g.membres||[],N=m.length;if(!N
   return shuffle(duos)}
 
 /* espace encadrants : chronomètre de la rotation en cours, visible dans tous les onglets, et où en est chaque atelier */
-function chronoProf(){const sid=profSeance||seanceSel;if(!sid||!seances[sid])return "";const p=phaseSeance(sid);if(p.phase!=="rot")return "";
+function chronoProf(){const sid=profSeance||seanceSel;if(!sid||!seances[sid])return "";const p=phaseSeance(sid);
+  if(p.phase==="pause"){const rep=new Date(Date.now()+p.reste).toLocaleTimeString("fr-FR",{hour:"2-digit",minute:"2-digit"});return `<div class="card" style="margin:12px 0;padding:14px 16px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;border-left:8px solid var(--warn)"><span><span class="eyebrow">Pause en cours</span><br><b>Reprise à ${rep}</b> avec la rotation ${p.r+1} sur ${NB_ROT}</span><span class="row" style="gap:12px;align-items:center"><b class="cptPause num" style="font-size:44px">${fmt(p.reste)}</b><button class="btn ghost sm" id="finPause">Reprendre maintenant</button></span></div>`}
+  if(p.phase!=="rot")return "";
   const gs=groupesDe(sid),fin=new Date(Date.now()+(p.reste||0)).toLocaleTimeString("fr-FR",{hour:"2-digit",minute:"2-digit"}),k=ongletProf;
   const tuiles=ATELIERS.map(a=>{const g=gs.find(x=>atelierDe(x.k,p.r).id===a.id);if(!g)return "";let fini=false;try{fini=groupeAFini(g,a.id)}catch(e){}
     const pret=!!(p.prets||{})[g.id],ici=k===a.id;
@@ -3749,6 +3757,9 @@ function chronoProf(){const sid=profSeance||seanceSel;if(!sid||!seances[sid])ret
   return `<div class="card" style="margin:12px 0;padding:14px 16px;display:grid;gap:10px">
     <div class="row" style="justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px"><span class="eyebrow">Rotation ${p.r+1} sur ${NB_ROT} · temps restant par atelier</span><span class="note">Changement au plus tard à ${fin} · ${gs.filter(x=>(p.prets||{})[x.id]).length}/${gs.length} groupes prêts</span></div>
     <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:10px">${tuiles}</div></div>`}
+setInterval(()=>{const els=document.querySelectorAll(".cptPause");if(!els.length)return;const sid=profSeance||seanceSel||(monGroupe()||{}).seance;const p=sid&&seances[sid]?phaseSeance(sid):null;if(!p||p.phase!=="pause"){rendre();return}els.forEach(el=>el.textContent=fmt(p.reste||0))},1000);
+document.addEventListener("click",e=>{const b=e.target.closest&&e.target.closest("#finPause");if(!b||!db)return;const sid=profSeance||seanceSel,d=deroules[sid];if(!d)return;
+  modale("Reprendre maintenant ?","La pause s'arrête et la rotation suivante démarre tout de suite, avec sa durée complète.","Oui, reprendre",()=>{const nd={r:d.r,t:Date.now()};deroules[sid]=nd;ecrire("deroule",sid,nd,"set");rendre()},"","Non")});
 setInterval(()=>{const els=document.querySelectorAll(".cptProf");if(!els.length)return;const sid=profSeance||seanceSel;const p=sid&&seances[sid]?phaseSeance(sid):null;if(!p||p.phase!=="rot")return;els.forEach(el=>el.textContent=fmt(p.reste||0))},1000);
 /* question retirée de l'atelier 3 (« le côlon dorsal gauche du cheval est lisse… ») : comptée juste pour tout le monde */
 function noteA3Corrigee(n){let v=+n.note;const q=n.quiz||{},det=q.det||[];if(!det.length||!q.total)return v;
