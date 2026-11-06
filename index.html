@@ -1522,7 +1522,7 @@ function vM1(){
       <h3 style="margin-top:6px">${esc(e.titre)}</h3><p style="margin:0 0 2px">${TR?"Quelle légende va dans cette case ?":"Qu'est-ce qui est faux ?"}</p><div class="once">Une seule chance : votre première réponse est définitive.</div>
       <div class="opts">${s.opts.map((o,k)=>`<button class="opt ${s.rep===k?"sel "+(s.ok?"bon"+(animer("e"+ouvert)?" pop":""):"mauvais"+(animer("e"+ouvert)?" secoue":"")):""}" data-r="${k}" ${peut?"":"disabled"}><span class="let">${"ABCD"[k]}</span><span>${esc(o.t)}</span></button>`).join("")}</div>
       ${s.rep>=0?(s.ok?`<div class="fb ok ${animer("e"+ouvert)?"pop":""}">✓ ${TR?"Légende juste !":"Correction juste !"}</div>`:`<div class="fb ko">${TR?"Ce n'est pas la bonne légende.":"Ce n'est pas la bonne correction."}</div>`):""}
-      ${d&&s.rep>=0?`<p style="margin:12px 0 0"><button class="btn pen" id="findemo">C'est compris, retour à l'accueil</button></p>`:`<p style="margin:10px 0 0"><button class="link" id="fermer">Fermer</button></p>`}</div>`;
+      ${d&&s.rep>=0?`<p style="margin:12px 0 0"><button class="btn pen" id="findemo">C’est compris, continuer</button></p>`:`<p style="margin:10px 0 0"><button class="link" id="fermer">Fermer</button></p>`}</div>`;
   }else side+=TR?`<div class="card"><h3>Comment jouer</h3><p class="note" style="margin:0">Touchez une case numérotée sur la planche, puis choisissez ici la légende qui va dedans. Une seule chance par case.</p></div>`:`<div class="card"><h3>Comment jouer</h3><p class="note" style="margin:0">Touchez la planche là où vous voyez une erreur (légende ou flèche). Si c'est une erreur, elle est entourée et vous choisissez la correction ici. Pastilles : F facile, M moyen, D difficile.</p></div>`;
   const tr=E.map((s,i)=>i).filter(i=>TR?E[i].rep>=0:E[i].t);
   if(tr.length&&!d)side+=`<div class="card"><div class="eyebrow" style="margin-bottom:8px">${TR?"Cases complétées":"Erreurs trouvées"}</div><ul class="list">${tr.map(i=>`<li><button class="link" data-o="${i}" style="color:var(--ink);text-decoration:none;text-align:left">${esc(pl.erreurs[i].titre)}</button><b style="color:${E[i].ok?"var(--ok)":E[i].rep>=0?"var(--pen)":"var(--warn)"}">${E[i].ok?"juste":E[i].rep>=0?"faux":"à corriger"}</b></li>`).join("")}</ul></div>`;
@@ -3614,11 +3614,26 @@ function ouvrirAtelier(aid){const g=monGroupe();if(!g)return;
   if(!subsDe(g.id,aid)){creerSousGroupes(g).then(()=>ouvrirAtelier(aid));return}
   const t=monEquipe(g,aid);if(!t){toast("Vous n'êtes dans aucune équipe de cet atelier");return}
   if(aid==="a1"){ctxEquipe=t;vue="a1";a1Form=null;a1Photo=null;if(!(a1docs[t.id]||{}).debut){a1docs[t.id]=Object.assign({},a1docs[t.id],{debut:Date.now()});ecrire("a1",t.id,{debut:Date.now()},"set")}rendre();window.scrollTo(0,0);return}
-  if(aid==="a2"){if(duelsFaits(g,t.id)>=2){toast("Les deux duels sont joués");return}lancerDuelEquipes(g);return}
+  if(aid==="a2"){if(duelsFaits(g,t.id)>=2){toast("Les deux duels sont joués");return}proposerDemoA2(g,t);return}
   if(aid==="a3"){vue="a3";rendre();window.scrollTo(0,0)}
   if(aid==="a4"){a4Etape=null;a4Sel={};vue="a4";rendre();window.scrollTo(0,0)}
   if(aid==="a5"){vue="a5";rendre();window.scrollTo(0,0)}
   if(aid==="a6"){a6Etape=null;a6Brouillon={};a6Pred={};a6Quiz={};vue="a6";rendre();window.scrollTo(0,0)}}
+
+/* ----- atelier 2 : entraînement d'une minute pour apprendre à toucher la planche, proposé avant le premier duel ----- */
+let demoDepuisA2=false;
+async function proposerDemoA2(g,t){
+  if(g.id==="TEST"||duelsFaits(g,t.id)>0||LS.get("demoA2_"+t.id,false)){lancerDuelEquipes(g);return}
+  /* un duel déjà commencé pour ce groupe : on le reprend sans rien proposer */
+  try{const p=phaseSeance(g.seance),id=(g.id+"-R"+(p.r!=null?p.r:0)+"-D1").replace(/[^A-Za-z0-9-]/g,"");const sn=await db.collection("duels").doc(id).get();if(sn&&sn.exists){lancerDuelEquipes(g);return}}catch(e){}
+  modale("Avant le duel : un essai pour apprendre à toucher la planche",
+    "Pendant le duel, on <b>touche directement la planche</b> à l'endroit de l'erreur (la légende fausse ou la flèche mal placée), puis on choisit la bonne correction parmi 4 propositions.<br><br>Faites d’abord cet <b>essai rapide (2 minutes au plus)</b> sur une planche d'exemple : une seule erreur à trouver, <b>rien n'est noté</b>. Le duel commencera juste après.",
+    "Faire l’essai (2 min max)",()=>{LS.set("demoA2_"+t.id,true);demoDepuisA2=true;demarrerDemo()},"","Passer : lancer le duel");
+  const non=document.querySelector(".modale #mnon");if(non)non.addEventListener("click",()=>{LS.set("demoA2_"+t.id,true);lancerDuelEquipes(g)})}
+function finDemo(){clearInterval(tick);jeu=null;
+  if(demoDepuisA2&&monGroupe()){demoDepuisA2=false;vue="hub";rendre();window.scrollTo(0,0);
+    modale("Essai terminé","Vous savez maintenant où toucher. Prêts pour le vrai duel ?","Lancer le duel",()=>{const g=monGroupe();if(g)lancerDuelEquipes(g)},"","Plus tard");return}
+  vue="accueil";rendre();toast("Fin de la démo")}
 
 /* ----- atelier 2 : deux duels (manche + revanche), note = moyenne des deux ----- */
 const resA2=tid=>resultats.filter(r=>r.groupe===tid);
