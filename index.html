@@ -599,6 +599,7 @@ input.petit{width:80px;padding:6px;border-radius:8px;border:1.5px solid var(--ru
 
 /* v3 : groupes de 10, répartition, prêts */
 .perso{display:grid;gap:10px;margin-top:10px}.perso .masc,.perso .coul{display:flex;flex-wrap:wrap;gap:8px}
+.ecran{margin-top:14px;padding:10px 14px;border:1px dashed var(--rule);border-radius:12px;background:var(--sheet)}.ecran summary{cursor:pointer;font-weight:700}.ecran ol{margin:8px 0 4px;padding-left:1.3em}.ecran li{margin:4px 0}.ecran .att{margin:8px 0 0;padding:8px 10px;border-radius:10px;background:var(--pen-soft);color:var(--ink)}.ecran .ok{margin:8px 0 0;color:var(--ok)}
 .pretbox{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px;margin-top:16px;padding:12px 14px;border-radius:14px;background:var(--sheet);border:1.5px dashed var(--rule)}
 .atcard.cour{outline:3px solid var(--team,#2f7a4a);outline-offset:2px}.atcard .att .atn{position:static;display:block;margin-bottom:2px;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;opacity:.65}
 .eqgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px}
@@ -2249,6 +2250,10 @@ function phaseSeance(sid){const s=seances[sid],d=deroules[sid],H0=debutSeance(s)
   if(!H0&&tirageManuel(s))return {phase:"inscription",reste:null,manuel:true};
   if(H0&&Date.now()<H0)return {phase:"inscription",reste:H0-Date.now()};
   return {phase:"formation"}}
+/* consigne « changer d'écran » affichée sous l'atelier en cours */
+function aideEcran(a){if(!a)return "";const risque=a.id==="a3"?"<b>Un seul téléphone ou tablette par duo</b> pour tout l'atelier (jeu et évaluation), de préférence le plus grand écran du duo. Si vous voulez changer d'écran, faites-le avant de commencer l'évaluation 3D ou après l'avoir validée, jamais pendant.":a.id==="a5"?"Pendant le <b>Défi foie</b>, ne changez pas d'appareil en cours d'étape : votre progression serait perdue. Changez avant de commencer ou après avoir validé votre fiche.":"";
+  const duo=a.id==="a3"?`<p class="ecran att" style="margin-top:14px;font-size:17px">⚠️ <b>Atelier 3 : un seul téléphone ou tablette par duo</b>, du début à la fin (jeu et évaluation). Choisissez maintenant le plus grand écran du duo et travaillez tous les deux dessus.</p>`:"";
+  return duo+`<details class="ecran"><summary>Vous voyez mal ? Continuer sur un autre écran</summary><ol><li>Sur l'autre téléphone ou la tablette, scannez le QR code du TP.</li><li>Choisissez <b>votre propre nom</b>.</li><li>Vous retrouvez votre groupe, votre équipe et cet atelier : touchez « Ouvrir l'atelier ». Plusieurs étudiants peuvent le faire sur le même grand écran.</li></ol>${risque?`<p class="att">${risque}</p>`:`<p class="ok">Dans cet atelier, vous pouvez changer d'écran à tout moment : votre travail est enregistré en ligne.</p>`}</details>`}
 const atelierDe=(k,r)=>ATELIERS[((k||0)+r)%NB_ROT];
 function groupeAFini(g,aid){if(!atelierActif(aid))return false;const sd=subsDe(g.id,aid);if(!sd)return false;
   return sd.equipes.every((m,i)=>{const tid=g.id+"-"+aid+"-e"+(i+1);
@@ -2396,7 +2401,7 @@ function vHub(){
        ${app?(sd?`<p style="margin:12px 0 4px">Vous êtes dans <b>${esc(t?t.nom.split(" · ")[0]:"?")}</b> : ${t?t.membres.map(m=>esc(nomCourt(g.seance,m))).join(", "):""}.</p><button class="btn pen gros" data-at="${a.id}">${e.st==="fait"?"Revoir l'atelier":"Ouvrir l'atelier"}</button>`
          :`<p style="margin:12px 0 4px">Cet atelier se fait en <b>${BESOIN[a.id].titre}</b>.</p><button class="btn pen gros" id="repartir" data-ra="${a.id}">Former les ${BESOIN[a.id].type==="duos"?"duos":"équipes"}</button>`)
          :`<p class="note" style="margin-top:10px">Cet atelier se déroule hors de l'application : suivez les consignes sur la table.</p>`}
-       <div class="pretbox"><span>Changement au plus tard dans <b id="cptRot">${fmt(p.reste)}</b> · ${gs.filter(x=>p.prets[x.id]).length}/${gs.length} groupes prêts</span>
+       ${aideEcran(a)}<div class="pretbox"><span>Changement au plus tard dans <b id="cptRot">${fmt(p.reste)}</b> · ${gs.filter(x=>p.prets[x.id]).length}/${gs.length} groupes prêts</span>
        <button class="btn ${pret?"ghost":"blue"}" id="pretChanger" ${pret?"disabled":""}>${pret?"Prêts à changer ✓":"Atelier terminé : prêts à changer"}</button></div></div>`}}
   else if(p.phase==="fin")centre=`<div class="maint"><span class="eyebrow">Séance terminée</span><h2>Fin des ateliers</h2><p>${pendEq?"<b>Dernière mission : évaluez une maquette (atelier 1). Elle compte dans votre note !</b>":b.complet?"Toutes vos notes sont prêtes.":"Les dernières notes arrivent dès que toutes les évaluations sont faites."}</p></div>`;
   else centre=`<div class="maint"><h2>Formation des groupes…</h2></div>`;
