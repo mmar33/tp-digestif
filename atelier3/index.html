@@ -2682,7 +2682,8 @@ boot();
     var dbP=null;function base(){if(!dbP)dbP=(window.claude&&window.claude.use?window.claude.use("db"):Promise.resolve(null)).catch(function(){return null});return dbP}
     function vider(){var l=file();if(!l.length)return;base().then(function(db){if(!db)return;l.forEach(function(x){
       var p=[db.collection("a3prog").doc(x.id).set({reperage:x.prog.reperage,quiz:x.prog.quiz,maj:x.t})];
-      if(x.note!=null)p.push(db.collection("notes_a3").doc(x.id).set({note:x.note,reperage:x.prog.reperage,quiz:x.prog.quiz,maj:x.t,direct:1}));
+      /* la meilleure note du duo est gardée : une note plus basse (autre téléphone, épreuve vide) ne remplace jamais une meilleure */
+      if(x.note!=null){var rn=db.collection("notes_a3").doc(x.id);p.push(rn.get().then(function(s){var d=s&&s.exists?s.data():null;if(d&&d.note!=null&&+d.note>=+x.note)return;return rn.set({note:x.note,reperage:x.prog.reperage,quiz:x.prog.quiz,maj:x.t,direct:1})}))}
       Promise.all(p).then(function(){poser(file().filter(function(y){return !(y.id===x.id&&y.t===x.t)}))}).catch(function(){})})})}
     var orig=Storage.prototype.setItem;Storage.prototype.setItem=function(k,v){orig.apply(this,arguments);if(k===K)setTimeout(function(){preparer();vider()},50)};
     setInterval(function(){preparer();vider()},15000);window.addEventListener("online",vider);setTimeout(vider,2000)}

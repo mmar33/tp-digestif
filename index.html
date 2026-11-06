@@ -1258,7 +1258,7 @@ function blocMS(){if(!jeu||!duel||duel.test||!finEnregistree||!egaliteFinale())r
    <div class="sol" style="gap:14px"><div class="qimg"><div class="qctx"><span class="eyebrow">Vous regardez</span><b>${esc(Q.voir)}</b><span class="note">${esc(Q.vue)}</span></div><img src="${Q.img}" alt="${esc(Q.voir)}"></div><div><h3>${esc(Q.q)}</h3>${bas}</div></div></div>`;
 }
 async function enregistrerFin(force){
-  if(!duel||!jeu||(finEnregistree&&!force))return; finEnregistree=true; if(duel.test){if(duel.groupeA==="TEST"&&testE){const mi=resume(jeu);testE.a2=noteDe(mi.tot,PTS_M1+duel.qids.length-(mi.jokers||0)+2,false,false)}rendre();return}
+  if(!duel||!jeu||(finEnregistree&&!force))return; if(duel.statut==="annule")return; finEnregistree=true; if(duel.test){if(duel.groupeA==="TEST"&&testE){const mi=resume(jeu);testE.a2=noteDe(mi.tot,PTS_M1+duel.qids.length-(mi.jokers||0)+2,false,false)}rendre();return}
   const mine=resume(jeu), adv=duel.solo?{tot:mine.tot}:(scores[autre(moi)]||{tot:0});
   const max=PTS_M1+duel.qids.length-(mine.jokers||0)+2;
   let gagne=mine.tot>adv.tot, egal=mine.tot===adv.tot;
@@ -1782,7 +1782,7 @@ function rendrePortail(){if(["hub","profil","inscr","a1","a3","a4","a5","a6","af
 /* ----- état des ateliers d'un groupe ----- */
 function noteA1(gid){if(gid==="TEST"){const e=evals.find(x=>x.evaluateur==="TEST"&&x.statut==="envoyee");return e?+e.total:null}const a=a1docs[gid];if(a&&a.noteProf!=null&&a.noteProf!=="")return +a.noteProf;
   const ev=evals.filter(e=>e.cible===gid&&e.statut==="envoyee");if(!ev.length)return null;
-  return Math.round(ev.reduce((s,e)=>s+(+e.total||0),0)/ev.length*2)/2}
+  return Math.max(...ev.map(e=>+e.total||0))}
 function etatAt(g,id){
   if(!atelierActif(id))return {st:"off"};
   if(id==="a1"){const a=a1docs[g.id]||{}, mes=evals.filter(e=>e.evaluateur===g.id), pend=mes.filter(e=>e.statut!=="envoyee");
@@ -2017,7 +2017,7 @@ function vProfAt(aid){const sid=profSeance||seanceSel||seanceParDefaut(),gs=grou
   if(aid==="a3")profChargerFam(sid);
   if(!gs.length)return `<p class="note">Les groupes ne sont pas encore formés pour cette séance.</p>`;
   const LIBS={fait:"terminé",encours:"en cours",afaire:"à faire"}, B=BESOIN[aid]||{};
-  return `<p class="note" style="margin:0">Séance : ${esc((seances[sid]||{}).nom||"")} (changez-la dans l'onglet « Suivi de la séance »). Atelier ${a.n} · ${esc(titreAt(a))}, en ${esc(B.titre||"sous-groupes")}.${aid==="a6"?" La note de l'atelier 6 est la même pour tout le groupe : la moyenne des deux équipes.":""}${aid==="a3"?` <button class="link" id="profFamMaj">Actualiser le jeu</button>`:""}</p>`+
+  return `<p class="note" style="margin:0">Séance : ${esc((seances[sid]||{}).nom||"")} (changez-la dans l'onglet « Suivi de la séance »). Atelier ${a.n} · ${esc(titreAt(a))}, en ${esc(B.titre||"sous-groupes")}.${aid==="a6"?" La note de l'atelier 6 est la même pour tout le groupe : la meilleure des deux équipes.":""}${aid==="a3"?` <button class="link" id="profFamMaj">Actualiser le jeu</button>`:""}</p>`+
    gs.map(g=>{const sd=subsDe(g.id,aid);const p=phaseSeance(sid),cour=p.phase==="rot"&&atelierDe(g.k,p.r).id===aid;
     const lignes=sd?sd.equipes.map((m,i)=>{const tid=g.id+"-"+aid+"-e"+(i+1),av=profAvancement(aid,g,tid),n=m.length?noteEtu(g,m[0],aid):null;
       return `<tr><td><b>${B.type==="duos"?"Binôme":"Équipe"} ${i+1}</b></td><td class="wrap">${m.map(x=>esc(nomCourt(sid,x))).join(", ")}</td><td><span class="chip ${av.st}">${LIBS[av.st]}</span> <span class="note">${av.txt}</span></td><td class="num"><b>${n!=null?fr(n):"–"}</b></td></tr>`}).join(""):`<tr><td colspan="4" class="note">Sous-groupes pas encore formés.</td></tr>`;
@@ -2062,9 +2062,9 @@ function lignesNotesAt(aid){const sid=seanceProfAt();return equipesAt(aid).map(t
 function vProfNotesAt(aid){if(aid==="a3")profChargerFam(seanceProfAt());const L=lignesNotesAt(aid);
   if(!L.length)return enteteAt(aid)+`<p class="note">Les sous-groupes ne sont pas encore formés pour cette séance.</p>`;
   const cols=L[0].c.map(x=>x[0]),notes=L.filter(l=>l.n!=null).map(l=>l.n),moy=notes.length?notes.reduce((s,x)=>s+x,0)/notes.length:null;
-  return enteteAt(aid)+`<div class="tablebox"><table><tr><th>Groupe</th><th></th><th>Membres</th>${cols.map(c=>`<th>${esc(c)}</th>`).join("")}<th>Note /20${aid==="a6"?" (moyenne du groupe)":""}</th></tr>
+  return enteteAt(aid)+`<div class="tablebox"><table><tr><th>Groupe</th><th></th><th>Membres</th>${cols.map(c=>`<th>${esc(c)}</th>`).join("")}<th>Note /20${aid==="a6"?" (meilleure des 2 équipes)":""}</th></tr>
    ${L.map(l=>`<tr><td><b style="color:${l.t.g.couleur}">${esc(l.t.g.nom)}</b></td><td>${libEq(aid,l.t.i)}</td><td class="wrap">${l.t.m.map(x=>esc(nomCourt(l.sid,x))).join(", ")}</td>${l.c.map(x=>`<td class="num wrap">${esc(x[1])}</td>`).join("")}<td class="num"><b>${l.n!=null?fr(l.n):"–"}</b></td></tr>`).join("")}</table></div>
-   <p class="note">${L.length} ${(BESOIN[aid]||{}).type==="duos"?"binôme(s)":"équipe(s)"} · ${notes.length} noté(s)${moy!=null?` · moyenne ${fr(Math.round(moy*10)/10)} / 20`:""}. Chaque étudiant reçoit la note de son ${(BESOIN[aid]||{}).type==="duos"?"binôme":"équipe"}${aid==="a6"?" (pour l'atelier 6 : la moyenne des deux équipes du groupe)":""}.</p>
+   <p class="note">${L.length} ${(BESOIN[aid]||{}).type==="duos"?"binôme(s)":"équipe(s)"} · ${notes.length} noté(s)${moy!=null?` · moyenne ${fr(Math.round(moy*10)/10)} / 20`:""}. Chaque étudiant reçoit la note de son ${(BESOIN[aid]||{}).type==="duos"?"binôme":"équipe"}${aid==="a6"?" (pour l'atelier 6 : la meilleure des deux équipes du groupe)":""}.</p>
    <div class="row"><button class="btn" data-csvat="${aid}">Copier le tableau par étudiant (pour Excel)</button><button class="btn ghost" data-dlat="${aid}">Télécharger en CSV</button></div>`}
 function csvAt(aid,sep){const L=lignesNotesAt(aid);if(!L.length)return "";const sid=L[0].sid,h=["Seance","Groupe","Sous-groupe","Etudiant",...L[0].c.map(x=>x[0]),"Note /20"],rows=[];
   L.forEach(l=>l.t.m.forEach(e=>{const n=noteEtu(l.t.g,e,aid);rows.push([(seances[sid]||{}).nom||"",l.t.g.nom,libEq(aid,l.t.i),nomLong(sid,e),...l.c.map(x=>x[1]),n!=null?fr(n):""])}));
@@ -2839,8 +2839,8 @@ function a6PtsQuiz(d){const q=d.quiz||{};return Math.round(A6_QUIZ.reduce((s,x)=
 function a6Note(d,force){if(!d||(!d.fini&&!force))return null;const n=a6PtsMissions(d)+a6PtsQuiz(d);return Math.min(20,Math.round(n*2)/2)}
 function a6NoteGroupe(g,force){const sd=subsDe(g.id,"a6");if(!sd)return null;
   const notes=sd.equipes.map((m,i)=>{const tid=g.id+"-a6-e"+(i+1);const d=g.id==="TEST"?((testE&&testE.a6)||{})[tid]:a6docs[tid];return a6Note(d,force&&d&&(d.vuIntro||d.m))});
-  if(g.id==="TEST"){const v=notes.filter(x=>x!=null);return v.length?Math.round(v.reduce((s,x)=>s+x,0)/v.length*10)/10:null}
-  if(notes.some(x=>x==null))return null;return Math.round(notes.reduce((s,x)=>s+x,0)/notes.length*10)/10}
+  if(g.id==="TEST"){const v=notes.filter(x=>x!=null);return v.length?Math.max(...v):null}
+  if(notes.some(x=>x==null))return null;return Math.max(...notes)}
 const a6f=(x,n)=>(+x).toFixed(n==null?1:n).replace(".",",");
 function a6Expliquer(r,s,prec){const t=[];
   if(s.NDFfo>=250)t.push("Assez de fibres longues : les vaches ruminent "+a6f(s.rum)+" h par jour et leur salive ("+Math.round(s.salive)+" L/j) tamponne le rumen.");
@@ -2900,7 +2900,7 @@ function vA6(){const g=monGroupe();if(!g){vue="hub";return vHub()}const t=monEqu
       <div><b>1</b><span><b>Trois missions</b> (environ 6 min chacune). Chaque mission a ses objectifs : essayez de tous les atteindre, en autant d'essais que nécessaire. Mission réussie en 3 essais au plus : 4 points ; en 4 à 6 essais : 3 points ; au-delà : 2 points. Pas réussie : 1 point pour avoir essayé, plus des points pour chaque objectif atteint par votre meilleur essai, moins 1 point après 3 essais sans trouver et 1 point de plus après 6 essais (jamais moins de 1 point). Vous pouvez passer une mission après 3 essais.</span></div>
       <div><b>2</b><span><b>Une prédiction avant chaque simulation</b> : l'indicateur clé va-t-il monter, baisser ou rester stable ? Elle sert à réfléchir et à gagner des badges, <b>elle ne fait jamais perdre de points</b>.</span></div>
       <div><b>3</b><span><b>Le quiz final</b> (environ 8 min) : 20 questions faciles sur la fermentation, 8 points.</span></div></div>
-    <div class="a4bareme">${ico("coche")}<span><b>Notation sur 20 par équipe, volontairement bienveillante</b> : missions 12 points, quiz 8 points. Le but est de comprendre en jouant avec le simulateur : réfléchissez avant chaque essai, car chaque mission perd 1 point si la solution n'est pas trouvée au bout de 3 essais, et 1 point de plus au bout de 6 essais (jamais moins de 1 point). Les deux équipes du groupe ont les mêmes missions ; <b>la note du groupe est la moyenne des deux équipes</b>, et elle s'enregistre toute seule.</span></div>
+    <div class="a4bareme">${ico("coche")}<span><b>Notation sur 20 par équipe, volontairement bienveillante</b> : missions 12 points, quiz 8 points. Le but est de comprendre en jouant avec le simulateur : réfléchissez avant chaque essai, car chaque mission perd 1 point si la solution n'est pas trouvée au bout de 3 essais, et 1 point de plus au bout de 6 essais (jamais moins de 1 point). Les deux équipes du groupe ont les mêmes missions ; <b>la note du groupe est la meilleure des deux équipes</b>, et elle s'enregistre toute seule.</span></div>
     <p><b>Repères</b> : sur l'échelle INRA, un pH moyen de 6,0 ou moins signe une <b>acidose latente (subaiguë)</b>. L'indice de risque d'acidose (IRA) note six critères de la ration de 0 à 2 : en dessous de 0,67 pas de risque, au-delà de 1,33 risque élevé.</p>
     <p class="note">Une seule équipe, plusieurs téléphones : les essais sont partagés. Discutez avant chaque simulation, c'est là que se joue la prédiction. Le simulateur est un modèle pédagogique construit à partir des équations du livre INRA <i>Alimentation des ruminants</i> (2018) et d'essais publiés : il reproduit les tendances, pas une vache réelle.</p>
     <button class="btn pen gros" id="a6go">Commencer la mission 1</button></div>`;
@@ -2931,7 +2931,7 @@ function vA6(){const g=monGroupe();if(!g){vue="hub";return vHub()}const t=monEqu
      <p style="margin:10px 0 0"><b>Note de votre équipe</b></p>
      <div class="fnote">${fr(n)}<small>/20</small></div>
      <div class="fdet">${A6_MISSIONS.map((mi,i)=>`<span>Mission ${i+1} · <b>${a6PtsMission(a6M(d,mi.id),mi)}/4</b></span>`).join("")}<span>Prédictions justes ${p.j}/${p.n} (sans effet sur la note)</span><span>Quiz · <b>${fr(a6PtsQuiz(d))}/8</b></span></div>
-     <div style="margin:12px 0;padding:12px 14px;border:2px solid var(--blue);border-radius:12px;background:var(--blue-soft)"><b>Note de l'atelier pour chacun de vous : ${ng!=null?`${fr(ng)}/20`:(()=>{const v=a6NoteGroupe(g,true);return v!=null?`${fr(v)}/20 (provisoire : l'autre équipe n'a pas encore terminé, sa note partielle est comptée)`:"en attente de l'autre équipe"})()}</b><br><span class="note">C'est la moyenne des notes des 2 équipes de votre groupe : c'est elle qui apparaît dans « Mon relevé de notes ».</span></div>
+     <div style="margin:12px 0;padding:12px 14px;border:2px solid var(--blue);border-radius:12px;background:var(--blue-soft)"><b>Note de l'atelier pour chacun de vous : ${ng!=null?`${fr(ng)}/20`:(()=>{const v=a6NoteGroupe(g,true);return v!=null?`${fr(v)}/20 (provisoire : l'autre équipe n'a pas encore terminé)`:"en attente de l'autre équipe"})()}</b><br><span class="note">C'est la meilleure des notes des 2 équipes de votre groupe : c'est elle qui apparaît dans « Mon relevé de notes ».</span></div>
      <button class="btn pen gros" id="retourHub2">Retour aux ateliers</button></div>`}
   return `${tete}<div class="a1form a4 a6" style="max-width:860px;margin:14px auto">${e!=="intro"&&e!=="fin"?barre:""}${c}</div>`}
 function a6Solution(mi){const sol={m1:"foin long, 50 % de concentré à base de maïs, en ration complète",m2:"foin long, 55 % de concentré à base de maïs, en 4 repas ou en ration complète, avec bicarbonate",m3:"ensilage d'herbe, 55 % de concentré à base de maïs, en 4 repas ou en ration complète, avec bicarbonate"};return sol[mi.id]}
@@ -3320,7 +3320,7 @@ function pfDetail(c,aid){
   if(aid==="a3"&&c.a3){const r=c.a3.reperage,q=c.a3.quiz;return [r?`Repérage ${r.score}/${r.total}`:"",q?`quiz ${q.score}/${q.total}`:"",c.titres.length?`${c.titres.length} famille${c.titres.length>1?"s":""} au jeu`:""].filter(Boolean).join(" · ")}
   if(aid==="a4"&&c.a4.vuIntro)return `Pièces : ${fr(A4_PIECES.reduce((s,p)=>s+a4PtsPiece(p,c.a4[p.id]),0))}/12`+(c.a4.concl?` · conclusion : ${c.a4.concl.toLowerCase()}`:"");
   if(aid==="a5"&&c.a5&&c.a5.a!=null)return `Puzzle 1 : ${fr(+c.a5.a)}/4 · puzzle 2 : ${fr(+c.a5.b)}/4 · Défi foie : ${fr(+c.a5.c)}/12`;
-  if(aid==="a6"&&c.a6.vuIntro){const ok=A6_MISSIONS.filter(mi=>a6M(c.a6,mi.id).ok).length,ne=a6Note(c.a6);return `Note du groupe = moyenne des 2 équipes du groupe`+(ne!=null?` · votre équipe : ${fr(ne)}/20`:"")+` · missions réussies ${ok}/3`+(c.a6.quizFini?` · quiz ${A6_QUIZ.filter(x=>(c.a6.quiz||{})[x.id]===x.b).length}/${A6_QUIZ.length}`:"")}
+  if(aid==="a6"&&c.a6.vuIntro){const ok=A6_MISSIONS.filter(mi=>a6M(c.a6,mi.id).ok).length,ne=a6Note(c.a6);return `Note du groupe = meilleure des 2 équipes du groupe`+(ne!=null?` · votre équipe : ${fr(ne)}/20`:"")+` · missions réussies ${ok}/3`+(c.a6.quizFini?` · quiz ${A6_QUIZ.filter(x=>(c.a6.quiz||{})[x.id]===x.b).length}/${A6_QUIZ.length}`:"")}
   return ""}
 function pfNiveau(xp){let i=0;PF_NIVEAUX.forEach((n,k)=>{if(xp>=n[0])i=k});const cur=PF_NIVEAUX[i],nxt=PF_NIVEAUX[i+1];return {nom:cur[1],suiv:nxt?nxt[1]:null,pct:nxt?Math.round((xp-cur[0])/(nxt[0]-cur[0])*100):100,reste:nxt?nxt[0]-xp:0}}
 function vProfil(){const g=monGroupe();if(!g){vue="hub";return vHub()}pfChargerFamilles(g);
@@ -3637,7 +3637,10 @@ function finDemo(){clearInterval(tick);jeu=null;
   vue="accueil";rendre();toast("Fin de la démo")}
 
 /* ----- atelier 2 : deux duels (manche + revanche), note = moyenne des deux ----- */
-const resA2=tid=>resultats.filter(r=>r.groupe===tid);
+/* un duel annulé (l'autre équipe ne l'a jamais rejoint) ne compte pas dans la note */
+const duelStatut={};let duelStatutEnCours={};
+function duelAnnule(id){if(!id)return false;if(duelStatut[id]===undefined&&!duelStatutEnCours[id]&&db){duelStatutEnCours[id]=1;db.collection("duels").doc(id).get().then(s=>{duelStatut[id]=s&&s.exists?(s.data().statut||""):"";rendrePortail()}).catch(()=>{delete duelStatutEnCours[id]})}return duelStatut[id]==="annule"}
+const resA2=tid=>resultats.filter(r=>r.groupe===tid&&!duelAnnule(r.duel));
 function duelsFaits(g,tid){if(g.id==="TEST")return testE&&testE.a2!=null?2:0;return new Set(resA2(tid).map(r=>r.duel)).size}
 async function lancerDuelEquipes(g){
   if(g.id==="TEST"){partieTest("hasard");Object.assign(duel,{groupeA:"TEST",mascotteA:TEST_G.mascotte,couleurA:TEST_G.couleur,equipes:{A:TEST_G.nom,B:"Adversaire fictif"}});jeu.mascotte=TEST_G.mascotte;jeu.couleur=TEST_G.couleur;rendre();return}
@@ -3682,8 +3685,8 @@ function vA5(){const g=monGroupe();if(!g){vue="hub";return vHub()}const duos=duo
      <p style="margin:10px 0 0"><b>Note sur 20</b> : puzzle 1 (4 pts) + puzzle 2 (4 pts) + Défi foie (12 pts). Le chrono de l'atelier vous guide d'une étape à l'autre.</p></div>
     <div class="card"><h3>Les binômes</h3><div class="duolist">${duos.map(d=>{const n=g.id==="TEST"?((testE.a5||{})[d.id]):(notesA5.find(x=>x.id===d.id)||{}).note;const moiD=t&&t.id===d.id;
       return `<div class="duo ${moiD?"moi":""}"><span class="dn">${d.num}</span><b>${esc(d.noms.join(" & "))}${moiD?" (vous)":""}<small style="display:block;font-weight:500;opacity:.7">corrige le binôme ${corrige(d).num}</small></b>${n!=null?`<span class="chip fait">${ico("coche")} note reçue</span>`:""}</div>`}).join("")}</div></div>
-    ${(()=>{const n=t&&g.id!=="TEST"?notesA5.find(x=>x.id===t.id):null;return n?`<div class="card" style="border-left:6px solid var(--ok)"><h3 style="margin-top:0">Atelier terminé ✓</h3><p style="margin:0">Votre fiche est validée et votre note est enregistrée : <b>${fr(+n.note||0)} / 20</b> (puzzle 1 : ${fr(+n.a||0)}/4 · puzzle 2 : ${fr(+n.b||0)}/4 · défi : ${fr(+n.c||0)}/12). L'atelier ne peut pas être refait.</p></div>`:""})()}
-    ${t&&g.id!=="TEST"&&notesA5.find(x=>x.id===t.id)?"":`<div class="card"><h3>Ouvrir l'atelier</h3><p class="note" style="margin-top:0">Une tablette par binôme : votre binôme et celui qui vous corrige sont déjà remplis. Aux corrections, vous échangez les tablettes.</p>
+    ${(()=>{const n=t&&g.id!=="TEST"?notesA5.find(x=>x.id===t.id&&+x.note>0):null;return n?`<div class="card" style="border-left:6px solid var(--ok)"><h3 style="margin-top:0">Atelier terminé ✓</h3><p style="margin:0">Votre fiche est validée et votre note est enregistrée : <b>${fr(+n.note||0)} / 20</b> (puzzle 1 : ${fr(+n.a||0)}/4 · puzzle 2 : ${fr(+n.b||0)}/4 · défi : ${fr(+n.c||0)}/12). L'atelier ne peut pas être refait.</p></div>`:""})()}
+    ${t&&g.id!=="TEST"&&notesA5.find(x=>x.id===t.id&&+x.note>0)?"":`<div class="card"><h3>Ouvrir l'atelier</h3><p class="note" style="margin-top:0">Une tablette par binôme : votre binôme et celui qui vous corrige sont déjà remplis. Aux corrections, vous échangez les tablettes.</p>
      <button class="btn pen gros" id="a5ouvrir">Ouvrir le Défi foie</button></div>`}</div>`}
 function brancherA5(){if(vue!=="a5")return;const b=$("#a5ouvrir");if(b)b.addEventListener("click",()=>{const g=monGroupe(),t=monEquipe(g,"a5");location.href=lienA5(g,t?t.id:"")})}
 
@@ -3714,7 +3717,7 @@ function sousGroupes(g,aid){const B=BESOIN[aid],m=g.membres||[],N=m.length;if(!N
 function noteEtuCalc(g,eid,aid){const sd=subsDe(g.id,aid);if(!sd)return null;const i=sd.equipes.findIndex(e=>e.includes(eid));if(i<0)return null;const tid=g.id+"-"+aid+"-e"+(i+1);
   if(aid==="a1")return noteA1Equipe(tid);
   if(aid==="a2"){if(g.id==="TEST")return testE&&testE.a2!=null?testE.a2:null;const parDuel={};resA2(tid).forEach(r=>parDuel[r.duel]=+r.note);const v=Object.values(parDuel);
-    if(!v.length)return null;if(v.length<2&&!atelierPasse(g,"a2"))return null;return Math.round(v.reduce((s,x)=>s+x,0)/v.length*2)/2}
+    if(!v.length)return null;if(v.length<2&&!atelierPasse(g,"a2"))return null;return Math.max(...v)}
   if(aid==="a4")return a4Note(g.id==="TEST"?((testE&&testE.a4)||{})[tid]:a4docs[tid]);
   if(aid==="a3"){if(g.id==="TEST")return testE&&testE.a3&&testE.a3[tid]!=null?testE.a3[tid]:null;const n=notesA3.find(x=>x.id===tid);return n?+n.note:null}
   if(aid==="a6")return a6NoteGroupe(g);

@@ -1,6 +1,9 @@
 <!DOCTYPE html>
 <html lang="fr">
-<head><script src="../firebase-config.js"></script><script src="../vendor/firebase-app-compat.js"></script><script src="../vendor/firebase-firestore-compat.js"></script><script src="../adapter.js"></script>
+<head><script>
+/* tablette passée à un nouveau binôme : on repart d'un chrono et d'une fiche vides (sinon le chrono du groupe précédent, déjà fini, validait une fiche vide à 0) */
+(function(){try{var duo=new URLSearchParams(location.search).get("duo");if(!duo)return;if(localStorage.getItem("a5-duo-tablette")!==duo){["chrono-foie","corr-en-cours","defi-foie-score","binome-note","binome-info","correction-foie-recap"].forEach(function(k){localStorage.removeItem(k)});localStorage.setItem("a5-duo-tablette",duo)}}catch(e){}})();
+</script><script src="../firebase-config.js"></script><script src="../vendor/firebase-app-compat.js"></script><script src="../vendor/firebase-firestore-compat.js"></script><script src="../adapter.js"></script>
 <script>
 /* Mode local : remplace les services claude.ai (db, user, downloads) quand l'application
    est ouverte hors de claude.ai (fichier, Moodle, serveur web). Les données sont enregistrées
@@ -1309,10 +1312,10 @@ body.enc .auto-val{display:none}
   var dbP=null;function base(){if(!dbP)dbP=(window.claude&&window.claude.use?window.claude.use("db"):Promise.resolve(null)).catch(function(){return null});return dbP}
   function vider(){var l=file().filter(function(x){return !x.ok});if(!l.length)return;base().then(function(db){if(!db)return;l.forEach(function(x){
     if(String(x.id).indexOf("TEST")===0)return;
-    /* la première fiche enregistrée compte : une autre tablette ne peut plus l'écraser (sinon la note alternait entre deux valeurs) */
+    /* la meilleure fiche du binôme est gardée : une fiche moins bonne (autre tablette, fiche vide) ne l'écrase jamais */
     var marquer=function(){var f=file();f.forEach(function(y){if(y.id===x.id&&y.t===x.t)y.ok=1});poser(f)};
     var ref=db.collection("notes_a5").doc(x.id);
-    ref.get().then(function(s){if(s&&s.exists){var d=s.data()||{};if(d.maj&&d.maj!==x.t){marquer();return}}
+    ref.get().then(function(s){if(s&&s.exists){var d=s.data()||{};if(d.note!=null&&+d.note>=+x.note&&d.maj!==x.t){marquer();return}}
       return ref.set({note:x.note,a:x.a,b:x.b,c:x.c,correcteur:x.correcteur||"",maj:x.t}).then(marquer)}).catch(function(){})})})}
   Storage.prototype.setItem=function(k,v){orig.apply(this,arguments);if(k!==K||!duos)return;
     try{var list=JSON.parse(v||"[]"),r=list[list.length-1];if(!r)return;var d=trouver(r.noted)||moiDuo();if(!d)return;
@@ -1327,8 +1330,8 @@ body.enc .auto-val{display:none}
       '<p style="font-size:16px;opacity:.85;margin:0 0 18px">L’atelier ne peut pas être refait.</p><a href="../index.html" style="display:inline-block;background:#fff;color:#1d1f1c;padding:12px 22px;border-radius:12px;font-weight:700;text-decoration:none">Retour au portail des ateliers</a></div>';
     document.body.appendChild(o)}
   function verifierFini(){if(!duos||!moi||String(moi).indexOf("TEST")===0)return;
-    var loc=file().filter(function(x){return x.id===moi})[0];if(loc&&!window.__a5enCours){verrouiller(loc);return}
-    base().then(function(db){if(!db)return;db.collection("notes_a5").doc(moi).get().then(function(s){if(s&&s.exists&&!window.__a5enCours)verrouiller(s.data())}).catch(function(){})})}
+    var loc=file().filter(function(x){return x.id===moi&&+x.note>0})[0];if(loc&&!window.__a5enCours){verrouiller(loc);return}
+    base().then(function(db){if(!db)return;db.collection("notes_a5").doc(moi).get().then(function(s){if(s&&s.exists&&+(s.data()||{}).note>0&&!window.__a5enCours)verrouiller(s.data())}).catch(function(){})})}
   verifierFini();
 
   /* lien de retour vers le portail */
