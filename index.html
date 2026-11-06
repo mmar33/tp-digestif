@@ -2271,7 +2271,12 @@ function phaseSeance(sid){const s=seances[sid],d=deroules[sid],H0=debutSeance(s)
   /* pause décidée par un encadrant : la rotation d.r démarre à la fin de la pause */
   if(d&&d.pauseJusqu&&Date.now()<d.pauseJusqu)return {phase:"pause",r:d.r,reste:d.pauseJusqu-Date.now(),prets:{}};
   const prets={};groupesDe(sid).forEach(g=>{if(d&&(g.pret===d.r||(d.r>=0&&d.r<NB_ROT&&groupeAFini(g,atelierDe(g.k,d.r).id))))prets[g.id]=1});
-  if(d&&d.r>=0){const R=dureeRot(s);return {phase:"rot",r:d.r,reste:Math.max(0,R-(Date.now()-d.t)),prets}}
+  if(d&&d.r>=0){const R=dureeRot(s);let r=d.r,t=d.t;
+    /* si le changement d'atelier n'a pas pu être enregistré (base indisponible), on avance à l'heure prévue, au bout de 1 min de dépassement */
+    while(r<NB_ROT&&Date.now()-t>=R+60e3){t+=R;r++}
+    if(r>=NB_ROT)return {phase:"fin"};
+    if(r!==d.r){const p2={};groupesDe(sid).forEach(g=>{if(g.pret===r)p2[g.id]=1});return {phase:"rot",r,reste:Math.max(0,R-(Date.now()-t)),prets:p2}}
+    return {phase:"rot",r:d.r,reste:Math.max(0,R-(Date.now()-d.t)),prets}}
   if(groupesDe(sid).length)return {phase:"prepa",prets};
   if(!H0&&tirageManuel(s))return {phase:"inscription",reste:null,manuel:true};
   if(H0&&Date.now()<H0)return {phase:"inscription",reste:H0-Date.now()};
@@ -2293,6 +2298,11 @@ document.addEventListener("click",ev=>{const b=ev.target.closest&&ev.target.clos
       if(aid==="a3"&&g){const p=phaseSeance(g.seance),fid=(g.id+"-fam-R"+(p.r!=null?p.r:0)).replace(/[^A-Za-z0-9-]/g,"");const duos=duosA3(g).map(d=>({id:d.id,nom:d.nom}));
         await db.collection("familles").doc(fid).set({groupe:g.id,seance:g.seance,statut:"attente",duos,ordre:[],mains:{},poses:{},pioche:[],tour:null,evt:{n:0},journal:[],duree:famDuree(g),cree:Date.now()})}
       LS.set(cle,"zero");rendre();toast("Atelier remis à zéro")}catch(e){toast("Remise à zéro impossible, réessayez")}},"","Annuler")});
+/* fin du TP : consigne en gros et en rouge */
+function finRouge(){return `<div style="margin:0 0 16px;padding:22px 20px;border:4px solid #c0262d;border-radius:18px;background:#fbe9e8;color:#c0262d;text-align:center">
+  <div style="font-size:clamp(26px,6vw,40px);font-weight:800;line-height:1.15">Vous avez terminé !</div>
+  <div style="font-size:clamp(20px,4.6vw,28px);font-weight:800;margin-top:10px;line-height:1.3">NE FERMEZ PAS l'application<br>NE RECHARGEZ PAS la page<br>VENEZ VOIR LES ENSEIGNANTS</div>
+  <div style="font-size:17px;color:#7a1a1e;margin-top:10px">Vos notes sont peut-être encore sur ce téléphone : un enseignant doit vérifier qu'elles sont bien envoyées.</div></div>`}
 /* consigne « changer d'écran » affichée sous l'atelier en cours */
 function aideEcranBase(a){return aideEcran(Object.assign({},a,{id:"_"+a.id}))}
 function aideEcran(a){if(!a)return "";const risque=a.id==="a3"?"<b>Un seul téléphone ou tablette par duo</b> pour tout l'atelier (jeu et évaluation), de préférence le plus grand écran du duo. Si vous voulez changer d'écran, faites-le avant de commencer l'évaluation 3D ou après l'avoir validée, jamais pendant.":a.id==="a5"?"Pendant le <b>Défi foie</b>, ne changez pas d'appareil en cours d'étape : votre progression serait perdue. Changez avant de commencer ou après avoir validé votre fiche.":"";
@@ -2453,9 +2463,9 @@ function vHub(){
        ${app?(sd?`<p style="margin:12px 0 4px">Vous êtes dans <b>${esc(t?t.nom.split(" · ")[0]:"?")}</b> : ${t?t.membres.map(m=>esc(nomCourt(g.seance,m))).join(", "):""}.</p><button class="btn pen gros" data-at="${a.id}">${e.st==="fait"?"Revoir l'atelier":"Ouvrir l'atelier"}</button>`
          :`<p style="margin:12px 0 4px">Cet atelier se fait en <b>${BESOIN[a.id].titre}</b>.</p><button class="btn pen gros" id="repartir" data-ra="${a.id}">Former les ${BESOIN[a.id].type==="duos"?"duos":"équipes"}</button>`)
          :`<p class="note" style="margin-top:10px">Cet atelier se déroule hors de l'application : suivez les consignes sur la table.</p>`}
-       ${choixApresPause(g,a)}${aideEcran(a)}${t&&g.id!=="TEST"?`<p class="note" style="margin:10px 0 0">Code de votre ${(BESOIN[a.id]||{}).type==="duos"?"binôme":"équipe"} (à donner à l'enseignant si vous devez refaire l'atelier) : <b>${codeEquipe(t.id)}</b></p>`:""}<div class="pretbox"><span>Changement au plus tard dans <b id="cptRot">${fmt(p.reste)}</b> · ${gs.filter(x=>p.prets[x.id]).length}/${gs.length} groupes prêts</span>
+       ${p.r===NB_ROT-1&&(pret||e.st==="fait")?finRouge():""}${choixApresPause(g,a)}${aideEcran(a)}${t&&g.id!=="TEST"?`<p class="note" style="margin:10px 0 0">Code de votre ${(BESOIN[a.id]||{}).type==="duos"?"binôme":"équipe"} (à donner à l'enseignant si vous devez refaire l'atelier) : <b>${codeEquipe(t.id)}</b></p>`:""}<div class="pretbox"><span>Changement au plus tard dans <b id="cptRot">${fmt(p.reste)}</b> · ${gs.filter(x=>p.prets[x.id]).length}/${gs.length} groupes prêts</span>
        <button class="btn ${pret?"ghost":"blue"}" id="pretChanger" ${pret?"disabled":""}>${pret?"Prêts à changer ✓":"Atelier terminé : prêts à changer"}</button></div></div>`}}
-  else if(p.phase==="fin")centre=`<div class="maint"><span class="eyebrow">Séance terminée</span><h2>Fin des ateliers</h2><p>${pendEq?"<b>Dernière mission : évaluez une maquette (atelier 1). Elle compte dans votre note !</b>":b.complet?"Toutes vos notes sont prêtes.":"Les dernières notes arrivent dès que toutes les évaluations sont faites."}</p></div>`;
+  else if(p.phase==="fin")centre=finRouge()+`<div class="maint"><span class="eyebrow">Séance terminée</span><h2>Fin des ateliers</h2><p>${pendEq?"<b>Dernière mission : évaluez une maquette (atelier 1). Elle compte dans votre note !</b>":b.complet?"Toutes vos notes sont prêtes.":"Les dernières notes arrivent dès que toutes les évaluations sont faites."}</p></div>`;
   else centre=`<div class="maint"><h2>Formation des groupes…</h2></div>`;
   const parcours=test?ATELIERS:(p.phase==="rot"||p.phase==="fin")?Array.from({length:NB_ROT},(_,r)=>atelierDe(g.k,r)):[];
   const cartes=parcours.map((a,r)=>{const app=AVEC_CONTENU.includes(a.id)&&atelierActif(a.id), e=etatAt(g,a.id), cour=!test&&p.phase==="rot"&&p.r===r, passe=!test&&(p.phase==="fin"||(p.phase==="rot"&&r<p.r));
