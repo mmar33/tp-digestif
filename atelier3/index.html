@@ -2669,6 +2669,13 @@ boot();
   try{duos=JSON.parse(q.get("duos")||"null")}catch(e){}
   if(!duos||!duos.length)return;
   var K="tp-digestif-eval-v1";
+  /* évaluation déjà notée pour ce duo (sur ce téléphone ou un autre) : on ne peut plus la refaire, même après un rechargement */
+  (function(){var duo=q.get("duo");if(!duo||String(duo).indexOf("TEST")===0||q.get("eval")===null)return;
+    var dbV=(window.claude&&window.claude.use?window.claude.use("db"):Promise.resolve(null));
+    dbV.then(function(db){if(!db)return;return db.collection("notes_a3").doc(duo).get().then(function(s){if(!s||!s.exists)return;var d=s.data()||{};
+      var o=document.createElement("div");o.id="a3fini";o.style.cssText="position:fixed;inset:0;z-index:99999;background:rgba(20,22,20,.94);color:#fff;display:flex;align-items:center;justify-content:center;padding:20px;font-family:system-ui,sans-serif";
+      o.innerHTML='<div style="max-width:520px;text-align:center"><div style="font-size:52px">✓</div><h2 style="margin:6px 0 10px;font-size:26px">Évaluation terminée pour votre duo</h2><p style="font-size:18px;margin:0 0 8px">Votre note est enregistrée'+(d.note!=null?' : <b>'+String(d.note).replace(".",",")+' / 20</b>':'')+'.</p><p style="font-size:16px;opacity:.85;margin:0 0 18px">L’évaluation ne peut pas être refaite.</p><a href="../index.html" style="display:inline-block;background:#fff;color:#1d1f1c;padding:12px 22px;border-radius:12px;font-weight:700;text-decoration:none">Retour au portail des ateliers</a></div>';
+      var poser=function(){if(!document.getElementById("a3fini"))document.body.appendChild(o)};poser();setInterval(poser,1000)})}).catch(function(e){console.warn("verrou a3",e)})})();
   /* envoi direct des notes au serveur, sans attendre le retour sur le portail (téléphone éteint, oubli…) */
   if(duos){var FILE="a3fileEnvoi",envoyes={};
     function noteDe(b){if(!b||!b.reperage||!b.reperage.total||!b.quiz||b.quiz.score==null||!b.quiz.total)return null;return Math.round((b.reperage.score/b.reperage.total*10+b.quiz.score/b.quiz.total*10)*10)/10}

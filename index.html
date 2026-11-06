@@ -3626,6 +3626,11 @@ let inscrEnvoi=false;
 function ouvrirAtelier(aid){const g=monGroupe();if(!g)return;
   if(!subsDe(g.id,aid)){creerSousGroupes(g).then(()=>ouvrirAtelier(aid));return}
   const t=monEquipe(g,aid);if(!t){toast("Vous n'êtes dans aucune équipe de cet atelier");return}
+  /* atelier terminé pour le groupe (sa rotation est passée) : plus personne ne peut le relancer.
+     Seule exception : l'atelier 1 pour une équipe qui doit encore évaluer une maquette (premier groupe, évaluation en fin de séance). */
+  if(g.id!=="TEST"&&moiE&&atelierPasse(g,aid)&&!(aid==="a1"&&!evals.some(e=>e.evaluateur===t.id&&e.statut==="envoyee"))){
+    const n=noteEtu(g,moiE.eid,aid);const at=ATELIERS.find(x=>x.id===aid)||{n:"",titre:""};
+    modale("Atelier terminé",`L'atelier ${at.n} · ${esc(titreAt(at))} est terminé pour votre groupe${n!=null?` : votre note est <b>${fr(n)} / 20</b>`:""}. Il ne peut pas être relancé.`,"Compris",()=>{},"","Fermer");return}
   if(aid==="a1"){ctxEquipe=t;vue="a1";a1Form=null;a1Photo=null;if(!(a1docs[t.id]||{}).debut){a1docs[t.id]=Object.assign({},a1docs[t.id],{debut:Date.now()});ecrire("a1",t.id,{debut:Date.now()},"set")}rendre();window.scrollTo(0,0);return}
   if(aid==="a2"){if(duelsFaits(g,t.id)>=2){toast("Les deux duels sont joués");return}proposerDemoA2(g,t);return}
   if(aid==="a3"){vue="a3";rendre();window.scrollTo(0,0)}
