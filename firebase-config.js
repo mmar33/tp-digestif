@@ -4,7 +4,7 @@
    2. Choisissez le code de l'espace encadrants.
    ============================================================ */
 window.APP_CONFIG = {
-  codeEncadrant: "602",
+  codeEncadrant: "760",
   firebase: {
     apiKey: "AIzaSyBd08xdcTOUjAL8qFpE6WBL9pO7tLh2dyw",
     authDomain: "tp-digestif-unilasalle.firebaseapp.com",
