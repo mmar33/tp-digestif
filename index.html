@@ -3761,9 +3761,11 @@ function ouvrirAtelier(aid){const g=monGroupe();if(!g)return;
 /* ----- atelier 2 : entraînement d'une minute pour apprendre à toucher la planche, proposé avant le premier duel ----- */
 let demoDepuisA2=false;
 async function proposerDemoA2(g,t){
-  if(g.id==="TEST"||duelsFaits(g,t.id)>0||LS.get("demoA2_"+t.id,false)){lancerDuelEquipes(g);return}
-  /* un duel déjà commencé pour ce groupe : on le reprend sans rien proposer */
-  try{const p=phaseSeance(g.seance),id=(g.id+"-R"+(p.r!=null?p.r:0)+"-D1").replace(/[^A-Za-z0-9-]/g,"");const sn=await db.collection("duels").doc(id).get();if(sn&&sn.exists){lancerDuelEquipes(g);return}}catch(e){}
+  if(duelsFaits(g,t.id)>0||LS.get("demoA2_"+t.id,false)){lancerDuelEquipes(g);return}
+  /* duel déjà en cours de jeu (téléphone changé en plein duel) : on le reprend sans essai.
+     Si l'autre équipe a seulement ouvert le duel et attend, cette équipe fait quand même son essai. */
+  if(g.id!=="TEST")try{const p=phaseSeance(g.seance),id=(g.id+"-R"+(p.r!=null?p.r:0)+"-D1").replace(/[^A-Za-z0-9-]/g,"");const sn=await db.collection("duels").doc(id).get();
+    if(sn&&sn.exists){const d=sn.data()||{};if(d.statut&&d.statut!=="attente"){lancerDuelEquipes(g);return}}}catch(e){}
   /* consignes à valider (grand écran, Barone interdit sauf emprunt), puis essai de clic obligatoire, non noté */
   document.querySelectorAll(".modale").forEach(x=>x.remove());
   const m=document.createElement("div");m.className="modale";m.id="a2regles";m.setAttribute("role","dialog");m.setAttribute("aria-modal","true");
