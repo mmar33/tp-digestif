@@ -1784,10 +1784,19 @@ function initPortail(){
   db.collection("subs").onSnapshot(s=>{subsDocs={};s.docs.forEach(d=>subsDocs[d.id]=d.data());rendrePortail()},()=>{});
   db.collection("notes_a3").onSnapshot(s=>{notesA3=s.docs.map(d=>Object.assign({id:d.id},d.data()));rendrePortail()},()=>{});
   db.collection("config").doc("ateliers").onSnapshot(s=>{if(s.exists)cfgAt=Object.assign({actifs:{a1:true,a2:true},titres:{}},s.data());rendrePortail()},()=>{});
-  db.collection("duels").where("statut","==","en_cours").onSnapshot(s=>{duelsEnCours=s.docs.map(x=>Object.assign({id:x.id},x.data()));if(vue==="prof")rendre()},()=>{});
+  db.collection("duels").where("statut","==","en_cours").onSnapshot(s=>{duelsEnCours=s.docs.map(x=>Object.assign({id:x.id},x.data()));if(vue==="prof")rendrePortail()},()=>{});
   viderFile();
 }
-function rendrePortail(){if(["hub","profil","inscr","a1","a3","a4","a5","a6","affiche","repartition","prof","accueil"].includes(vue)&&!document.querySelector(".modale")&&!(vue==="a1"&&a1Form)&&!(vue==="inscr")&&!(vue==="rejoindre")&&!(vue==="prof"&&grpEdit))rendre()}
+/* pendant qu'on tape (code encadrant, nom, note…), les mises à jour de la base ne redessinent plus l'écran :
+   sinon le champ est recréé, le clavier du téléphone se ferme et se rouvre ; on redessine en sortant du champ */
+let saisieT=0;["focusin","input","keydown"].forEach(t=>document.addEventListener(t,()=>{saisieT=Date.now()},true));
+function saisieEnCours(){const a=document.activeElement;if(!a||a===document.body)return false;if(Date.now()-saisieT>15000)return false;
+  if(a.tagName==="TEXTAREA")return true;
+  return a.tagName==="INPUT"&&!a.readOnly&&!/^(button|submit|checkbox|radio|range|file|color)$/i.test(a.type||"")}
+let portailDiffere=false;
+document.addEventListener("focusout",()=>{if(portailDiffere)setTimeout(()=>{if(!saisieEnCours()&&portailDiffere){portailDiffere=false;rendrePortail()}},250)});
+setInterval(()=>{if(portailDiffere&&!saisieEnCours()){portailDiffere=false;rendrePortail()}},3000);
+function rendrePortail(){if(saisieEnCours()){portailDiffere=true;return}if(["hub","profil","inscr","a1","a3","a4","a5","a6","affiche","repartition","prof","accueil"].includes(vue)&&!document.querySelector(".modale")&&!(vue==="a1"&&a1Form)&&!(vue==="inscr")&&!(vue==="rejoindre")&&!(vue==="prof"&&grpEdit))rendre()}
 
 /* ----- état des ateliers d'un groupe ----- */
 function noteA1(gid){if(gid==="TEST"){const e=evals.find(x=>x.evaluateur==="TEST"&&x.statut==="envoyee");return e?+e.total:null}const a=a1docs[gid];if(a&&a.noteProf!=null&&a.noteProf!=="")return +a.noteProf;
@@ -1908,13 +1917,24 @@ function evalRecueA1(t){if(!t||String(t.id).startsWith("TEST"))return "";const e
      <p style="margin:0 0 10px"><b>Notée par</b> : ${mem?mem.map(x=>esc(etu(t.seance,x))).join(", "):"chargement…"}${gr?` <span class="note">(${esc(gr.nom)})</span>`:""}</p>
      <div class="evgrid">${photoSrc(e)?`<a href="${photoSrc(e)}" target="_blank" rel="noopener"><img src="${photoSrc(e)}" alt="Photo de votre maquette"></a>`:"<span class='note'>pas de photo</span>"}
       <div style="min-width:0;overflow-x:auto"><table class="mini" style="width:100%">${CRITERES.map(c=>`<tr><td class="wrap">${esc(c.titre)}</td><td class="num">${c.liste?(e.portions||[]).length:(e.pts||{})[c.id]}/${c.max}</td><td class="wrap">${esc((e.coms||{})[c.id]||"")}</td></tr>`).join("")}</table>${e.final?`<p style="margin:8px 0 0"><b>Commentaire final</b> : ${esc(e.final)}</p>`:""}</div></div></div>`}).join("")}
+/* atelier 1 : consigne de taille à valider avant de commencer (une fois par équipe) */
+function popupTailleA1(id){if(LS.get("a1taille_"+id,false)||document.getElementById("a1taille"))return;
+  const m=document.createElement("div");m.className="modale";m.id="a1taille";m.setAttribute("role","dialog");m.setAttribute("aria-modal","true");
+  m.innerHTML=`<div class="mbox" style="text-align:center"><div style="font-size:56px;line-height:1">📏</div><h2 style="margin:6px 0 10px">Avant de modeler : la taille</h2>
+    <p style="font-size:22px;line-height:1.4;margin:0 0 10px"><b>Environ 5 à 10 cm par portion</b></p>
+    <p style="margin:0 0 6px">Les 7 portions forment un seul ensemble <b>compact</b>, d'une seule couleur, qui tient sur la table et se manipule facilement.</p>
+    <p class="note" style="margin:0">Cette consigne compte dans la note (« Respect des consignes de réalisation »).</p>
+    <div class="row" style="justify-content:center;margin-top:18px"><button class="btn pen gros" id="a1tailleOK">J'ai bien lu : 5 à 10 cm par portion</button></div></div>`;
+  document.body.appendChild(m);const b=m.querySelector("#a1tailleOK");b.addEventListener("click",()=>{LS.set("a1taille_"+id,true);m.remove();rendre()});b.focus()}
 function vA1(){
   const g=monGroupe(); if(!g){vue="hub";return vHub()}
   const a=a1docs[g.id]||{}, mes=evals.filter(e=>e.evaluateur===g.id), pend=mes.find(e=>e.statut!=="envoyee"), faites=mes.filter(e=>e.statut==="envoyee");
   const etape=!a.maquette?1:pend?3:faites.length?4:2;
+  if(etape===1&&!LS.get("a1taille_"+g.id,false))setTimeout(()=>popupTailleA1(g.id),250);
   const pas=[["Modeler",1],["Maquette terminée",2],["Évaluer une maquette",3]].map(([t,n])=>`<span class="pas ${etape>n?"fait":etape===n||(n===3&&etape===4)?"ici":""}"><i>${etape>n||(n===3&&etape===4)?ico("coche"):n}</i>${t}</span>`).join("<span class='trait'></span>");
   let corps="";
   if(etape===1)corps=`<div class="a1grid"><div class="card fiche">
+     <div style="border:3px solid var(--rouge,#c0392b);border-radius:14px;padding:12px 14px;margin:0 0 14px;background:#fff4f2;font-size:18px;line-height:1.4">📏 <b>Taille demandée : environ 5 à 10 cm par portion</b>, soit un modèle <b>compact</b> qui tient sur la table et se manipule facilement. Une maquette trop grande ou trop petite perd le point « Respect des consignes ».</div>
      <h3>Objectif</h3><p>Réaliser une maquette en trois dimensions du <b>côlon ascendant du cheval</b> pour comprendre l'enchaînement des portions, leur disposition dans l'espace et la forme des courbures.</p>
      <h3>Les 7 structures, dans l'ordre</h3><div class="segs">${SEGMENTS.map((s,i)=>`<span class="seg ${s.startsWith("Courbure")?"courb":""}"><i>${i+1}</i>${s}</span>`).join(`<span class="fl">→</span>`)}</div>
      <h3>Consignes</h3><ul class="rlist small">
@@ -2028,7 +2048,7 @@ function vProfA1(){
 }
 /* ----- suivi par atelier (ateliers 3 à 6) dans l'espace encadrants ----- */
 let profFam={};
-function profChargerFam(sid){if(!db||!sid||profFam[sid])return;profFam[sid]={docs:[]};db.collection("familles").where("seance","==",sid).get().then(s=>{profFam[sid]={docs:s.docs.map(d=>d.data()),t:Date.now()};if(vue==="prof")rendre()}).catch(()=>{})}
+function profChargerFam(sid){if(!db||!sid||profFam[sid])return;profFam[sid]={docs:[]};db.collection("familles").where("seance","==",sid).get().then(s=>{profFam[sid]={docs:s.docs.map(d=>d.data()),t:Date.now()};if(vue==="prof")rendrePortail()}).catch(()=>{})}
 function profAvancement(aid,g,tid){
   if(aid==="a3"){const n=notesA3.find(x=>x.id===tid),pr=a3prog[tid]||{},src=n||pr,fam=new Set();((profFam[g.seance]||{}).docs||[]).forEach(p=>((p.poses||{})[tid]||[]).forEach(f=>fam.add(f)));
     const ev=[src.reperage?`repérage ${src.reperage.score}/${src.reperage.total}`:"",src.quiz?`quiz ${src.quiz.score}/${src.quiz.total}`:""].filter(Boolean).join(", ");
@@ -3587,7 +3607,7 @@ function reabonner(){if(!db)return;const c=portee();if(c===aboCle)return;aboCle=
     S(W("resultats"),coll("resultats",d=>{resultats=d.map(x=>Object.assign({},x.data()))}));
     S(Q("secours"),coll("secours",d=>{secoursDocs={};d.forEach(x=>secoursDocs[x.id]=x.data())}));
     S(Q("notes_manuelles"),coll("nm",d=>{notesManu={};d.forEach(x=>notesManu[x.id]=x.data())}));
-    S(db.collection("duels").where("statut","==","en_cours"),s=>{duelsEnCours=s.docs.map(x=>Object.assign({id:x.id},x.data()));if(vue==="prof")rendre()});
+    S(db.collection("duels").where("statut","==","en_cours"),s=>{duelsEnCours=s.docs.map(x=>Object.assign({id:x.id},x.data()));if(vue==="prof")rendrePortail()});
     return}
   if(c.startsWith("acc:")){const sid=c.slice(4);if(!sid)return;
     S(db.collection("groupes").where("seance","==",sid),coll("groupes",d=>{groupes=d.map(x=>Object.assign({id:x.id},x.data()))}));
