@@ -66,20 +66,22 @@
     var b=document.createElement("button");b.id="signalBtn";b.type="button";b.textContent="⚠️ Signaler";b.title="Signaler un problème aux encadrants";b.setAttribute("aria-label","Signaler un problème aux encadrants");
     b.style.cssText="position:fixed;left:8px;bottom:60px;z-index:60;font:600 12px system-ui,sans-serif;padding:7px 10px;opacity:.92;border-radius:999px;border:2px solid #b3541e;background:#fff7ef;color:#7a3410;box-shadow:0 2px 8px rgba(0,0,0,.15);cursor:pointer";
     b.onclick=ouvrir;document.body.appendChild(b)}
-  function ouvrir(){var c=ctx();var o=document.createElement("div");o.id="signalFen";
-    o.style.cssText="position:fixed;inset:0;z-index:80;background:rgba(0,0,0,.45);display:grid;place-items:center;padding:16px";
-    o.innerHTML='<div style="background:#fff;color:#222;border-radius:16px;max-width:520px;width:100%;padding:18px;font:15px system-ui,sans-serif;display:grid;gap:10px">'+
+  function ouvrir(){var c=ctx();var ecran="";try{ecran=(document.body.innerText||"").replace(/\s+/g," ").slice(0,900)}catch(e){}var o=document.createElement("div");o.id="signalFen";
+    o.style.cssText="box-sizing:border-box;position:fixed;inset:0;z-index:80;background:rgba(0,0,0,.45);display:grid;place-items:center;padding:16px";
+    o.innerHTML='<div style="box-sizing:border-box;background:#fff;color:#222;border-radius:16px;max-width:520px;width:100%;max-height:92vh;overflow:auto;padding:18px;font:15px system-ui,sans-serif;display:grid;gap:10px">'+
       '<b style="font-size:18px">Signaler un problème</b>'+
       '<p style="margin:0;color:#555">Décrivez ce qui ne va pas : une réponse juste comptée fausse (ou l\'inverse), un écran bloqué, une question mal posée… Les encadrants reçoivent votre message avec l\'état de votre atelier, pour corriger la note si besoin.</p>'+
       (c.atelier?'<p style="margin:0"><b>Atelier :</b> '+String(c.atelierNom||c.atelier)+(c.groupe?' · <b>Groupe :</b> '+String(c.groupe):"")+'</p>':"")+
-      '<textarea id="signalTxt" rows="5" style="font:inherit;padding:10px;border-radius:10px;border:2px solid #ccc" placeholder="Ex. : question sur l\'anse spirale, nous avons pointé le bon endroit mais c\'est compté faux"></textarea>'+
+      '<label style="display:grid;gap:4px"><b>Type de problème</b><select id="signalType" style="box-sizing:border-box;width:100%;font:inherit;padding:8px;border-radius:10px;border:2px solid #ccc">'+
+      '<option>Ma réponse juste est comptée fausse</option><option>Une réponse fausse est comptée juste</option><option>Question mal posée ou erreur dans le contenu</option><option>Zone 3D ou zone de clic mal placée</option><option>Écran bloqué ou bug</option><option>Autre</option></select></label>'+
+      '<textarea id="signalTxt" rows="5" style="box-sizing:border-box;width:100%;font:inherit;padding:10px;border-radius:10px;border:2px solid #ccc" placeholder="Ex. : question sur l\'anse spirale, nous avons pointé le bon endroit mais c\'est compté faux"></textarea>'+
       '<div style="display:flex;gap:10px;justify-content:flex-end"><button id="signalNon" type="button" style="font:inherit;padding:10px 14px;border-radius:10px;border:2px solid #ccc;background:#fff">Annuler</button>'+
       '<button id="signalOui" type="button" style="font:inherit;font-weight:700;padding:10px 14px;border-radius:10px;border:0;background:#b3541e;color:#fff">Envoyer</button></div></div>';
     document.body.appendChild(o);document.getElementById("signalTxt").focus();
     document.getElementById("signalNon").onclick=function(){o.remove()};
     document.getElementById("signalOui").onclick=function(){var t=(document.getElementById("signalTxt").value||"").trim();if(!t){document.getElementById("signalTxt").focus();return}
-      var c2=ctx(),etat="";try{etat=JSON.stringify({etat:c2.etat||{},journal:J.slice(-25)})}catch(e){}
-      window.envoyerFeuille("SIGNAL",[c2.sid||"",c2.groupe||"",c2.equipe||"",c2.atelier||"",c2.eid||"",c2.nom||"",t,c2.page||"",etat.slice(0,3800)],"signal");
+      var c2=ctx(),etat="";try{etat=JSON.stringify({ecran:ecran,journal:J.slice(-20),etat:c2.etat||{}})}catch(e){}
+      window.envoyerFeuille("SIGNAL",[c2.sid||"",c2.groupe||"",c2.equipe||"",c2.atelier||"",c2.eid||"",c2.nom||"",(document.getElementById("signalType")||{}).value+" : "+t,c2.page||"",etat.slice(0,3800)],"signal");
       o.remove();var m=document.createElement("div");m.textContent="Merci : votre signalement a été envoyé aux encadrants.";
       m.style.cssText="position:fixed;left:50%;bottom:60px;transform:translateX(-50%);z-index:90;background:#2f6b3a;color:#fff;padding:10px 16px;border-radius:12px;font:600 14px system-ui,sans-serif";
       document.body.appendChild(m);setTimeout(function(){m.remove()},3500)}}
