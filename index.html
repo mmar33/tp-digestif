@@ -810,6 +810,19 @@ html[data-format="tel"] .home,html[data-format="tel"] .game,html[data-format="te
 .affg ul{margin:0;padding-left:18px;columns:2;font-size:16px}.affg p{margin:6px 0;font-size:15px}
 .a4attente{margin:10px 0;padding:8px 12px;border-radius:10px;background:#fff6dd;border-left:4px solid #e0a800}.a4attente.ok{background:#e2f1e6;border-left-color:#2f7a4a}.a4attente .ric{width:18px;height:18px;vertical-align:-3px}
 [data-attente]:disabled{opacity:.45;cursor:not-allowed}
+.badgepop{position:fixed;inset:0;z-index:95;display:grid;place-items:center;pointer-events:none;padding:16px}
+.badgepop .badgecard{pointer-events:auto;background:#fff;color:#1d1f1c;border-radius:22px;padding:22px 26px;text-align:center;max-width:340px;box-shadow:0 18px 50px rgba(0,0,0,.35);border:4px solid #e3a43c;animation:badgeIn .55s cubic-bezier(.2,1.6,.4,1) both;font-size:16px}
+.badgepop.out .badgecard{animation:badgeOut .35s ease-in both}
+.badgepop .bic{font-size:72px;line-height:1;animation:badgeTourne 1.2s ease-in-out .3s both}
+.badgepop .bbravo{font-size:30px;font-weight:800;color:#c0262d;margin:6px 0 2px}
+.badgepop .bnom{font-size:22px;font-weight:800;margin:4px 0}
+.badgepop .bdesc{color:#555;font-size:14px}
+.badgepop .bclose{color:#888;font-size:12px;margin-top:10px}
+.surnom{font-style:normal;color:#fff3c4;text-shadow:0 1px 2px rgba(0,0,0,.35)}
+@keyframes badgeIn{0%{transform:scale(.2) rotate(-12deg);opacity:0}100%{transform:scale(1) rotate(0);opacity:1}}
+@keyframes badgeOut{to{transform:scale(.6);opacity:0}}
+@keyframes badgeTourne{0%{transform:rotateY(0)}100%{transform:rotateY(720deg)}}
+@media (prefers-reduced-motion: reduce){.badgepop .badgecard,.badgepop .bic{animation:none}}
 </style>
 
 <div class="wrap" id="app"></div>
@@ -2477,7 +2490,8 @@ function vHub(){
   const me=test?TEST_MEMBRES[0]:moiE.eid;
   if(b.complet){const k="feu_"+g.id+"_"+me;if(test?!testE.feu:!LS.get(k,false)){if(test)testE.feu=true;else LS.set(k,true);setTimeout(()=>{feter("Bravo !","Tous vos ateliers sont validés");feuArtifice();bip([523,659,784,1047,1319])},500)}}
   const bandTest=test?`<div class="testban">${ico("main")}<span><b>Mode test encadrant</b> Ateliers tous ouverts, sans minuteur. Rien n'est enregistré ni compté.</span><button class="btn sm" id="quitterTest">Quitter le test</button></div>`:"";
-  const tete=`<div class="grhead">${mascSVG(g.mascotte,96)}<div><span class="eyebrow">${esc(s.nom)} · vous : ${esc(test?me:etu(g.seance,me))}</span><h1>${esc(g.nom)} <span>· les ${esc(g.mascotte)}</span></h1>
+  const tete=`<div class="grhead">${mascSVG(g.mascotte,96)}<div><span class="eyebrow">${esc(s.nom)} · vous : ${esc(test?me:etu(g.seance,me))}</span><h1>${esc(g.nom)}${g.surnom?` <em class="surnom">« ${esc(g.surnom)} »</em>`:""} <span>· les ${esc(g.mascotte)}</span></h1>
+    <button class="link" id="nommerGroupe" style="margin:2px 0 6px">✏️ ${g.surnom?"Changer le nom du groupe":"Donner un nom à votre groupe"}</button>
     <div class="membres">${(g.membres||[]).map(m=>`<span>${esc(test?m:nomCourt(g.seance,m))}</span>`).join("")}</div>
     <button class="pfchip" id="ouvrirProfil"><span>${pfAvatar()}</span>Mon profil, mes notes et mes badges</button></div>
     <div class="prog"><b>${b.faits}<small>/${b.dispo.length}</small></b><span>ateliers notés validés</span><i><em style="width:${b.dispo.length?b.faits/b.dispo.length*100:0}%"></em></i></div></div>`;
@@ -3996,6 +4010,39 @@ document.addEventListener("click",e=>{const t=e.target.closest&&e.target.closest
       const s2=await db.collection("deroule").doc(sid).get();const d2=s2&&s2.exists?s2.data():null;if(d2&&d2.r!==d.r){deroules[sid]=d2;toast("Un autre encadrant vient déjà de changer d'atelier");rendre();return}}catch(e){}
     const nd=rotSuivanteDoc(d.r+1);deroules[sid]=nd;ecrire("deroule",sid,nd,"set");rendre()},"","Annuler")});
 
+
+/* ----- nom choisi par le groupe (en plus du numéro, de la mascotte et de la couleur) ----- */
+document.addEventListener("click",e=>{const b=e.target.closest&&e.target.closest("#nommerGroupe");if(!b)return;const g=monGroupe();if(!g)return;
+  document.querySelectorAll(".modale").forEach(x=>x.remove());
+  const m=document.createElement("div");m.className="modale";m.setAttribute("role","dialog");m.setAttribute("aria-modal","true");
+  m.innerHTML=`<div class="mbox"><h2>Le nom de votre groupe</h2><p>Choisissez un nom pour le ${esc(g.nom)} (les ${esc(g.mascotte)} restent votre mascotte). Il s'affiche sur les téléphones de tout le groupe.</p>
+    <input id="surnomIn" maxlength="28" autocomplete="off" value="${esc(g.surnom||"")}" placeholder="Ex. : Les Pyloriques" style="font:inherit;font-size:20px;width:100%;box-sizing:border-box;padding:10px;border:2px solid var(--rule,#ccc);border-radius:10px">
+    <div class="row" style="justify-content:flex-end;margin-top:16px"><button class="btn ghost" id="surnomNon">Annuler</button><button class="btn pen" id="surnomOK">Enregistrer</button></div></div>`;
+  document.body.appendChild(m);const inp=m.querySelector("#surnomIn");inp.focus();
+  const ok=async()=>{const v=inp.value.replace(/\s+/g," ").trim().slice(0,28);m.remove();
+    if(g.id==="TEST"){TEST_G.surnom=v;rendre();return}
+    g.surnom=v;rendre();try{await ecrire("groupes",g.id,{surnom:v},"update");toast(v?"Nom du groupe enregistré : « "+v+" »":"Nom du groupe effacé")}catch(err){toast("Nom non enregistré, réessayez")}};
+  m.querySelector("#surnomOK").addEventListener("click",ok);inp.addEventListener("keydown",ev=>{if(ev.key==="Enter")ok()});
+  m.querySelector("#surnomNon").addEventListener("click",()=>m.remove())});
+
+/* ----- badge gagné : bravo en grand, avec confettis (ne bloque pas le jeu, disparaît seul) ----- */
+let badgeFile=[],badgeAffiche=false;
+function montrerBadge(){if(badgeAffiche||!badgeFile.length)return;const b=badgeFile.shift();badgeAffiche=true;
+  const o=document.createElement("div");o.className="badgepop";o.setAttribute("role","status");
+  o.innerHTML=`<div class="badgecard"><div class="bic">${b.ic||"🏅"}</div><div class="bbravo">Bravo !</div><div>Vous avez gagné le badge</div><div class="bnom">${esc(b.nom)}</div><div class="bdesc">${esc(b.desc||"")}</div><div class="bclose">Touchez pour fermer</div></div>`;
+  document.body.appendChild(o);try{confettis()}catch(e){}try{bip([660,880,1320])}catch(e){}
+  const fin=()=>{if(!o.parentNode)return;o.classList.add("out");setTimeout(()=>{o.remove();badgeAffiche=false;setTimeout(montrerBadge,400)},350)};
+  o.addEventListener("click",fin);setTimeout(fin,5500)}
+function verifierBadges(){try{
+  if(["prof","accueil","inscr","affiche","repartition","rejoindre"].includes(vue))return;
+  const g=monGroupe();if(!g||(!moiE&&g.id!=="TEST"))return;const c=pfContexte(g);if(!c)return;
+  const ids=ATELIERS.filter(a=>atelierActif(a.id)).map(a=>a.id);
+  const gagnes=PF_BADGES.filter(b=>(!b.at||ids.includes(b.at))&&(()=>{try{return b.ok(c)}catch(e){return false}})());
+  const cle="badgesVus_"+g.id+"_"+(c.eid||"");const vus=LS.get(cle,null);
+  if(vus===null){LS.set(cle,gagnes.map(b=>b.id));return}
+  const neufs=gagnes.filter(b=>!vus.includes(b.id));if(!neufs.length)return;
+  LS.set(cle,[...vus,...neufs.map(b=>b.id)]);badgeFile.push(...neufs);montrerBadge()}catch(e){}}
+setInterval(verifierBadges,6000);
 /* ----- avant chaque atelier : rappel que chaque atelier a ses propres consignes (fermeture par double appui) ----- */
 const _ouvrirAtelierSansConsigne=ouvrirAtelier;
 ouvrirAtelier=function(aid){const g=monGroupe();if(!g)return _ouvrirAtelierSansConsigne(aid);
