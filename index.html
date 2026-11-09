@@ -3750,10 +3750,17 @@ async function proposerDemoA2(g,t){
   if(g.id==="TEST"||duelsFaits(g,t.id)>0||LS.get("demoA2_"+t.id,false)){lancerDuelEquipes(g);return}
   /* un duel déjà commencé pour ce groupe : on le reprend sans rien proposer */
   try{const p=phaseSeance(g.seance),id=(g.id+"-R"+(p.r!=null?p.r:0)+"-D1").replace(/[^A-Za-z0-9-]/g,"");const sn=await db.collection("duels").doc(id).get();if(sn&&sn.exists){lancerDuelEquipes(g);return}}catch(e){}
-  modale("Avant le duel : un essai pour apprendre à toucher la planche",
-    "Pendant le duel, on <b>touche directement la planche</b> à l'endroit de l'erreur (la légende fausse ou la flèche mal placée), puis on choisit la bonne correction parmi 4 propositions.<br><br>Faites d’abord cet <b>essai rapide (2 minutes au plus)</b> sur une planche d'exemple : une seule erreur à trouver, <b>rien n'est noté</b>. Le duel commencera juste après.",
-    "Faire l’essai (2 min max)",()=>{LS.set("demoA2_"+t.id,true);demoDepuisA2=true;demarrerDemo()},"","Passer : lancer le duel");
-  const non=document.querySelector(".modale #mnon");if(non)non.addEventListener("click",()=>{LS.set("demoA2_"+t.id,true);lancerDuelEquipes(g)})}
+  /* consignes à valider (grand écran, Barone interdit sauf emprunt), puis essai de clic obligatoire, non noté */
+  document.querySelectorAll(".modale").forEach(x=>x.remove());
+  const m=document.createElement("div");m.className="modale";m.id="a2regles";m.setAttribute("role","dialog");m.setAttribute("aria-modal","true");
+  const bloc=(ic,t,x)=>`<div style="display:flex;gap:12px;align-items:flex-start;text-align:left;border:3px solid var(--rouge,#c0392b);border-radius:14px;padding:10px 12px;margin:0 0 10px;background:#fff4f2"><span style="font-size:34px;line-height:1">${ic}</span><span style="font-size:17px;line-height:1.35"><b style="font-size:19px">${t}</b><br>${x}</span></div>`;
+  m.innerHTML=`<div class="mbox" style="max-height:92vh;overflow:auto"><h2 style="margin:0 0 12px;text-align:center">Avant le duel du Barone</h2>
+    ${bloc("📺","Le plus grand écran mène le jeu","C'est la personne qui a la <b>tablette ou l'ordinateur</b> qui joue pour l'équipe. Avec des téléphones seulement, on s'adapte.")}
+    ${bloc("📕","Le Barone papier est interdit","<b>Sauf</b> si votre équipe l'emprunte pendant le jeu avec le bouton <b>« Emprunter le Barone »</b> (45 secondes). Le reste du temps : pas de Barone.")}
+    ${bloc("👆","D'abord, un essai de clic","On <b>touche directement la planche</b> à l'endroit de l'erreur (légende fausse ou flèche mal placée), puis on choisit la bonne correction. Essai rapide (2 min au plus) sur une planche d'exemple, <b>non noté</b> ; le duel commence juste après.")}
+    <div class="row" style="justify-content:center;margin-top:8px"><button class="btn pen gros" id="a2reglesOK">J'ai compris : faire l'essai</button></div></div>`;
+  document.body.appendChild(m);const b=m.querySelector("#a2reglesOK");try{b.focus({preventScroll:true})}catch(e){}
+  b.addEventListener("click",()=>{LS.set("demoA2_"+t.id,true);m.remove();demoDepuisA2=true;demarrerDemo()})}
 function finDemo(){clearInterval(tick);jeu=null;
   if(demoDepuisA2&&monGroupe()){demoDepuisA2=false;vue="hub";rendre();window.scrollTo(0,0);
     modale("Essai terminé","Vous savez maintenant où toucher. Prêts pour le vrai duel ?","Lancer le duel",()=>{const g=monGroupe();if(g)lancerDuelEquipes(g)},"","Plus tard");return}
