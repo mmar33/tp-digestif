@@ -64,10 +64,10 @@
     return c}
   function bouton(){if(document.getElementById("signalBtn"))return;
     var b=document.createElement("button");b.id="signalBtn";b.type="button";b.textContent="⚠️ Signaler";b.title="Signaler un problème aux encadrants";b.setAttribute("aria-label","Signaler un problème aux encadrants");
-    b.style.cssText="position:fixed;left:8px;bottom:60px;z-index:60;font:600 12px system-ui,sans-serif;padding:7px 10px;opacity:.92;border-radius:999px;border:2px solid #b3541e;background:#fff7ef;color:#7a3410;box-shadow:0 2px 8px rgba(0,0,0,.15);cursor:pointer";
+    b.style.cssText="position:fixed;left:8px;bottom:60px;z-index:130;font:600 12px system-ui,sans-serif;padding:7px 10px;opacity:.92;border-radius:999px;border:2px solid #b3541e;background:#fff7ef;color:#7a3410;box-shadow:0 2px 8px rgba(0,0,0,.15);cursor:pointer";
     b.onclick=ouvrir;document.body.appendChild(b)}
   function ouvrir(){var c=ctx();var ecran="";try{ecran=(document.body.innerText||"").replace(/\s+/g," ").slice(0,900)}catch(e){}var o=document.createElement("div");o.id="signalFen";
-    o.style.cssText="box-sizing:border-box;position:fixed;inset:0;z-index:80;background:rgba(0,0,0,.45);display:grid;place-items:center;padding:16px";
+    o.style.cssText="box-sizing:border-box;position:fixed;inset:0;z-index:140;background:rgba(0,0,0,.45);display:grid;place-items:center;padding:16px";
     o.innerHTML='<div style="box-sizing:border-box;background:#fff;color:#222;border-radius:16px;max-width:520px;width:100%;max-height:92vh;overflow:auto;padding:18px;font:15px system-ui,sans-serif;display:grid;gap:10px">'+
       '<b style="font-size:18px">Signaler un problème</b>'+
       '<p style="margin:0;color:#555">Décrivez ce qui ne va pas : une réponse juste comptée fausse (ou l\'inverse), un écran bloqué, une question mal posée… Les encadrants reçoivent votre message avec l\'état de votre atelier, pour corriger la note si besoin.</p>'+
@@ -83,7 +83,7 @@
       var c2=ctx(),etat="";try{etat=JSON.stringify({ecran:ecran,journal:J.slice(-20),etat:c2.etat||{}})}catch(e){}
       window.envoyerFeuille("SIGNAL",[c2.sid||"",c2.groupe||"",c2.equipe||"",c2.atelier||"",c2.eid||"",c2.nom||"",(document.getElementById("signalType")||{}).value+" : "+t,c2.page||"",etat.slice(0,3800)],"signal");
       o.remove();var m=document.createElement("div");m.textContent="Merci : votre signalement a été envoyé aux encadrants.";
-      m.style.cssText="position:fixed;left:50%;bottom:60px;transform:translateX(-50%);z-index:90;background:#2f6b3a;color:#fff;padding:10px 16px;border-radius:12px;font:600 14px system-ui,sans-serif";
+      m.style.cssText="position:fixed;left:50%;bottom:60px;transform:translateX(-50%);z-index:150;background:#2f6b3a;color:#fff;padding:10px 16px;border-radius:12px;font:600 14px system-ui,sans-serif";
       document.body.appendChild(m);setTimeout(function(){m.remove()},3500)}}
   /* visible dans les ateliers (la page principale décide avec __signalVisible), toujours sur les pages des ateliers 3 et 5 */
   if(!cadre)setInterval(function(){if(!document.body)return;var vis=(window.__signalVisible?!!window.__signalVisible():true)&&!document.querySelector(".modale,#signalFen");

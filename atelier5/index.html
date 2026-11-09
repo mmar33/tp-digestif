@@ -1353,7 +1353,7 @@ body.enc .auto-val{display:none}
   if(!duos||!moi)return;
   var md=moiDuo(), cr=correcteur(), cg=corrige();
   if(!md)return;
-  function setVal(id,v){var e=$(id);if(e&&!e.value&&v){e.value=v;e.dispatchEvent(new Event("input",{bubbles:true}))}}
+  function setVal(id,v){var e=$(id);if(e&&!e.value&&v&&document.activeElement!==e&&!e.dataset.touche){e.value=v;e.dispatchEvent(new Event("input",{bubbles:true}))}}
   function remplir(){
     setVal("teamIntro",md.nom); setVal("team",md.nom);
     setVal("stu1Intro",(md.noms||[])[0]||""); setVal("stu2Intro",(md.noms||[]).slice(1).join(", "));
@@ -1361,6 +1361,7 @@ body.enc .auto-val{display:none}
     if(cr) setVal("corrector",cr.nom);
   }
   remplir(); setInterval(remplir,1500);
+  document.addEventListener("input",function(ev){var t=ev.target;if(t&&t.dataset&&ev.isTrusted)t.dataset.touche="1"},true);
   ["teamIntro","stu1Intro","stu2Intro"].forEach(function(id){var e=$(id);if(e)e.readOnly=true;});
   var intro=$("chronoIntro");
   if(intro){var p=document.createElement("p");p.className="corr-notice";

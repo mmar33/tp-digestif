@@ -1035,7 +1035,7 @@ async function rejoindre(id,equipe){ let distant=null;try{const sn=await db.coll
   unsubs.push(db.collection("duels/"+id+"/scores").onSnapshot(s=>{s.docs.forEach(x=>scores[x.id]=x.data());majScores()},()=>{}));
   vue="salle"; rendre(); lancerTick();
 }
-function quitter(){if(db&&duel&&!duel.test&&moi==="A"&&vue==="salle")db.collection("duels").doc(duel.id).update({statut:"annule"}).catch(()=>{});unsubs.forEach(u=>u());unsubs=[];clearInterval(tick);duel=null;jeu=null;moi=null;LS.set("duelCourant",null);vue=monGroupe()?"hub":"accueil";rendre()}
+function quitter(){if(db&&duel&&!duel.test&&!duel.groupeA&&moi==="A"&&vue==="salle")db.collection("duels").doc(duel.id).update({statut:"annule"}).catch(()=>{});unsubs.forEach(u=>u());unsubs=[];clearInterval(tick);duel=null;jeu=null;moi=null;LS.set("duelCourant",null);vue=monGroupe()?"hub":"accueil";rendre()}
 async function lancer(){if(duel.test){duel.debut=Date.now()+3000;duel.statut="en_cours";majVue();return} try{await db.collection("duels").doc(duel.id).update({statut:"en_cours",debut:Date.now()+5000})}catch(e){toast("Lancement impossible")}}
 
 /* ----- le Barone (un seul exemplaire) : jeton partagé entre les deux tablettes ----- */
@@ -1754,7 +1754,7 @@ let testE=null;
 const TEST_G={id:"TEST",seance:"TEST",nom:"Groupe test",mascotte:"Chiens",couleur:"#3e4a59",membres:["Encadrant·e 1","Encadrant·e 2","Encadrant·e 3","Encadrant·e 4"]};
 const FICTIF={id:"TESTFICTIF",seance:"TEST",nom:"Groupe fictif",mascotte:"Cochons",couleur:"#c2407a",membres:[]};
 const enTest=()=>monGid==="TEST";
-function demarrerTestEtudiant(){testE={a1:{},evals:[],a2:null,ancien:monGid};monGid="TEST";a1Form=null;a1Photo=null;vue="hub";rendre();window.scrollTo(0,0);toast("Mode test : rien n'est enregistré")}
+function demarrerTestEtudiant(){try{Object.keys(localStorage).filter(k=>/(consignesLues_TEST_|a1taille_TEST|demoA2_TEST)/.test(k)).forEach(k=>{localStorage.removeItem(k);localStorage.removeItem(k.replace(/^.*?(?=consignesLues_|a1taille_|demoA2_)/,""))})}catch(e){}testE={a1:{},evals:[],a2:null,ancien:monGid};monGid="TEST";a1Form=null;a1Photo=null;vue="hub";rendre();window.scrollTo(0,0);toast("Mode test : rien n'est enregistré")}
 function quitterTest(){const anc=testE&&testE.ancien;testE=null;evals=evals.filter(e=>!String(e.id).startsWith("TEST"));delete a1docs.TEST;monGid=anc||LS.get("monGroupe",null);vue="prof";rendre();window.scrollTo(0,0)}
 function ecrireTest(col,id,data){
   if(col==="a1"){testE.a1[id]=Object.assign({},testE.a1[id],data);a1docs[id]=testE.a1[id]}
@@ -3683,7 +3683,7 @@ setInterval(archiverGroupe,30000);
    VERSION 4 : groupes tirés au sort par l'application (mixtes filles/garçons),
    sous-groupes de chaque atelier faits d'avance, ateliers de ~30 min, atelier 5 « Défi foie »
    ========================================================= */
-ATELIERS[4]={id:"a5",n:5,titre:"Défi foie",sous:"Anatomie comparée du foie : puzzles par espèce, correction croisée et quiz",parpar:"Rohan Mansuit",ic:"etoile"};
+ATELIERS[4]={id:"a5",n:5,titre:"Défi foie",sous:"Anatomie comparée du foie : puzzles par espèce, correction croisée et quiz",par:"Rohan Mansuit",ic:"etoile"};
 if(!AVEC_CONTENU.includes("a5"))AVEC_CONTENU.push("a5");
 BESOIN.a5={type:"duos",titre:"5 binômes"};
 BESOIN.a4={type:"equipes",n:2,titre:"2 équipes de 5"};
@@ -3765,7 +3765,7 @@ async function proposerDemoA2(g,t){
   /* duel déjà en cours de jeu (téléphone changé en plein duel) : on le reprend sans essai.
      Si l'autre équipe a seulement ouvert le duel et attend, cette équipe fait quand même son essai. */
   if(g.id!=="TEST")try{const p=phaseSeance(g.seance),id=(g.id+"-R"+(p.r!=null?p.r:0)+"-D1").replace(/[^A-Za-z0-9-]/g,"");const sn=await db.collection("duels").doc(id).get();
-    if(sn&&sn.exists){const d=sn.data()||{};if(d.statut&&d.statut!=="attente"){lancerDuelEquipes(g);return}}}catch(e){}
+    if(sn&&sn.exists){const d=sn.data()||{};if(d.statut&&d.statut!=="attente"&&d.statut!=="annule"){lancerDuelEquipes(g);return}}}catch(e){}
   /* consignes à valider (grand écran, Barone interdit sauf emprunt), puis essai de clic obligatoire, non noté */
   document.querySelectorAll(".modale").forEach(x=>x.remove());
   const m=document.createElement("div");m.className="modale";m.id="a2regles";m.setAttribute("role","dialog");m.setAttribute("aria-modal","true");
@@ -3776,9 +3776,9 @@ async function proposerDemoA2(g,t){
     ${bloc("👆","D'abord, un essai de clic","On <b>touche directement la planche</b> à l'endroit de l'erreur (légende fausse ou flèche mal placée), puis on choisit la bonne correction. Essai rapide (2 min au plus) sur une planche d'exemple, <b>non noté</b> ; le duel commence juste après.")}
     <div class="row" style="justify-content:center;margin-top:8px"><button class="btn pen gros" id="a2reglesOK">J'ai compris : faire l'essai</button></div></div>`;
   document.body.appendChild(m);const b=m.querySelector("#a2reglesOK");try{b.focus({preventScroll:true})}catch(e){}
-  b.addEventListener("click",()=>{LS.set("demoA2_"+t.id,true);m.remove();demoDepuisA2=true;demarrerDemo()})}
+  b.addEventListener("click",()=>{m.remove();demoDepuisA2=t.id;demarrerDemo()})}
 function finDemo(){clearInterval(tick);jeu=null;
-  if(demoDepuisA2&&monGroupe()){demoDepuisA2=false;vue="hub";rendre();window.scrollTo(0,0);
+  if(demoDepuisA2&&monGroupe()){LS.set("demoA2_"+demoDepuisA2,true);demoDepuisA2=false;vue="hub";rendre();window.scrollTo(0,0);
     modale("Essai terminé","Vous savez maintenant où toucher. Prêts pour le vrai duel ?","Lancer le duel",()=>{const g=monGroupe();if(g)lancerDuelEquipes(g)},"","Plus tard");return}
   vue="accueil";rendre();toast("Fin de la démo")}
 
@@ -3789,12 +3789,14 @@ function duelAnnule(id){if(!id)return false;if(duelStatut[id]===undefined&&!duel
 const resA2=tid=>resultats.filter(r=>r.groupe===tid&&!duelAnnule(r.duel));
 function duelsFaits(g,tid){if(g.id==="TEST")return testE&&testE.a2!=null?2:0;return new Set(resA2(tid).map(r=>r.duel)).size}
 async function lancerDuelEquipes(g){
-  if(g.id==="TEST"){partieTest("hasard");Object.assign(duel,{groupeA:"TEST",mascotteA:TEST_G.mascotte,couleurA:TEST_G.couleur,equipes:{A:TEST_G.nom,B:"Adversaire fictif"}});jeu.mascotte=TEST_G.mascotte;jeu.couleur=TEST_G.couleur;rendre();return}
+  if(g.id==="TEST"){partieTest("hasard");{const pl=duel.planche;duel.m1=4;duel.m2=6;duel.qids=shuffle(QUESTIONS.filter(q=>q.src!==pl).map(q=>q.id)).slice(0,12);jeu=nouvelEtat(pl,duel.qids,false,duel.mode1)}Object.assign(duel,{groupeA:"TEST",mascotteA:TEST_G.mascotte,couleurA:TEST_G.couleur,equipes:{A:TEST_G.nom,B:"Adversaire fictif"}});jeu.mascotte=TEST_G.mascotte;jeu.couleur=TEST_G.couleur;rendre();return}
   if(!db){toast("Pas de connexion au serveur");return}
   const sd=subsDe(g.id,"a2"), s=seances[g.seance]||{}, p=phaseSeance(g.seance);
   const me=moiE.eid, idx=sd.equipes.findIndex(e=>e.includes(me)), role=idx===0?"A":"B", tid=g.id+"-a2-e"+(idx+1);
-  const n=Math.min(2,duelsFaits(g,tid)+1);
-  const id=(g.id+"-R"+(p.r!=null?p.r:0)+"-D"+n).replace(/[^A-Za-z0-9-]/g,"");
+  let n=Math.min(2,duelsFaits(g,tid)+1);
+  const mkId=k=>(g.id+"-R"+(p.r!=null?p.r:0)+"-D"+k).replace(/[^A-Za-z0-9-]/g,"");let id=mkId(n);
+  /* duel 1 déjà fini mais résultats pas encore arrivés : on passe directement au duel 2 */
+  if(n<2){try{const s0=await db.collection("duels").doc(id).get();if(s0&&s0.exists&&(s0.data()||{}).statut==="fini"){n=2;id=mkId(2)}}catch(e){}}
   try{const L=await db.collection("verrous").doc(id+"-"+role).acquire({holder:DEVICE,ttlMs:60000});
     if(!L.acquired){const v=await db.collection("verrous").doc(id+"-"+role+"-qui").get();const qui=v.exists&&v.data().eid;
       modale("Votre équipe joue déjà",`Votre équipe joue sur le téléphone de <b>${esc(nomCourt(g.seance,qui))}</b>. Rejoignez-le. Si ce téléphone s'est éteint, réessayez dans une minute : la partie reprendra ici.`,"Compris",()=>{},"","Fermer");return}
@@ -3810,6 +3812,8 @@ async function lancerDuelEquipes(g){
           mascotteA:g.mascotte,mascotteB:solo?"Cochons":g.mascotte,couleurA:g.couleur,couleurB:alt,planche,mode1:n===2?"trous":choisirMode1(),qids,statut:"attente",cree:Date.now(),debut:null,
           m1:+s.duelM1||4,m2:+s.duelM2||6,rejoint:solo,luB:solo};
         try{await ref.set(d)}catch(e){toast("Création du duel impossible");return}}}
+  /* duel de groupe marqué annulé : on le rouvre pour les deux équipes */
+  if(snap&&snap.exists&&(snap.data()||{}).statut==="annule"){const solo=sd.equipes.length<2;try{await ref.update({statut:"attente",rejoint:solo,luA:false,luB:solo,debut:null})}catch(e){}try{snap=await ref.get()}catch(e){}}
     else await new Promise(r=>setTimeout(r,1500))}
   rejoindre(id,role)}
 
@@ -4061,20 +4065,24 @@ ouvrirAtelier=function(aid){const g=monGroupe();if(!g)return _ouvrirAtelierSansC
     if(now-t1<2500){LS.set(cle,true);m.remove();_ouvrirAtelierSansConsigne(aid);return}
     t1=now;b.innerHTML="Touchez encore une fois pour fermer";b.style.background="#1F3A5F"});};
 /* ----- échange de place entre deux séances : seulement avec le code donné par un encadrant ----- */
+function presentsSeance(sid){return new Set([...groupesDe(sid).flatMap(g=>g.membres||[]),...bandes.filter(b=>b.seance===sid).flatMap(b=>b.membres||[])])}
 function codeEchange(sid){let h=7;const t=sid+"|echange|"+PIN;for(let i=0;i<t.length;i++)h=(h*31+t.charCodeAt(i))%1000003;return String(1000+h%9000)}
-function ouvrirEchange(){const sid=seanceSel,s=seances[sid];if(!s)return;
+async function ouvrirEchange(){const sid=seanceSel,s=seances[sid];if(!s)return;
+  /* présents = déjà dans un groupe OU nom déjà choisi avant le tirage (bandes, non suivies sur l'accueil : lues ici) */
+  const pres=presentsSeance(sid);try{const q=await db.collection("bandes").where("seance","==",sid).get();q.docs.forEach(d=>((d.data()||{}).membres||[]).forEach(x=>pres.add(x)))}catch(e){}
   const autres=Object.keys(seances).filter(x=>x!==sid).flatMap(x=>(seances[x].etudiants||[]).map(e=>({sid:x,e}))).sort((a,b)=>a.e.n.localeCompare(b.e.n,"fr"));
   const ici=[...s.etudiants].sort((a,b)=>a.n.localeCompare(b.n,"fr"));
   modale("Échange de place",`<p>Vous venez à cette séance à la place d'un autre étudiant ? C'est possible <b>seulement avec l'accord d'un encadrant</b> : allez le voir, il vous donnera un code.</p>
    <label class="field">Votre nom (inscrit dans une autre séance)<select id="echMoi" class="gros"><option value="">Choisir…</option>${autres.map(a=>`<option value="${a.sid}|${a.e.id}">${esc(a.e.n)} ${esc(a.e.p)} (${esc(seances[a.sid].nom.split(" · ")[0])})</option>`).join("")}</select></label>
-   <label class="field">Vous prenez la place de<select id="echAvec" class="gros"><option value="">Personne (je m'ajoute simplement)</option>${ici.filter(e=>!groupesDe(sid).some(g=>(g.membres||[]).includes(e.id))).map(e=>`<option value="${e.id}">${esc(e.n)} ${esc(e.p)}</option>`).join("")}</select></label>
+   <label class="field">Vous prenez la place de<select id="echAvec" class="gros"><option value="">Personne (je m'ajoute simplement)</option>${ici.filter(e=>!pres.has(e.id)).map(e=>`<option value="${e.id}">${esc(e.n)} ${esc(e.p)}</option>`).join("")}</select></label>
    <label class="field">Code donné par l'encadrant<input id="echCode" inputmode="numeric" maxlength="6" autocomplete="off"></label>`,"Valider l'échange",()=>{
     const v=($("#echMoi")||{}).value||"",avec=($("#echAvec")||{}).value||"",code=(($("#echCode")||{}).value||"").trim();
     if(!v){toast("Choisissez votre nom");return}
     if(code!==codeEchange(sid)){toast("Code incorrect : demandez le code à un encadrant");return}
     faireEchange(sid,v.split("|")[0],v.split("|")[1],avec)},"","Annuler")}
 async function faireEchange(sid,sidAutre,eid,avec){
-  if(avec&&groupesDe(sid).some(g=>(g.membres||[]).includes(avec))){toast("Cette personne est déjà présente dans un groupe : choisissez « personne » ou un absent");return}
+  if(avec){let pres=presentsSeance(sid);try{const q=await db.collection("bandes").where("seance","==",sid).get();q.docs.forEach(d=>((d.data()||{}).membres||[]).forEach(x=>pres.add(x)))}catch(e){}
+    if(pres.has(avec)){toast("Cette personne est déjà présente : choisissez « personne » ou un absent");return}}
   try{const a=JSON.parse(JSON.stringify(seances[sid])),b=JSON.parse(JSON.stringify(seances[sidAutre]));
     const moiEnt=b.etudiants.find(e=>e.id===eid);if(!moiEnt){toast("Nom introuvable");return}
     b.etudiants=b.etudiants.filter(e=>e.id!==eid);
@@ -4090,7 +4098,7 @@ async function faireEchange(sid,sidAutre,eid,avec){
   catch(e){toast("Échange impossible pour l'instant : réessayez")}}
 
 /* ===== Google Sheets : contexte des signalements + notes par étudiant (lignes ETU) ===== */
-function aidDeVue(){return {a1:"a1",a3:"a3",fam:"a3",a4:"a4",a5:"a5",a6:"a6",salle:"a2",decompte:"a2",m1:"a2",m2:"a2",attente:"a2",fin:"a2"}[vue]||""}
+function aidDeVue(){if(vue==="repartition"&&repart&&repart.aid)return repart.aid;return {demo:"a2",a1:"a1",a3:"a3",fam:"a3",a4:"a4",a5:"a5",a6:"a6",salle:"a2",decompte:"a2",m1:"a2",m2:"a2",attente:"a2",fin:"a2"}[vue]||""}
 window.__signalVisible=function(){return monGid!=="TEST"&&(!!aidDeVue()||(vue==="hub"&&!!moiE))};
 window.__contexteSignal=function(){const aid=aidDeVue(),c={atelier:aid||vue,etat:{vue}};
   const at=ATELIERS.find(a=>a.id===aid);if(at)c.atelierNom="Atelier "+at.n+(at.nom?" · "+at.nom:"");
@@ -4115,7 +4123,7 @@ document.addEventListener("click",ev=>{const b=ev.target.closest&&ev.target.clos
 </script>
 
 <script>if("serviceWorker" in navigator)window.addEventListener("load",()=>navigator.serviceWorker.register("sw.js").catch(()=>{}));</script>
-<script>window.__CONFIRM_SEL__="[data-q],[data-fdk]";
+<script>window.__CONFIRM_SEL__="[data-q],[data-fdk],[data-r],[data-ms]";
 /* quiz : on choisit sa réponse, puis on la valide (évite les réponses données par erreur) */
 (function(){var SEL=window.__CONFIRM_SEL__;if(!SEL)return;var choix=null,bar=null;
   function cle(b){var a=b.attributes,k=[];for(var i=0;i<a.length;i++)if(/^data-/.test(a[i].name))k.push(a[i].name+"="+a[i].value);return (k.length?k.join("&"):"t="+b.textContent.trim())+"|"+(b.closest("[id]")||{}).id}
