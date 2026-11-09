@@ -2360,7 +2360,7 @@ async function assurerAvance(sid){if(!db||avEnCours||!sid)return;const p=phaseSe
   const gs=groupesDe(sid);if(!gs.length)return;
   let go=false;
   if(p.phase==="prepa")go=gs.every(g=>p.prets[g.id])||Date.now()-(debutSeance(s)||0)>10*60e3;
-  else if(p.phase==="rot")go=gs.every(g=>p.prets[g.id])||p.reste<=0;
+  else if(p.phase==="rot")go=gs.every(g=>p.prets[g.id])||p.reste<=(String(aboCle).startsWith("prof:")?0:-120e3);
   if(!go)return;
   avEnCours=true;
   try{const L=await db.collection("config").doc("av-"+sid+"-"+d.r).acquire({holder:DEVICE,ttlMs:10000});
@@ -2371,6 +2371,10 @@ async function rejoindreEnRetard(){const sid=moiE.sid,gs=groupesDe(sid);if(!gs.l
   const g=gs.reduce((a,b)=>(a.membres||[]).length<=(b.membres||[]).length?a:b);
   g.membres=[...(g.membres||[]),moiE.eid];majMonGid();vue="hub";rendre();confettis();
   await ecrire("groupes",g.id,{membres:g.membres},"update");
+  /* les équipes du groupe ne sont pas encore écoutées sur ce téléphone : on les lit avant d'y ajouter l'étudiant */
+  try{const ss=await db.collection("subs").where("groupe","==",g.id).get();ss.docs.forEach(x=>{subsDocs[x.id]=x.data()})}catch(e){}
+  /* deux retardataires en même temps : si notre ajout a été écrasé, on recommence */
+  const essai=(window.__retardEssai=(window.__retardEssai||0)+1);if(essai<4)setTimeout(()=>{const g2=groupes.find(x=>x.id===g.id);if(moiE&&g2&&!(g2.membres||[]).includes(moiE.eid)&&!groupes.some(x=>x.seance===moiE.sid&&(x.membres||[]).includes(moiE.eid)))rejoindreEnRetard()},5000);
   /* un retardataire rejoint aussi l'équipe la plus petite des ateliers déjà répartis, pour avoir une note */
   for(const id of Object.keys(subsDocs).filter(x=>x.startsWith(g.id+"-a"))){const sd=subsDocs[id];if(sd.equipes.some(e=>e.includes(moiE.eid)))continue;
     const eq=sd.equipes.map(e=>[...e]);eq.reduce((a,c)=>a.length<=c.length?a:c).push(moiE.eid);sd.equipes=eq;await ecrire("subs",id,{equipes:eq},"update")}}
@@ -3622,9 +3626,10 @@ setInterval(()=>{if(!db||!moiE||monGid==="TEST")return;const g=monGroupeDe();if(
 let a2Verif=0;
 setInterval(async()=>{if(!db||!moiE||monGid==="TEST"||Date.now()-a2Verif<45000)return;const g=monGroupeDe();if(!g||!atelierPasse(g,"a2"))return;
   const sd=subsDe(g.id,"a2");if(!sd)return;let r=-1;for(let k=0;k<NB_ROT;k++)if(atelierDe(g.k,k).id==="a2"){r=k;break}
-  for(const n of [1,2]){const id=(g.id+"-R"+r+"-D"+n).replace(/[^A-Za-z0-9-]/g,"");
+  const essais=window.__a2Essais||(window.__a2Essais={});
+  for(const n of [1,2]){const id=(g.id+"-R"+r+"-D"+n).replace(/[^A-Za-z0-9-]/g,"");if((essais[id]||0)>=4)continue;
     const manque=sd.equipes.map((_,i)=>g.id+"-a2-e"+(i+1)).filter(t=>!resultats.some(x=>x.groupe===t&&x.duel===id));if(!manque.length)continue;a2Verif=Date.now();
-    try{const ds=await db.collection("duels").doc(id).get();if(!ds.exists)continue;const D=ds.data();const sc=await db.collection("duels/"+id+"/scores").get();const S={};sc.docs.forEach(x=>S[x.id]=x.data());
+    essais[id]=(essais[id]||0)+1;try{const ds=await db.collection("duels").doc(id).get();if(!ds.exists){essais[id]=99;continue}const D=ds.data();const sc=await db.collection("duels/"+id+"/scores").get();const S={};sc.docs.forEach(x=>S[x.id]=x.data());
       for(const role of ["A","B"]){const tid=D["groupe"+role];if(!tid||!manque.includes(tid))continue;const mi=S[role];if(!mi)continue;
         const adv=D.solo?{tot:mi.tot}:(S[role==="A"?"B":"A"]||{tot:0});const max=PTS_M1+(D.qids||[]).length-(mi.jokers||0)+2;
         const gagne=(mi.tot||0)>(adv.tot||0),egal=(mi.tot||0)===(adv.tot||0);
@@ -3637,8 +3642,8 @@ async function archiverGroupe(){if(!db||!moiE||monGid==="TEST")return;const g=mo
   const s=seances[g.seance]||{etudiants:[]},dispo=ATELIERS_APP();
   const lignes=(g.membres||[]).map(eid=>{const n=noteEtudiant(g,eid),e=s.etudiants.find(x=>x.id===eid)||{n:eid,p:""};return {eid,nom:e.n,prenom:e.p,groupe:g.nom,notes:Object.fromEntries(dispo.map(a=>[a.id,n.par[a.id]])),finale:n.finale}});
   LS.set("archiveGroupe_"+g.id,{t:Date.now(),lignes});
-  if(Date.now()-dernArchiveG<170000&&p.phase!=="fin")return;dernArchiveG=Date.now();
-  try{const L=await db.collection("config").doc("archive-"+g.id).acquire({holder:DEVICE,ttlMs:160000});if(L.acquired)await db.collection("archives").doc(g.id).set({t:Date.now(),seance:g.seance,phase:p.phase,lignes})}catch(e){}}
+  if(p.phase==="fin"){if(window.__archFin===g.id)return;window.__archFin=g.id}else if(Date.now()-dernArchiveG<600000)return;dernArchiveG=Date.now();
+  try{const L=await db.collection("config").doc("archive-"+g.id).acquire({holder:DEVICE,ttlMs:590000});if(L.acquired)await db.collection("archives").doc(g.id).set({t:Date.now(),seance:g.seance,phase:p.phase,lignes})}catch(e){}}
 setInterval(archiverGroupe,30000);
 /* =========================================================
    VERSION 4 : groupes tirés au sort par l'application (mixtes filles/garçons),
@@ -3846,7 +3851,7 @@ setInterval(()=>{const els=document.querySelectorAll(".cptProf");if(!els.length)
 /* Défi foie, 6/11 : le corrigé de la question « position du foie » (chien / porc) était inversé jusqu'à 10 h 25.
    Les fiches validées avant reçoivent la valeur d'une question (0,6 point), sans dépasser 12 au défi ni 20 au total. */
 let a5Raz={};function chargerA5Raz(){if(!db)return;db.collection("config").doc("a5raz").get().then(x=>{a5Raz=x&&x.exists?(x.data()||{}):{};rendrePortail()}).catch(()=>{})}
-setInterval(chargerA5Raz,30000);setTimeout(chargerA5Raz,3000);
+let a5RazAbo=null;const a5RazT=setInterval(()=>{if(!db||a5RazAbo)return;try{a5RazAbo=db.collection("config").doc("a5raz").onSnapshot(x=>{a5Raz=x&&x.exists?(x.data()||{}):{};rendrePortail()},()=>{})}catch(e){}if(a5RazAbo)clearInterval(a5RazT)},3000);
 const a5RazDe=id=>Math.max(+a5Raz[String(id).replace(/-a5-e\d+$/,"")]||0,+a5Raz[id]||0);
 const a5Valide=n=>!!n&&!(a5RazDe(n.id)&&+n.maj<a5RazDe(n.id));
 const A5_CORR_AVANT=1793957100000;
@@ -3962,13 +3967,14 @@ function ouvrirEchange(){const sid=seanceSel,s=seances[sid];if(!s)return;
   const ici=[...s.etudiants].sort((a,b)=>a.n.localeCompare(b.n,"fr"));
   modale("Échange de place",`<p>Vous venez à cette séance à la place d'un autre étudiant ? C'est possible <b>seulement avec l'accord d'un encadrant</b> : allez le voir, il vous donnera un code.</p>
    <label class="field">Votre nom (inscrit dans une autre séance)<select id="echMoi" class="gros"><option value="">Choisir…</option>${autres.map(a=>`<option value="${a.sid}|${a.e.id}">${esc(a.e.n)} ${esc(a.e.p)} (${esc(seances[a.sid].nom.split(" · ")[0])})</option>`).join("")}</select></label>
-   <label class="field">Vous prenez la place de<select id="echAvec" class="gros"><option value="">Personne (je m'ajoute simplement)</option>${ici.map(e=>`<option value="${e.id}">${esc(e.n)} ${esc(e.p)}</option>`).join("")}</select></label>
+   <label class="field">Vous prenez la place de<select id="echAvec" class="gros"><option value="">Personne (je m'ajoute simplement)</option>${ici.filter(e=>!groupesDe(sid).some(g=>(g.membres||[]).includes(e.id))).map(e=>`<option value="${e.id}">${esc(e.n)} ${esc(e.p)}</option>`).join("")}</select></label>
    <label class="field">Code donné par l'encadrant<input id="echCode" inputmode="numeric" maxlength="6" autocomplete="off"></label>`,"Valider l'échange",()=>{
     const v=($("#echMoi")||{}).value||"",avec=($("#echAvec")||{}).value||"",code=(($("#echCode")||{}).value||"").trim();
     if(!v){toast("Choisissez votre nom");return}
     if(code!==codeEchange(sid)){toast("Code incorrect : demandez le code à un encadrant");return}
     faireEchange(sid,v.split("|")[0],v.split("|")[1],avec)},"","Annuler")}
 async function faireEchange(sid,sidAutre,eid,avec){
+  if(avec&&groupesDe(sid).some(g=>(g.membres||[]).includes(avec))){toast("Cette personne est déjà présente dans un groupe : choisissez « personne » ou un absent");return}
   try{const a=JSON.parse(JSON.stringify(seances[sid])),b=JSON.parse(JSON.stringify(seances[sidAutre]));
     const moiEnt=b.etudiants.find(e=>e.id===eid);if(!moiEnt){toast("Nom introuvable");return}
     b.etudiants=b.etudiants.filter(e=>e.id!==eid);

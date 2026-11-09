@@ -14,28 +14,33 @@
   window.FEUILLES={notes:"https://docs.google.com/spreadsheets/d/1RGpuaJMYUw5qekvyhBfvjYOs8HZd2E3AFGBDLb90kd4/edit",
                    signal:"https://docs.google.com/spreadsheets/d/1h3agXa4QsIUs7TOSyJPCJpvD7sBt705IuMp__JxMUmc/edit"};
   var CLE="fileFeuille", NOTES=["resultats","a1eval","notes_a3","notes_a5","a4","a6","notes_manuelles","secours"];
-  var mem=null;
-  function lire(){if(mem)return mem;try{mem=JSON.parse(localStorage.getItem(CLE)||"[]")}catch(e){mem=[]}return mem}
-  function garder(){try{localStorage.setItem(CLE,JSON.stringify(mem.slice(-1500)))}catch(e){}}
+  /* la file est relue sur le disque à chaque fois (plusieurs pages ou un cadre 3D partagent le même stockage) ;
+     un seul envoyeur à la fois sur l'appareil (verrou de 15 s), jamais depuis un cadre */
+  var cadre=false;try{cadre=window.top!==window}catch(e){cadre=true}
+  var MOI="p"+Math.random().toString(36).slice(2,9);
+  function lire(){try{var l=JSON.parse(localStorage.getItem(CLE)||"[]");return Array.isArray(l)?l:[]}catch(e){return []}}
+  function ecrireFile(l){try{localStorage.setItem(CLE,JSON.stringify(l.slice(-800)))}catch(e){try{localStorage.setItem(CLE,JSON.stringify(l.slice(-200)))}catch(e2){}}}
   function propre(v){return String(v==null?"":v).replace(/\s*\|\s*/g," / ").replace(/[\r\n]+/g," ").slice(0,4000)}
   function appareil(){try{return JSON.parse(localStorage.getItem("deviceId")||'""')||""}catch(e){return ""}}
   /* type = première colonne ; champs = la suite ; une ligne = « TYPE | champ | champ … » */
   window.envoyerFeuille=function(type,champs,quelle){
-    var l=lire();l.push({f:quelle||"notes",d:[type].concat(champs||[]).map(propre).join(" | ")+" | "+new Date().toISOString()+" | "+appareil(),n:0});garder();vider()};
+    var l=lire();l.push({i:Date.now().toString(36)+Math.random().toString(36).slice(2,7),f:quelle||"notes",d:[type].concat(champs||[]).map(propre).join(" | ")+" | "+new Date().toISOString()+" | "+appareil(),n:0});ecrireFile(l);setTimeout(vider,50)};
   var enCours=false;
-  function vider(){if(enCours||!navigator.onLine&&navigator.onLine!==undefined)return;var l=lire();if(!l.length)return;enCours=true;
+  function verrou(){try{var v=JSON.parse(localStorage.getItem(CLE+"_v")||"null");if(v&&v.p!==MOI&&Date.now()-v.t<15000)return false;localStorage.setItem(CLE+"_v",JSON.stringify({p:MOI,t:Date.now()}));return true}catch(e){return true}}
+  function vider(){if(cadre||enCours||navigator.onLine===false)return;var l=lire();if(!l.length)return;if(!verrou())return;enCours=true;
     var x=l[0],cfg=F[x.f]||F.notes,b=new URLSearchParams();b.append(cfg.champ,x.d);
-    fetch(cfg.url,{method:"POST",mode:"no-cors",body:b}).then(function(){l.shift();garder();enCours=false;if(l.length)setTimeout(vider,250)})
-      .catch(function(){x.n++;garder();enCours=false;setTimeout(vider,Math.min(60000,3000*x.n))})}
+    fetch(cfg.url,{method:"POST",mode:"no-cors",body:b}).then(function(){var l2=lire().filter(function(y){return y.i!==x.i});ecrireFile(l2);enCours=false;if(l2.length)setTimeout(vider,250)})
+      .catch(function(){var l2=lire();l2.forEach(function(y){if(y.i===x.i)y.n=(y.n||0)+1});ecrireFile(l2);enCours=false;setTimeout(vider,Math.min(60000,3000*((x.n||0)+1)))})}
   setInterval(vider,8000);window.addEventListener("online",vider);setTimeout(vider,1500);
   window.feuilleEnAttente=function(){return lire().length};
 
   /* copie de chaque écriture de note faite par n'importe quelle page */
+  var vus={};
   function enrober(db){if(!db||db.__feuille)return db;
     var col=db.collection.bind(db);
     db.collection=function(p){var c=col(p);if(NOTES.indexOf(p)<0)return c;var d=c.doc.bind(c);
       c.doc=function(id){var r=d(id),set=r.set&&r.set.bind(r),upd=r.update&&r.update.bind(r);
-        var copie=function(v,mode){try{var j=JSON.stringify(v);if(j.length>3500)j=j.slice(0,3500)+"…";window.envoyerFeuille("BRUT",[p,id,mode,j])}catch(e){}};
+        var copie=function(v,mode){try{var j=JSON.stringify(v);var k=p+"/"+id+"/"+mode+"/"+j;if(vus[k])return;vus[k]=1;if(j.length>3500)j=j.slice(0,3500)+"…";window.envoyerFeuille("BRUT",[p,id,mode,j])}catch(e){}};
         if(set)r.set=function(v,o){copie(v,"set");return o?set(v,o):set(v)};
         if(upd)r.update=function(v){copie(v,"update");return upd(v)};
         return r};return c};
@@ -79,7 +84,6 @@
       m.style.cssText="position:fixed;left:50%;bottom:60px;transform:translateX(-50%);z-index:90;background:#2f6b3a;color:#fff;padding:10px 16px;border-radius:12px;font:600 14px system-ui,sans-serif";
       document.body.appendChild(m);setTimeout(function(){m.remove()},3500)}}
   /* visible dans les ateliers (la page principale décide avec __signalVisible), toujours sur les pages des ateliers 3 et 5 */
-  var cadre=false;try{cadre=window.top!==window}catch(e){cadre=true}
   if(!cadre)setInterval(function(){if(!document.body)return;var vis=(window.__signalVisible?!!window.__signalVisible():true)&&!document.querySelector(".modale,#signalFen");
     var b=document.getElementById("signalBtn");if(vis&&!b)bouton();else if(!vis&&b)b.remove()},700);
 })();
