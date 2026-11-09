@@ -3958,8 +3958,16 @@ document.addEventListener("click",e=>{if(e.target.closest&&e.target.closest("#la
 
 /* commandes de secours de l'encadrant : +5 min, passer à l'atelier suivant */
 document.addEventListener("click",e=>{const t=e.target.closest&&e.target.closest("#rotPlus5,#rotSuivante");if(!t||!db)return;const sid=profSeance||seanceSel,d=deroules[sid];if(!d)return;
-  if(t.id==="rotPlus5"){const nd={r:d.r,t:d.t+5*60e3};deroules[sid]=nd;ecrire("deroule",sid,nd,"set");toast("5 minutes de plus pour tous les groupes");rendre();return}
-  modale(d.r<0?"Démarrer les ateliers ?":"Passer à l'atelier suivant ?",d.r<0?"Tous les groupes partent vers leur premier atelier.":"Tous les groupes changent d'atelier maintenant. Les notes déjà enregistrées sont gardées ; un atelier non terminé sera noté avec ce qui a été fait.","Oui",()=>{const nd=rotSuivanteDoc(d.r+1);deroules[sid]=nd;ecrire("deroule",sid,nd,"set");rendre()},"","Annuler")});
+  if(t.id==="rotPlus5"){if(Date.now()-(window.__plus5||0)<20000){toast("+5 min déjà ajoutées à l'instant");return}window.__plus5=Date.now();
+    db.collection("deroule").doc(sid).get().then(x=>{const c=x&&x.exists?x.data():d;if(c.r!==d.r){toast("L'atelier vient de changer : rien n'a été ajouté");return}
+      if(c.p5&&Date.now()-c.p5<30000){toast("Un autre encadrant vient d'ajouter 5 min : rien de plus n'a été ajouté");return}
+      const nd={r:c.r,t:c.t+5*60e3,p5:Date.now()};deroules[sid]=nd;ecrire("deroule",sid,nd,"set");toast("5 minutes de plus pour tous les groupes");rendre()}).catch(()=>{const nd={r:d.r,t:d.t+5*60e3};deroules[sid]=nd;ecrire("deroule",sid,nd,"set");rendre()});return}
+  modale(d.r<0?"Démarrer les ateliers ?":"Passer à l'atelier suivant ?",d.r<0?"Tous les groupes partent vers leur premier atelier.":"Tous les groupes changent d'atelier maintenant. Les notes déjà enregistrées sont gardées ; un atelier non terminé sera noté avec ce qui a été fait.","Oui",async()=>{
+    /* plusieurs encadrants : seul le premier qui valide fait changer d'atelier, les autres sont prévenus (pas d'atelier sauté) */
+    const cur=deroules[sid];if(!cur||cur.r!==d.r){toast("Un autre encadrant vient déjà de changer d'atelier");rendre();return}
+    try{const L=await db.collection("config").doc("av-"+sid+"-"+d.r).acquire({holder:DEVICE,ttlMs:120000});if(!L.acquired){toast("Un autre encadrant vient déjà de changer d'atelier");return}
+      const s2=await db.collection("deroule").doc(sid).get();const d2=s2&&s2.exists?s2.data():null;if(d2&&d2.r!==d.r){deroules[sid]=d2;toast("Un autre encadrant vient déjà de changer d'atelier");rendre();return}}catch(e){}
+    const nd=rotSuivanteDoc(d.r+1);deroules[sid]=nd;ecrire("deroule",sid,nd,"set");rendre()},"","Annuler")});
 /* ----- échange de place entre deux séances : seulement avec le code donné par un encadrant ----- */
 function codeEchange(sid){let h=7;const t=sid+"|echange|"+PIN;for(let i=0;i<t.length;i++)h=(h*31+t.charCodeAt(i))%1000003;return String(1000+h%9000)}
 function ouvrirEchange(){const sid=seanceSel,s=seances[sid];if(!s)return;
