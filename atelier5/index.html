@@ -3,7 +3,7 @@
 <head><script>
 /* tablette passée à un nouveau binôme : on repart d'un chrono et d'une fiche vides (sinon le chrono du groupe précédent, déjà fini, validait une fiche vide à 0) */
 (function(){try{var duo=new URLSearchParams(location.search).get("duo");if(!duo)return;if(localStorage.getItem("a5-duo-tablette")!==duo){["chrono-foie","corr-en-cours","defi-foie-score","binome-note","binome-info","correction-foie-recap"].forEach(function(k){localStorage.removeItem(k)});localStorage.setItem("a5-duo-tablette",duo)}}catch(e){}})();
-</script><script src="../firebase-config.js"></script><script src="../vendor/firebase-app-compat.js"></script><script src="../vendor/firebase-firestore-compat.js"></script><script src="../adapter.js"></script>
+</script><script src="../firebase-config.js"></script><script src="../vendor/firebase-app-compat.js"></script><script src="../vendor/firebase-firestore-compat.js"></script><script src="../adapter.js"></script><script src="../feuille.js"></script>
 <script>
 /* Mode local : remplace les services claude.ai (db, user, downloads) quand l'application
    est ouverte hors de claude.ai (fichier, Moodle, serveur web). Les données sont enregistrées

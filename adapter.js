@@ -40,7 +40,7 @@
       .catch(function(){return {acquired:false}})}
   }}
   function query(fs,q){return{
-    where:function(f,op,v){return query(fs,q.where(f,op,v))},
+    where:function(f,op,v){if(f==="__id__")f=firebase.firestore.FieldPath.documentId();return query(fs,q.where(f,op,v))},
     onSnapshot:function(next,err){return q.onSnapshot(function(s){next(snapQ(s))},err||function(){})},
     get:function(){return q.get().then(snapQ)}
   }}

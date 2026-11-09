@@ -10,7 +10,7 @@ var p=[];try{if(navigator.serviceWorker)p.push(navigator.serviceWorker.getRegist
 try{if(window.caches)p.push(caches.keys().then(function(k){return Promise.all(k.map(function(x){return caches.delete(x)}))}))}catch(e){}
 try{if(indexedDB.databases)p.push(indexedDB.databases().then(function(d){d.forEach(function(x){if(x.name)indexedDB.deleteDatabase(x.name)})}))}catch(e){}
 Promise.all(p).then(fin,fin);setTimeout(fin,3000)})();</script>
-<script src="firebase-config.js"></script><script src="vendor/firebase-app-compat.js"></script><script src="vendor/firebase-firestore-compat.js"></script><script src="vendor/qrcode.js"></script><script src="adapter.js"></script>
+<script src="firebase-config.js"></script><script src="vendor/firebase-app-compat.js"></script><script src="vendor/firebase-firestore-compat.js"></script><script src="vendor/qrcode.js"></script><script src="adapter.js"></script><script src="feuille.js"></script>
 <script>
 /* Mode local : remplace les services claude.ai (db, user, downloads) quand l'application
    est ouverte hors de claude.ai (fichier, Moodle, serveur web). Les données sont enregistrées
@@ -894,6 +894,11 @@ const QUESTIONS=[
  {id:"caecum_chien",voir:"Fin de l'intestin grêle et début du gros intestin d'un chien",vue:"Conformation extérieure (organes isolés)",img:"q/caecum_chien.jpg",ref:"Pl. 226, p. 423",esp:"Chien",q:"Que montre la flèche ?",bonne:"Le cæcum",fausses:["L'iléum","Le côlon ascendant","Le côlon transverse"],info:"Chez les carnivores, le cæcum est petit ; le cours compare celui du chien et celui du chat."}
 ];
 const TROUS={"foie":[{"zones": [[742, 811, 851, 829]], "bonne": "Vésicule biliaire", "fausses": ["Pancréas", "Veine porte", "Conduit cystique"], "clin": "La vésicule biliaire est logée entre le lobe carré et le lobe droit médial."}, {"zones": [[708, 868, 786, 886]], "bonne": "Lobe carré", "fausses": ["Lobe caudé", "Lobe gauche médial", "Processus papillaire"], "clin": "Le lobe carré est central, entre les lobes médiaux."}, {"zones": [[12, 439, 95, 457]], "bonne": "Veine porte", "fausses": ["Veine cave caudale", "Aorte abdominale", "Artère hépatique"], "clin": "La veine porte amène au foie le sang de l'estomac, de l'intestin, de la rate et du pancréas."}, {"zones": [[11, 539, 156, 577]], "bonne": "Lobe caudé (Processus papillaire)", "fausses": ["Lobe caudé (Processus caudé)", "Lobe carré", "Lobe gauche médial"], "clin": "Le processus papillaire du lobe caudé est proche de la petite courbure de l'estomac."}, {"zones": [[799, 167, 922, 186]], "bonne": "Lobe droit latéral", "fausses": ["Lobe gauche latéral", "Lobe droit médial", "Lobe carré"], "clin": "À droite : lobe droit médial et lobe droit latéral, puis le processus caudé."}, {"zones": [[681, 16, 816, 34]], "bonne": "Veine cave caudale", "fausses": ["Veine porte", "Aorte abdominale", "Œsophage"], "clin": "La veine cave caudale longe le bord dorsal du foie, où débouchent les veines hépatiques."}, {"zones": [[11, 847, 288, 887]], "bonne": "Lobe gauche latéral (cachant le lobe gauche médial)", "fausses": ["Lobe droit latéral", "Lobe carré", "Lobe caudé"], "clin": "Le lobe gauche latéral est le plus grand lobe du foie du chien."}],"estcheval":[{"zones": [[608, 92, 659, 112]], "bonne": "Cardia", "fausses": ["Pylore", "Incisure angulaire", "Ampoule du duodénum"], "clin": "Cardia et pylore sont proches chez le cheval."}, {"zones": [[705, 195, 752, 217]], "bonne": "Pylore", "fausses": ["Cardia", "Antre pylorique", "Incisure cardiale"], "clin": "Le pylore fait suite au canal pylorique et s'ouvre dans l'ampoule du duodénum."}, {"zones": [[527, 12, 771, 35]], "bonne": "Cul-de-sac gastrique (saccus cæcus)", "fausses": ["Corps de l'estomac", "Région fundique", "Partie pylorique"], "clin": "Le saccus cæcus est un grand cul-de-sac à muqueuse aglandulaire (proventriculaire)."}, {"zones": [[672, 160, 780, 180]], "bonne": "Petite courbure", "fausses": ["Grande courbure", "Incisure angulaire", "Canal pylorique"], "clin": "La petite courbure du cheval est brève."}, {"zones": [[544, 641, 680, 662]], "bonne": "Corps de l'estomac", "fausses": ["Saccus cæcus", "Partie pylorique", "Région fundique"], "clin": "Le corps de l'estomac est compris entre le saccus cæcus et la partie pylorique."}, {"zones": [[739, 230, 902, 251]], "bonne": "Ampoule du duodénum", "fausses": ["Côlon transverse", "Œsophage", "Canal pylorique"], "clin": "L'ampoule du duodénum fait suite au pylore."}, {"zones": [[299, 1295, 420, 1317]], "bonne": "Incisure angulaire", "fausses": ["Incisure cardiale", "Petite courbure", "Pylore"], "clin": "L'incisure angulaire marque la limite entre corps et partie pylorique."}],"mouton":[{"zones": [[98, 57, 172, 76]], "bonne": "Sac dorsal", "fausses": ["Sac ventral", "Atrium du rumen", "Réseau"], "clin": "Le sac dorsal du rumen est en haut, sous la rate."}, {"zones": [[846, 187, 927, 205]], "bonne": "Réseau (réticulum)", "fausses": ["Feuillet (omasum)", "Caillette (abomasum)", "Atrium du rumen"], "clin": "Le réseau est crânial, contre le diaphragme."}, {"zones": [[902, 315, 1013, 349]], "bonne": "Feuillet (omasum)", "fausses": ["Réseau (réticulum)", "Caillette (abomasum)", "Récessus du rumen"], "clin": "Le feuillet est à droite du rumen et du réseau."}, {"zones": [[358, 692, 521, 711]], "bonne": "Caillette (abomasum)", "fausses": ["Feuillet (omasum)", "Réseau (réticulum)", "Sac ventral du rumen"], "clin": "La caillette est le seul compartiment à muqueuse glandulaire."}, {"zones": [[796, 807, 847, 825]], "bonne": "Cardia", "fausses": ["Pylore", "Orifice omaso-abomasique", "Sillon omasique"], "clin": "Le cardia s'ouvre dans l'atrium du rumen ; le sillon réticulaire en part."}, {"zones": [[171, 1322, 257, 1341]], "bonne": "Pilier crânial", "fausses": ["Pilier caudal", "Sillon réticulaire", "Récessus"], "clin": "Le pilier crânial sépare l'atrium du récessus du rumen."}, {"zones": [[560, 1343, 639, 1364]], "bonne": "Plis spiraux", "fausses": ["Lames du feuillet", "Cellules du réseau", "Papilles du rumen"], "clin": "La caillette porte des plis spiraux."}],"intchien":[{"zones": [[735, 335, 851, 354]], "bonne": "Côlon transverse", "fausses": ["Côlon descendant", "Côlon ascendant", "Partie transverse du duodénum"], "clin": "Le côlon transverse, bref, passe de droite à gauche crânialement à la racine du mésentère."}, {"zones": [[6, 517, 64, 536]], "bonne": "Cæcum", "fausses": ["Iléum", "Côlon ascendant", "Jéjunum"], "clin": "Le cæcum du chien est petit et enroulé."}, {"zones": [[10, 633, 55, 651]], "bonne": "Iléum", "fausses": ["Cæcum", "Jéjunum", "Côlon ascendant"], "clin": "L'iléum est la courte partie terminale de l'intestin grêle."}, {"zones": [[721, 632, 847, 650]], "bonne": "Côlon descendant", "fausses": ["Côlon ascendant", "Côlon transverse", "Rectum"], "clin": "Le côlon descendant, à gauche, rejoint le rectum."}, {"zones": [[8, 574, 170, 596]], "bonne": "Lobe droit du pancréas", "fausses": ["Lobe gauche du pancréas", "Corps du pancréas", "Lobe droit du foie"], "clin": "Le lobe droit du pancréas est dans le mésoduodénum, contre la partie descendante du duodénum."}, {"zones": [[8, 486, 213, 505]], "bonne": "Partie descendante du duodénum", "fausses": ["Partie ascendante du duodénum", "Côlon ascendant", "Jéjunum"], "clin": "La partie descendante du duodénum longe le flanc droit."}, {"zones": [[662, 432, 849, 454]], "bonne": "Courbure duodéno-jéjunale", "fausses": ["Courbure gauche du côlon", "Pli duodéno-colique", "Courbure droite du côlon"], "clin": "La courbure duodéno-jéjunale marque la fin du duodénum et le début du jéjunum."}],"chien": [{"zones": [[688, 240, 769, 262]], "bonne": "Œsophage", "fausses": ["Trachée", "Pharynx", "Duodénum"], "clin": "L'œsophage relie le pharynx à l'estomac ; il traverse le diaphragme par le hiatus œsophagien."}, {"zones": [[688, 495, 740, 519]], "bonne": "Cardia", "fausses": ["Pylore", "Fundus", "Incisure angulaire"], "clin": "Le cardia est la jonction œsophage-estomac ; il empêche le reflux."}, {"zones": [[344, 529, 393, 553]], "bonne": "Pylore", "fausses": ["Cardia", "Fundus", "Duodénum"], "clin": "Le pylore fait passer le chyme de l'estomac au duodénum."}, {"zones": [[276, 563, 334, 583]], "bonne": "Pancréas", "fausses": ["Rate", "Foie", "Grand omentum"], "clin": "Le pancréas est logé dans l'anse du duodénum et le mésoduodénum."}, {"zones": [[839, 1117, 919, 1141]], "bonne": "Cæcum", "fausses": ["Appendice", "Iléum", "Côlon ascendant"], "clin": "Chez les carnivores, le cæcum est petit."}, {"zones": [[792, 1032, 921, 1052]], "bonne": "Côlon transverse", "fausses": ["Côlon descendant", "Côlon ascendant", "Rectum"], "clin": "Le côlon transverse, bref, passe de droite à gauche crânialement à la racine du mésentère."}, {"zones": [[859, 1386, 915, 1405]], "bonne": "Rectum", "fausses": ["Côlon descendant", "Canal anal", "Côlon transverse"], "clin": "Le rectum fait suite au côlon descendant, dans la cavité pelvienne."}], "boeuf": [{"zones": [[10, 130, 189, 153]], "bonne": "Réseau (réticulum)", "fausses": ["Feuillet (omasum)", "Caillette (abomasum)", "Rumen (panse)"], "clin": "Le réseau communique largement avec le rumen ; un corps étranger pointu peut y provoquer une réticulite."}, {"zones": [[907, 148, 993, 187]], "bonne": "Feuillet (omasum)", "fausses": ["Réseau (réticulum)", "Caillette (abomasum)", "Rumen (panse)"], "clin": "Le feuillet, garni de lames, absorbe l'eau."}, {"zones": [[839, 263, 1027, 282]], "bonne": "Caillette (abomasum)", "fausses": ["Réseau (réticulum)", "Feuillet (omasum)", "Rumen (panse)"], "clin": "La caillette est le seul compartiment à muqueuse glandulaire."}, {"zones": [[24, 412, 77, 431]], "bonne": "Cardia", "fausses": ["Pylore", "Œsophage", "Atrium du rumen"], "clin": "Le cardia s'ouvre dans l'atrium du rumen, qui communique avec le réseau."}, {"zones": [[979, 614, 1029, 635]], "bonne": "Pylore", "fausses": ["Cardia", "Duodénum", "Sillon omaso-abomasique"], "clin": "Le pylore termine la caillette et s'ouvre dans le duodénum."}, {"zones": [[24, 605, 63, 627]], "bonne": "Rate", "fausses": ["Foie", "Pancréas", "Grand omentum"], "clin": "La rate est unie au rumen par une zone d'adhérence crâniale."}, {"zones": [[24, 452, 150, 471]], "bonne": "Atrium du rumen", "fausses": ["Récessus du rumen", "Insula du rumen", "Cul-de-sac ventral"], "clin": "L'atrium du rumen reçoit le cardia et communique avec le réseau."}], "cheval": [{"zones": [[62, 682, 126, 704]], "bonne": "Cæcum", "fausses": ["Côlon ventral droit", "Petit côlon", "Jéjunum"], "clin": "Le cæcum du cheval est énorme : environ 1 m et 40 L."}, {"zones": [[169, 1108, 240, 1128]], "bonne": "Iléum", "fausses": ["Jéjunum", "Duodénum", "Petit côlon"], "clin": "L'iléum s'abouche au cæcum, auquel il est uni par le pli iléo-cæcal."}, {"zones": [[890, 1200, 1009, 1224]], "bonne": "Base du cæcum", "fausses": ["Apex du cæcum", "Corps du cæcum", "Courbure pelvienne"], "clin": "La base du cæcum, dorsale, reçoit l'iléum et donne naissance au côlon."}, {"zones": [[30, 564, 107, 601]], "bonne": "Apex du cæcum", "fausses": ["Base du cæcum", "Corps du cæcum", "Courbure sternale"], "clin": "L'apex du cæcum est ventral et crânial, près du sternum."}, {"zones": [[147, 44, 315, 67]], "bonne": "Courbure pelvienne", "fausses": ["Courbure sternale", "Courbure diaphragmatique", "Apex du cæcum"], "clin": "La courbure pelvienne est accessible par palpation transrectale."}, {"zones": [[183, 272, 331, 296]], "bonne": "Côlon ventral gauche", "fausses": ["Côlon dorsal gauche", "Côlon ventral droit", "Petit côlon"], "clin": "Le gros côlon : ventral droit, courbure sternale, ventral gauche, courbure pelvienne, dorsal gauche, courbure diaphragmatique, dorsal droit."}, {"zones": [[695, 643, 829, 665]], "bonne": "Côlon dorsal droit", "fausses": ["Côlon ventral droit", "Côlon dorsal gauche", "Côlon transverse"], "clin": "Le côlon dorsal droit se termine par le côlon transverse."}]};
+/* manche 2 : questions supplémentaires tirées des planches (une légende cachée par une case rouge) */
+(function(){const ESP={chien:"Chien",intchien:"Chien",foie:"Chien",cheval:"Cheval",estcheval:"Cheval",boeuf:"Bœuf",mouton:"Mouton"};
+  Object.keys(TROUS).forEach(pl=>{const P=PLANCHES[pl]||{};TROUS[pl].forEach((t,k)=>QUESTIONS.push({id:"t_"+pl+"_"+k,src:pl,voir:(P.legende||P.nom||"").split(" · ")[0],
+    vue:"Extrait de la planche : la case rouge cache une légende",img:"q/t_"+pl+"_"+k+".jpg",ref:P.ref||"",esp:ESP[pl]||"",
+    q:"Quelle légende manque dans la case rouge ?",bonne:t.bonne,fausses:t.fausses,info:t.clin}))})})();
 const DEMO={nom:"Démonstration",ref:"",legende:"Exemple d'entraînement · non noté",img:"demo.jpg",w:645,h:380,
   erreurs:[{titre:"« Larynx »",niv:"F",zones:[[147,293,207,312]],bonne:"C'est le pharynx.",fausses:["C'est la trachée.","C'est l'épiglotte.","C'est l'œsophage."],clin:""}]};
 const COULEURS=[["Rouge","#c0262d"],["Bleu","#1f5d8c"],["Vert","#2f7a4a"],["Orange","#d0661f"],["Violet","#6b3fa0"],["Turquoise","#127f80"],["Rose","#c2407a"],["Ardoise","#3e4a59"]];
@@ -902,7 +907,7 @@ function appliquerCouleurs(){const r=document.documentElement.style;if(duel&&due
 const MASCOTTES=["Chiens","Chats","Chevaux","Vaches","Cochons","Moutons","Chèvres","Lapins","Ânes","Furets"];
 const MYSTERE={img:"mystere.jpg",ref:"Pl. 170, p. 324",q:"Quel est cet organe, et de quelle espèce ?",bonne:"L'estomac du chien, ouvert",fausses:["L'estomac du porc, ouvert","L'estomac du cheval, ouvert","La caillette du bœuf, ouverte"],info:"Estomac du chien, conformation intérieure : plis gastriques, cardia, pylore."};
 const TUILES=16;
-const PAD=14, MALUS=0.1, MALUS_MAX=1, PIN=String((window.APP_CONFIG&&window.APP_CONFIG.codeEncadrant)||"7351"), BASE_NOTE=8, BONUS_VICTOIRE=1, PTS_M1=14;
+const PAD=14, MALUS=0.1, MALUS_MAX=1, PIN=String((window.APP_CONFIG&&window.APP_CONFIG.codeEncadrant)||"602"), BASE_NOTE=8, BONUS_VICTOIRE=1, PTS_M1=14;
 const fr=n=>String(Math.round(n*100)/100).replace(".",",");
 
 /* =========================================================
@@ -1106,7 +1111,7 @@ const ico=(n,cls)=>`<svg class="ric ${cls||""}" viewBox="0 0 64 64" aria-hidden=
 const balise=t=>esc(t).replace(/\*\*(.+?)\*\*/g,"<b>$1</b>").replace(/!!(.+?)!!/g,'<b class="rx">$1</b>').replace(/\+\+(.+?)\+\+/g,'<b class="rv">$1</b>');
 function regles(){const m1=fr(duel.m1||4), m2=fr(duel.m2||3.5), tot=fr((duel.m1||4)+(duel.m2||3.5));return [
  ["Le principe et le fair-play","tablette",[
-  ["tablette","",`Chaque équipe joue **sur sa tablette**, en même temps que l'autre. **Deux manches**, environ **${tot} minutes** en tout.`],
+  ["tablette","",`Chaque équipe joue **sur sa tablette**, en même temps que l'autre. **Deux manches**, environ **${tot} minutes** en tout. C'est **la personne qui a le plus grand écran** qui mène le jeu (avec des téléphones seulement, on s'adapte).`],
   ["chrono","",`Le **chrono démarre ensemble** sur les deux tablettes ; quand il s'arrête, la manche se termine.`],
   ["interdit","x",`!!Pas de triche!! : !!on ne regarde pas l'autre tablette!!, !!on ne souffle pas!!, !!ni téléphone ni notes de cours!!.`],
   ["oeil","",`Les deux équipes **se surveillent**. En cas de doute, **appelez l'enseignante**.`]]],
@@ -1121,10 +1126,10 @@ function regles(){const m1=fr(duel.m1||4), m2=fr(duel.m2||3.5), tot=fr((duel.m1|
   ["loupe","",`Une planche du Barone a été **falsifiée** : **7 erreurs** (légendes fausses ou inversées, flèches mal placées).`],
   ["doigt","",`Touchez l'erreur sur la planche, puis **choisissez la bonne correction**.`],
   ["un","x",`!!Une seule chance par erreur!! : la première réponse est **définitive**.`],
-  ["cible","x",`!!Pas de clic au hasard!! : chaque clic à côté **coûte des points**.`],
+  ["cible","x",`!!Pas de clic au hasard!! : un clic loin de toute légende **coûte des points** ; un clic **juste à côté** d'une légende n'est pas pénalisé.`],
   ["fleche","",`Tout est trouvé et corrigé ? On passe **automatiquement** à la manche 2. Passer plus tôt **clôture la manche 1**.`]]],
  ["Manche 2 · Questions sur le Barone","livre",[
-  ["livre","",`Un **extrait de planche du Barone**, une **flèche rouge** : choisissez **ce qu'elle montre** (${m2} min).`],
+  ["livre","",`Un **extrait de planche du Barone**, une **flèche rouge** ou une **case rouge** qui cache une légende : choisissez **ce qu'elle montre** (${m2} min, une douzaine de questions).`],
   ["un","x",`!!Une seule chance par question!!. Vous pouvez **passer une question** et y revenir.`],
   ["sablier","",`**Un seul Barone pour deux équipes** : réservez-le sur la tablette (**45 s**), puis rendez-le. !!S'il est chez l'autre équipe, on n'y touche pas!!.`],
   ["ampoule","",`L'**indice** donne la page du Barone, mais la réponse compte alors **moitié moins**.`],
@@ -1377,7 +1382,7 @@ function clicPlanche(ev){
   if(!jeu||!(vue==="m1"||vue==="demo"))return;
   const pl=PL(), b=ev.currentTarget.getBoundingClientRect();
   const x=(ev.clientX-b.left)*pl.w/b.width, y=(ev.clientY-b.top)*pl.h/b.height;
-  let i=-1,best=1e9;pl.erreurs.forEach((e,k)=>e.zones.forEach(z=>{const dx=Math.max(0,z[0]-x,x-z[2]),dy=Math.max(0,z[1]-y,y-z[3]);if(dx>PAD||dy>PAD)return;
+  const tol=Math.max(PAD,26*pl.w/b.width);let proche=1e9;let i=-1,best=1e9;pl.erreurs.forEach((e,k)=>e.zones.forEach(z=>{const dx=Math.max(0,z[0]-x,x-z[2]),dy=Math.max(0,z[1]-y,y-z[3]);proche=Math.min(proche,Math.max(dx,dy));if(dx>tol||dy>tol)return;
     const sc=dx+dy+(jeu.err[k].t?40:0);if(sc<best){best=sc;i=k}}));
   if(i>=0){const nouveau=!jeu.err[i].t;jeu.err[i].t=1;ouvert=i;
     if(nouveau&&!jeu.demo){const adv=duel&&!duel.test?(scores[autre(moi)]||{}):{};const deja=adv.err&&adv.err[i]&&adv.err[i].t;
@@ -1385,6 +1390,7 @@ function clicPlanche(ev){
     sauver();rendre();
     if(window.innerWidth<=900){const c=document.getElementById("carte");if(c)c.scrollIntoView({behavior:"smooth",block:"start"})}}
   else if(enTrous()){toast("Touchez une case numérotée")}
+  else if(proche<=3*tol){toast("Presque : touchez la légende elle-même (pas de pénalité)")}
   else{jeu.faux.push([Math.round(x),Math.round(y)]);echec();sauver();rendre();toast("Rien d'anormal ici : les clics au hasard sont pénalisés")}
 }
 function repondreErreur(i,k){const e=jeu.err[i];if(e.rep>=0)return;e.rep=k;e.ok=e.opts[k].ok;dernierJuste={k:"e"+i,t:Date.now()};e.ok?succes():echec();sauver();rendre();verifFinM1()}
@@ -2314,7 +2320,7 @@ function finRouge(){return `<div style="margin:0 0 16px;padding:22px 20px;border
 function aideEcranBase(a){return aideEcran(Object.assign({},a,{id:"_"+a.id}))}
 function aideEcran(a){if(!a)return "";const risque=a.id==="a3"?"<b>Un seul téléphone ou tablette par duo</b> pour tout l'atelier (jeu et évaluation), de préférence le plus grand écran du duo. Si vous voulez changer d'écran, faites-le avant de commencer l'évaluation 3D ou après l'avoir validée, jamais pendant.":a.id==="a5"?"Pendant le <b>Défi foie</b>, ne changez pas d'appareil en cours d'étape : votre progression serait perdue. Changez avant de commencer ou après avoir validé votre fiche.":"";
   if(a.id==="a4")return `<p class="ecran att" style="margin-top:14px;font-size:17px">⚠️ <b>Atelier 4 : un seul téléphone ou tablette par équipe</b>, du début à la fin, de préférence le plus grand écran. Toute l’équipe répond ensemble sur cet appareil.</p>`+aideEcranBase(a);
-  if(a.id==="a2")return `<p class="ecran att" style="margin-top:14px;font-size:17px">📺 <b>Atelier 2 : utilisez l’écran le plus grand du groupe</b> (une tablette de préférence) avant de commencer le duel : tout le monde doit bien voir la planche.</p>`+aideEcranBase(a);
+  if(a.id==="a2")return `<p class="ecran att" style="margin-top:14px;font-size:17px">📺 <b>Atelier 2 : c’est la personne qui a le plus grand écran (tablette ou ordinateur) qui mène le jeu.</b> Ce jeu est peu adapté aux téléphones : toute l’équipe doit bien voir la planche. Si vous n’avez que des téléphones, ce n’est pas grave, on s’adapte, mais un grand écran reste bien mieux.</p>`+aideEcranBase(a);
   const duo=a.id==="a3"?`<p class="ecran att" style="margin-top:14px;font-size:17px">⚠️ <b>Atelier 3 : un seul téléphone ou tablette par duo</b>, du début à la fin (jeu et évaluation). Choisissez maintenant le plus grand écran du duo et travaillez tous les deux dessus.</p>`:"";
   return duo+`<details class="ecran"><summary>Vous voyez mal ? Continuer sur un autre écran</summary><ol><li>Sur l'autre téléphone ou la tablette, scannez le QR code du TP.</li><li>Choisissez <b>votre propre nom</b>.</li><li>Vous retrouvez votre groupe, votre équipe et cet atelier : touchez « Ouvrir l'atelier ». Plusieurs étudiants peuvent le faire sur le même grand écran.</li></ol>${risque?`<p class="att">${risque}</p>`:`<p class="ok">Dans cet atelier, vous pouvez changer d'écran à tout moment : votre travail est enregistré en ligne.</p>`}</details>`}
 const atelierDe=(k,r)=>ATELIERS[((k||0)+r)%NB_ROT];
@@ -2421,7 +2427,8 @@ function vBienvenue(){
      ${ids.length?`<select id="selSeance" class="gros">${ids.map(x=>`<option value="${x}" ${x===sid?"selected":""}>${esc(seances[x].nom)}</option>`).join("")}</select>`:`<p class="note">Aucune séance n'est encore enregistrée.</p>`}</div></div>
    <div class="card etape"><span class="num1">2</span><div style="flex:1"><h3>Qui êtes-vous ?</h3>
      ${s?`<select id="selMoi" class="gros"><option value="">Choisir mon nom…</option>${[...s.etudiants].sort((a,b)=>a.n.localeCompare(b.n,"fr")).map(e=>`<option value="${e.id}">${esc(e.n)} ${esc(e.p)}</option>`).join("")}</select>
-      <p class="note" style="margin:8px 0 0">Téléphone éteint ou changé ? Choisissez simplement votre nom : vous retrouvez tout où vous en étiez.</p>`:""}</div></div></div>`}
+      <p class="note" style="margin:8px 0 0">Téléphone éteint ou changé ? Choisissez simplement votre nom : vous retrouvez tout où vous en étiez.</p>
+      <button class="link" id="echangePlace" style="margin-top:10px">Votre nom n'est pas dans cette liste ? (place échangée avec un étudiant d'une autre séance)</button>`:""}</div></div></div>`}
 function vInscriptionBande(){const sid=moiE.sid,s=seances[sid],p=phaseSeance(sid),b=maBande();
   const deja=new Set(bandes.filter(x=>x.seance===sid).flatMap(x=>x.membres));
   const moiNom=etu(sid,moiE.eid);
@@ -2632,6 +2639,8 @@ function vProfSeance(){
    <div class="banner" style="background:var(--sheet);border:1px solid var(--rule)">${etat}.${p.manuel?"":" Tout se fait automatiquement : cette page sert seulement à suivre."}</div>
    ${p.phase==="inscription"?`<div class="card tirage"><h3 style="margin:0 0 6px">Tirage au sort des groupes</h3><p class="note" style="margin:0 0 10px">Attendez que tous les étudiants présents aient choisi leur nom sur leur téléphone (${enBande.size} pour l'instant), puis lancez le tirage : les groupes de 10, les équipes et les binômes de chaque atelier sont formés aussitôt.</p><button class="btn pen gros" id="lancerTirage" ${enBande.size?"":"disabled"}>Lancer le tirage au sort maintenant</button>${p.manuel?"":`<p class="note" style="margin:8px 0 0">Sinon, le tirage aura lieu automatiquement à ${hd}.</p>`}</div>`:""}
    ${p.phase==="rot"||p.phase==="prepa"?`<div class="card"><h3 style="margin:0 0 6px">En cas de besoin</h3><p class="note" style="margin:0 0 10px">Normalement rien à faire : on change d'atelier tout seul quand tous les groupes ont fini, ou au bout de ${Math.round(dureeRot(seances[sid])/60e3)} min.</p><div class="row"><button class="btn ghost" id="rotPlus5">+5 min pour cet atelier</button><button class="btn ghost" id="rotSuivante">${p.phase==="prepa"?"Démarrer les ateliers maintenant":"Passer tout de suite à l'atelier suivant"}</button></div></div>`:""}
+   <div class="card" style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between"><div><b>Code d'échange de place</b><p class="note" style="margin:2px 0 0">À donner à un étudiant qui vient à cette séance à la place d'un autre (bouton « Votre nom n'est pas dans cette liste ? » de l'accueil). Sans ce code, l'échange est bloqué.</p>${(s.echanges||[]).length?`<p class="note" style="margin:4px 0 0">Échanges faits : ${(s.echanges||[]).filter(x=>x.vers===sid).map(x=>esc(etu(sid,x.eid))+(x.avec?" à la place de "+esc(x.avec):"")).join(" ; ")||"aucun vers cette séance"}</p>`:""}</div><b style="font-size:30px;letter-spacing:4px">${codeEchange(sid)}</b></div>
+   <div class="card"><b>Notes et signalements dans Google Sheets</b><p class="note" style="margin:2px 0 8px">Chaque note enregistrée par un téléphone part aussi dans le tableur des notes (lignes BRUT), et les notes par étudiant (lignes ETU) y sont envoyées par cet écran dès qu'elles changent. Les signalements des étudiants vont dans un tableur à part.${typeof feuilleEnAttente==="function"&&feuilleEnAttente()?` <b>${feuilleEnAttente()} ligne(s) en attente d'envoi.</b>`:""}</p><div class="row"><a class="btn ghost" target="_blank" rel="noopener" href="${(window.FEUILLES||{}).notes||"#"}">Ouvrir le tableur des notes</a><a class="btn ghost" target="_blank" rel="noopener" href="${(window.FEUILLES||{}).signal||"#"}">Ouvrir les signalements</a><button class="btn ghost" id="feuilleTout">Envoyer toutes les notes au tableur</button></div></div>
    <div class="row"><button class="btn pen" id="afficheOuvrir">Afficher qui est avec qui (groupes, équipes, binômes)</button></div>
    <div class="tgrid">${cartes}</div>
    <div class="tablebox"><table><tr><th>Étudiant·e</th><th>Groupe</th>${dispo.map(a=>`<th>Atelier ${a.n}</th>`).join("")}<th>Note finale</th></tr>${lignes||`<tr><td colspan="${3+dispo.length}" class="note">Les groupes ne sont pas encore formés.</td></tr>`}</table></div>
@@ -2656,6 +2665,7 @@ function brancherV2(){
   const on=(s,ev,f)=>{const el=$(s);if(el)el.addEventListener(ev,f)};
   const all=(s,f)=>document.querySelectorAll(s).forEach(b=>b.addEventListener("click",()=>f(b)));
   on("#selMoi","change",e=>{if(!e.target.value)return;moiE={sid:seanceSel,eid:e.target.value};LS.set("moiEtu",moiE);choixBande=null;majMonGid();vue="hub";rendre();window.scrollTo(0,0)});
+  on("#echangePlace","click",ouvrirEchange);
   document.querySelectorAll("#pasMoi").forEach(b=>b.addEventListener("click",()=>modale("Changer de personne ?","Ce téléphone ne sera plus associé à votre nom. Rien n'est effacé : choisissez de nouveau votre nom pour tout retrouver.","Oui",()=>{moiE=null;LS.set("moiEtu",null);monGid=null;vue="hub";rendre()},"","Non")));
   all("[data-ami]",b=>{const id=b.dataset.ami;const i=choixBande.indexOf(id);if(i>=0)choixBande.splice(i,1);else if(choixBande.length<4)choixBande.push(id);else toast("5 personnes au maximum par groupe");const y=window.scrollY;rendre();window.scrollTo(0,y)});
   on("#creerBande","click",()=>{const m=[moiE.eid,...choixBande];modale(m.length>1?"Valider votre groupe ?":"Travailler seul·e ?",m.length>1?`${m.map(x=>esc(etu(moiE.sid,x))).join("<br>")}<br><br>Ne mettez que des personnes <b>présentes</b>. Ce choix est définitif.`:"Vous serez placé·e dans un groupe de 10 avec d'autres étudiants.","Oui, valider",async()=>{
@@ -3506,7 +3516,7 @@ async function archiver(){const sid=profSeance;if(!sid||!db||monGid==="TEST")ret
   try{const L=await db.collection("config").doc("archive-"+sid).acquire({holder:DEVICE,ttlMs:170000});if(!L.acquired)return;
     await db.collection("archives").doc(sid).set({t:Date.now(),phase:p.phase,lignes});
     if(p.phase==="fin")await db.collection("archives").doc(sid+"-fin-"+new Date().toISOString().slice(11,16).replace(":","h")).set({t:Date.now(),lignes})}catch(e){}}
-setInterval(()=>{if(aboCle==="prof")archiver()},30000);
+setInterval(()=>{if(String(aboCle).startsWith("prof:"))archiver()},30000);
 
 /* ----- code de secours ----- */
 const SEL_SECOURS=()=>"tpdig|"+PIN;
@@ -3550,26 +3560,29 @@ function ouvrirNoteManu(k){{const [sid,eid,aid]=k.split("~"),m=notesManu[k];
    Seul l'espace encadrants écoute tout.
    ========================================================= */
 let abos=[], aboCle="", a3prog={};
-function portee(){if(vue==="prof")return "prof";if(moiE&&monGid!=="TEST"){const g=monGroupeDe();return "etu:"+moiE.sid+":"+(g?g.id:"")}return "acc:"+(seanceSel||"")}
+function portee(){if(vue==="prof"){let ps="";try{ps=profSeance||seanceSel||(typeof seanceParDefaut==="function"?seanceParDefaut():"")||""}catch(e){}return "prof:"+(ps||"")}if(moiE&&monGid!=="TEST"){const g=monGroupeDe();return "etu:"+moiE.sid+":"+(g?g.id:"")}return "acc:"+(seanceSel||"")}
 function upsert(arr,id,data){const i=arr.findIndex(x=>x.id===id);if(data==null){if(i>=0)arr.splice(i,1);return}const o=Object.assign({id},data);if(i>=0)arr[i]=o;else arr.push(o)}
 function reabonner(){if(!db)return;const c=portee();if(c===aboCle)return;aboCle=c;abos.forEach(u=>{try{u&&u()}catch(e){}});abos=[];
   const S=(q,f)=>{try{abos.push(q.onSnapshot(f,()=>{}))}catch(e){}};
   const coll=(nom,f)=>s=>{f(s.docs);rendrePortail()};
-  if(c==="prof"){
-    S(db.collection("groupes"),coll("groupes",d=>{groupes=d.map(x=>Object.assign({id:x.id},x.data()))}));
-    S(db.collection("bandes"),coll("bandes",d=>{bandes=d.map(x=>Object.assign({id:x.id},x.data()))}));
-    S(db.collection("deroule"),coll("deroule",d=>{deroules={};d.forEach(x=>deroules[x.id]=x.data())}));
-    S(db.collection("subs"),coll("subs",d=>{subsDocs={};d.forEach(x=>subsDocs[x.id]=x.data())}));
-    S(db.collection("a1"),coll("a1",d=>{a1docs={};d.forEach(x=>a1docs[x.id]=x.data());if(testE)Object.assign(a1docs,testE.a1)}));
-    S(db.collection("a1eval"),coll("a1eval",d=>{evals=d.map(x=>Object.assign({id:x.id},x.data()));if(testE)evals=evals.concat(testE.evals)}));
-    S(db.collection("a4"),coll("a4",d=>{a4docs={};d.forEach(x=>a4docs[x.id]=x.data())}));
-    S(db.collection("a6"),coll("a6",d=>{a6docs={};d.forEach(x=>a6docs[x.id]=x.data())}));
-    S(db.collection("notes_a3"),coll("notes_a3",d=>{notesA3=d.map(x=>Object.assign({id:x.id},x.data()))}));
-    S(db.collection("a3prog"),coll("a3prog",d=>{a3prog={};d.forEach(x=>a3prog[x.id]=x.data())}));
-    S(db.collection("notes_a5"),coll("notes_a5",d=>{notesA5=d.map(x=>Object.assign({id:x.id},x.data()))}));
-    S(db.collection("resultats"),coll("resultats",d=>{resultats=d.map(x=>Object.assign({},x.data()))}));
-    S(db.collection("secours"),coll("secours",d=>{secoursDocs={};d.forEach(x=>secoursDocs[x.id]=x.data())}));
-    S(db.collection("notes_manuelles"),coll("nm",d=>{notesManu={};d.forEach(x=>notesManu[x.id]=x.data())}));
+  if(c.startsWith("prof:")){const ps=c.slice(5);
+    /* lecture limitée à la séance affichée (quota gratuit Firestore) ; sans séance connue : tout */
+    const Q=n=>ps?db.collection(n).where("__id__",">=",ps).where("__id__","<",ps+"\uf8ff"):db.collection(n);
+    const W=n=>ps?db.collection(n).where("seance","==",ps):db.collection(n);
+    S(Q("groupes"),coll("groupes",d=>{groupes=d.map(x=>Object.assign({id:x.id},x.data()))}));
+    S(W("bandes"),coll("bandes",d=>{bandes=d.map(x=>Object.assign({id:x.id},x.data()))}));
+    S(Q("deroule"),coll("deroule",d=>{deroules={};d.forEach(x=>deroules[x.id]=x.data())}));
+    S(Q("subs"),coll("subs",d=>{subsDocs={};d.forEach(x=>subsDocs[x.id]=x.data())}));
+    S(Q("a1"),coll("a1",d=>{a1docs={};d.forEach(x=>a1docs[x.id]=x.data());if(testE)Object.assign(a1docs,testE.a1)}));
+    S(W("a1eval"),coll("a1eval",d=>{evals=d.map(x=>Object.assign({id:x.id},x.data()));if(testE)evals=evals.concat(testE.evals)}));
+    S(Q("a4"),coll("a4",d=>{a4docs={};d.forEach(x=>a4docs[x.id]=x.data())}));
+    S(Q("a6"),coll("a6",d=>{a6docs={};d.forEach(x=>a6docs[x.id]=x.data())}));
+    S(Q("notes_a3"),coll("notes_a3",d=>{notesA3=d.map(x=>Object.assign({id:x.id},x.data()))}));
+    S(Q("a3prog"),coll("a3prog",d=>{a3prog={};d.forEach(x=>a3prog[x.id]=x.data())}));
+    S(Q("notes_a5"),coll("notes_a5",d=>{notesA5=d.map(x=>Object.assign({id:x.id},x.data()))}));
+    S(W("resultats"),coll("resultats",d=>{resultats=d.map(x=>Object.assign({},x.data()))}));
+    S(Q("secours"),coll("secours",d=>{secoursDocs={};d.forEach(x=>secoursDocs[x.id]=x.data())}));
+    S(Q("notes_manuelles"),coll("nm",d=>{notesManu={};d.forEach(x=>notesManu[x.id]=x.data())}));
     S(db.collection("duels").where("statut","==","en_cours"),s=>{duelsEnCours=s.docs.map(x=>Object.assign({id:x.id},x.data()));if(vue==="prof")rendre()});
     return}
   if(c.startsWith("acc:")){const sid=c.slice(4);if(!sid)return;
@@ -3599,7 +3612,7 @@ function initPortail(){
   aboCle="";reabonner();viderFile()}
 setInterval(reabonner,1500);
 /* maquettes des autres groupes : lues seulement quand il faut en attribuer une */
-async function chargerA1(sid){if(!db||aboCle==="prof")return;try{const s=await db.collection("a1").get();s.docs.forEach(d=>{if(d.id.startsWith(sid+"-G"))a1docs[d.id]=d.data()})}catch(e){}}
+async function chargerA1(sid){if(!db||String(aboCle).startsWith("prof:"))return;try{const s=await db.collection("a1").where("__id__",">=",sid+"-G").where("__id__","<",sid+"-G\uf8ff").get();s.docs.forEach(d=>{if(d.id.startsWith(sid+"-G"))a1docs[d.id]=d.data()})}catch(e){}}
 
 /* ----- un groupe qui a fini son atelier se déclare prêt lui-même (les autres téléphones ne voient pas son détail) ----- */
 setInterval(()=>{if(!db||!moiE||monGid==="TEST")return;const g=monGroupeDe();if(!g)return;const d=deroules[g.seance];if(!d||d.r<0||d.r>=NB_ROT||g.pret===d.r)return;
@@ -3742,12 +3755,12 @@ async function lancerDuelEquipes(g){
   const ref=db.collection("duels").doc(id);let snap=null;try{snap=await ref.get()}catch(e){}
   if(!snap||!snap.exists){let L={acquired:true};try{L=await db.collection("config").doc("lock-"+id).acquire({holder:DEVICE,ttlMs:8000})}catch(e){}
     if(L.acquired){try{snap=await ref.get()}catch(e){}
-      if(!snap||!snap.exists){const solo=sd.equipes.length<2;const planche=await tirerPlanche();const qids=shuffle(QUESTIONS.map(q=>q.id)).slice(0,Math.min(Math.max(reglages.nq,8),QUESTIONS.length));
+      if(!snap||!snap.exists){const solo=sd.equipes.length<2;const planche=await tirerPlanche();const qids=shuffle(QUESTIONS.filter(q=>q.src!==planche).map(q=>q.id)).slice(0,Math.max(reglages.nq,12));
         const nomE=i=>"Équipe "+(i+1)+" ("+sd.equipes[i].map(x=>nomCourt(g.seance,x).split(" ")[0]).join(", ")+")";
         const alt=COULEURS.map(c=>c[1]).find(c=>c!==g.couleur);
         const d={equipes:{A:nomE(0),B:solo?"Adversaire fictif":nomE(1)},groupeA:g.id+"-a2-e1",groupeB:solo?"":g.id+"-a2-e2",seance:g.seance,solo,num:n,
           mascotteA:g.mascotte,mascotteB:solo?"Cochons":g.mascotte,couleurA:g.couleur,couleurB:alt,planche,mode1:n===2?"trous":choisirMode1(),qids,statut:"attente",cree:Date.now(),debut:null,
-          m1:+s.duelM1||6,m2:+s.duelM2||5,rejoint:solo,luB:solo};
+          m1:+s.duelM1||4,m2:+s.duelM2||6,rejoint:solo,luB:solo};
         try{await ref.set(d)}catch(e){toast("Création du duel impossible");return}}}
     else await new Promise(r=>setTimeout(r,1500))}
   rejoindre(id,role)}
@@ -3942,6 +3955,57 @@ document.addEventListener("click",e=>{if(e.target.closest&&e.target.closest("#la
 document.addEventListener("click",e=>{const t=e.target.closest&&e.target.closest("#rotPlus5,#rotSuivante");if(!t||!db)return;const sid=profSeance||seanceSel,d=deroules[sid];if(!d)return;
   if(t.id==="rotPlus5"){const nd={r:d.r,t:d.t+5*60e3};deroules[sid]=nd;ecrire("deroule",sid,nd,"set");toast("5 minutes de plus pour tous les groupes");rendre();return}
   modale(d.r<0?"Démarrer les ateliers ?":"Passer à l'atelier suivant ?",d.r<0?"Tous les groupes partent vers leur premier atelier.":"Tous les groupes changent d'atelier maintenant. Les notes déjà enregistrées sont gardées ; un atelier non terminé sera noté avec ce qui a été fait.","Oui",()=>{const nd=rotSuivanteDoc(d.r+1);deroules[sid]=nd;ecrire("deroule",sid,nd,"set");rendre()},"","Annuler")});
+/* ----- échange de place entre deux séances : seulement avec le code donné par un encadrant ----- */
+function codeEchange(sid){let h=7;const t=sid+"|echange|"+PIN;for(let i=0;i<t.length;i++)h=(h*31+t.charCodeAt(i))%1000003;return String(1000+h%9000)}
+function ouvrirEchange(){const sid=seanceSel,s=seances[sid];if(!s)return;
+  const autres=Object.keys(seances).filter(x=>x!==sid).flatMap(x=>(seances[x].etudiants||[]).map(e=>({sid:x,e}))).sort((a,b)=>a.e.n.localeCompare(b.e.n,"fr"));
+  const ici=[...s.etudiants].sort((a,b)=>a.n.localeCompare(b.n,"fr"));
+  modale("Échange de place",`<p>Vous venez à cette séance à la place d'un autre étudiant ? C'est possible <b>seulement avec l'accord d'un encadrant</b> : allez le voir, il vous donnera un code.</p>
+   <label class="field">Votre nom (inscrit dans une autre séance)<select id="echMoi" class="gros"><option value="">Choisir…</option>${autres.map(a=>`<option value="${a.sid}|${a.e.id}">${esc(a.e.n)} ${esc(a.e.p)} (${esc(seances[a.sid].nom.split(" · ")[0])})</option>`).join("")}</select></label>
+   <label class="field">Vous prenez la place de<select id="echAvec" class="gros"><option value="">Personne (je m'ajoute simplement)</option>${ici.map(e=>`<option value="${e.id}">${esc(e.n)} ${esc(e.p)}</option>`).join("")}</select></label>
+   <label class="field">Code donné par l'encadrant<input id="echCode" inputmode="numeric" maxlength="6" autocomplete="off"></label>`,"Valider l'échange",()=>{
+    const v=($("#echMoi")||{}).value||"",avec=($("#echAvec")||{}).value||"",code=(($("#echCode")||{}).value||"").trim();
+    if(!v){toast("Choisissez votre nom");return}
+    if(code!==codeEchange(sid)){toast("Code incorrect : demandez le code à un encadrant");return}
+    faireEchange(sid,v.split("|")[0],v.split("|")[1],avec)},"","Annuler")}
+async function faireEchange(sid,sidAutre,eid,avec){
+  try{const a=JSON.parse(JSON.stringify(seances[sid])),b=JSON.parse(JSON.stringify(seances[sidAutre]));
+    const moiEnt=b.etudiants.find(e=>e.id===eid);if(!moiEnt){toast("Nom introuvable");return}
+    b.etudiants=b.etudiants.filter(e=>e.id!==eid);
+    if(avec){const lui=a.etudiants.find(e=>e.id===avec);a.etudiants=a.etudiants.filter(e=>e.id!==avec);if(lui)b.etudiants.push(lui)}
+    if(!a.etudiants.some(e=>e.id===eid))a.etudiants.push(moiEnt);
+    const trace={t:Date.now(),eid,de:sidAutre,vers:sid,avec:avec||null};
+    a.echanges=[...(a.echanges||[]),trace];b.echanges=[...(b.echanges||[]),trace];
+    await db.collection("seances").doc(sid).update({etudiants:a.etudiants,echanges:a.echanges});
+    await db.collection("seances").doc(sidAutre).update({etudiants:b.etudiants,echanges:b.echanges});
+    seances[sid]=a;seances[sidAutre]=b;
+    if(typeof envoyerFeuille==="function")envoyerFeuille("ECHANGE",[sid,eid,moiEnt.n+" "+moiEnt.p,"de "+sidAutre,avec?"à la place de "+avec:"ajout"]);
+    moiE={sid,eid};LS.set("moiEtu",moiE);choixBande=null;majMonGid();vue="hub";rendre();window.scrollTo(0,0);toast("Échange enregistré : vous êtes inscrit à cette séance")}
+  catch(e){toast("Échange impossible pour l'instant : réessayez")}}
+
+/* ===== Google Sheets : contexte des signalements + notes par étudiant (lignes ETU) ===== */
+function aidDeVue(){return {a1:"a1",a3:"a3",fam:"a3",a4:"a4",a5:"a5",a6:"a6",salle:"a2",decompte:"a2",m1:"a2",m2:"a2",attente:"a2",fin:"a2"}[vue]||""}
+window.__signalVisible=function(){return monGid!=="TEST"&&(!!aidDeVue()||(vue==="hub"&&!!moiE))};
+window.__contexteSignal=function(){const aid=aidDeVue(),c={atelier:aid||vue,etat:{vue}};
+  const at=ATELIERS.find(a=>a.id===aid);if(at)c.atelierNom="Atelier "+at.n+(at.nom?" · "+at.nom:"");
+  if(moiE){c.sid=moiE.sid;c.eid=moiE.eid;const s=seances[moiE.sid],e=s&&(s.etudiants||[]).find(x=>x.id===moiE.eid);if(e)c.nom=e.n+" "+e.p}
+  let g=null;try{g=monGroupe()}catch(e){}
+  if(g){c.groupe=g.nom||g.id;c.etat.gid=g.id;if(aid){try{const t=monEquipe(g,aid);if(t)c.equipe=t.id}catch(e){}}
+    try{if(moiE)c.etat.notes=noteEtudiant(g,moiE.eid)}catch(e){}
+    try{const docs={a1:a1docs,a4:a4docs,a6:a6docs}[aid];if(docs&&c.equipe&&docs[c.equipe])c.etat.doc=docs[c.equipe]}catch(e){}}
+  try{if(duel)c.etat.duel={id:duel.id||null,moi:moi||null,scores}}catch(e){}
+  return c};
+function envoyerNotesFeuille(force){if(typeof envoyerFeuille!=="function"||!String(aboCle).startsWith("prof:"))return 0;
+  const sid=profSeance,s=seances[sid];if(!s||!(s.etudiants||[]).length)return 0;const p=phaseSeance(sid);if(!force&&p.phase!=="rot"&&p.phase!=="fin")return 0;
+  const memo=LS.get("memoFeuille_"+sid,{});let n=0;
+  s.etudiants.forEach(e=>{const g=groupesDe(sid).find(x=>(x.membres||[]).includes(e.id));if(!g)return;let r;try{r=noteEtudiant(g,e.id)}catch(err){return}
+    const v=["a1","a2","a3","a4","a5","a6"].map(a=>r.par[a]!=null?fr(r.par[a]):"");const fin=r.finale!=null?fr(r.finale):"";
+    const cle=v.join(";")+";"+fin;if(!force&&memo[e.id]===cle)return;if(!force&&!v.some(x=>x!==""))return;
+    memo[e.id]=cle;n++;envoyerFeuille("ETU",[sid,g.nom||g.id,e.id,(e.n||"")+" "+(e.p||""),...v,fin,p.phase])});
+  LS.set("memoFeuille_"+sid,memo);return n}
+setInterval(()=>{try{envoyerNotesFeuille(false)}catch(e){}},45000);
+document.addEventListener("click",ev=>{const b=ev.target.closest&&ev.target.closest("#feuilleTout");if(!b)return;
+  const n=envoyerNotesFeuille(true);toast(n?n+" ligne(s) envoyée(s) au tableur des notes":"Rien à envoyer pour l'instant (groupes pas encore formés ?)")});
 </script>
 
 <script>if("serviceWorker" in navigator)window.addEventListener("load",()=>navigator.serviceWorker.register("sw.js").catch(()=>{}));</script>
@@ -3960,5 +4024,6 @@ document.addEventListener("click",e=>{const t=e.target.closest&&e.target.closest
   document.addEventListener("click",function(e){if(e.__confirme)return;var b=e.target.closest&&e.target.closest(SEL);if(!b||b.disabled)return;
     e.stopImmediatePropagation();e.preventDefault();choix=cle(b);sync()},true);
   setInterval(sync,300)})();
+
 </script>
 </body></html>
