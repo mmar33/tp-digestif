@@ -3995,6 +3995,22 @@ document.addEventListener("click",e=>{const t=e.target.closest&&e.target.closest
     try{const L=await db.collection("config").doc("av-"+sid+"-"+d.r).acquire({holder:DEVICE,ttlMs:120000});if(!L.acquired){toast("Un autre encadrant vient déjà de changer d'atelier");return}
       const s2=await db.collection("deroule").doc(sid).get();const d2=s2&&s2.exists?s2.data():null;if(d2&&d2.r!==d.r){deroules[sid]=d2;toast("Un autre encadrant vient déjà de changer d'atelier");rendre();return}}catch(e){}
     const nd=rotSuivanteDoc(d.r+1);deroules[sid]=nd;ecrire("deroule",sid,nd,"set");rendre()},"","Annuler")});
+
+/* ----- avant chaque atelier : rappel que chaque atelier a ses propres consignes (fermeture par double appui) ----- */
+const _ouvrirAtelierSansConsigne=ouvrirAtelier;
+ouvrirAtelier=function(aid){const g=monGroupe();if(!g)return _ouvrirAtelierSansConsigne(aid);
+  const cle="consignesLues_"+g.id+"_"+aid;if(LS.get(cle,false)||document.getElementById("consignesAt"))return _ouvrirAtelierSansConsigne(aid);
+  const a=ATELIERS.find(x=>x.id===aid)||{};
+  const m=document.createElement("div");m.className="modale";m.id="consignesAt";m.setAttribute("role","dialog");m.setAttribute("aria-modal","true");
+  m.innerHTML=`<div class="mbox" style="text-align:center;max-height:92vh;overflow:auto"><div style="font-size:60px;line-height:1">📋</div>
+    <h2 style="margin:8px 0 12px">Atelier ${esc(String(a.n||""))}${a.id&&!/^Atelier \d$/.test(titreAt(a))?" : "+esc(titreAt(a)):""}</h2>
+    <p style="font-size:22px;line-height:1.35;margin:0 0 12px"><b>Chaque atelier a ses propres consignes.</b></p>
+    <p style="font-size:18px;line-height:1.4;margin:0 0 16px">Elles ne sont pas les mêmes que dans l'atelier précédent : <b>lisez-les entièrement</b>, en équipe, avant de commencer. Une consigne non respectée peut coûter des points.</p>
+    <button class="btn pen gros" id="consignesOK" style="width:100%;display:flex;flex-direction:column;align-items:center;gap:4px">J'ai compris, je vais lire les consignes<br><small style="font-weight:400">(touchez deux fois pour fermer)</small></button></div>`;
+  document.body.appendChild(m);const b=m.querySelector("#consignesOK");let t1=0;
+  b.addEventListener("click",()=>{const now=Date.now();
+    if(now-t1<2500){LS.set(cle,true);m.remove();_ouvrirAtelierSansConsigne(aid);return}
+    t1=now;b.innerHTML="Touchez encore une fois pour fermer";b.style.background="#1F3A5F"});};
 /* ----- échange de place entre deux séances : seulement avec le code donné par un encadrant ----- */
 function codeEchange(sid){let h=7;const t=sid+"|echange|"+PIN;for(let i=0;i<t.length;i++)h=(h*31+t.charCodeAt(i))%1000003;return String(1000+h%9000)}
 function ouvrirEchange(){const sid=seanceSel,s=seances[sid];if(!s)return;
