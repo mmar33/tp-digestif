@@ -4055,7 +4055,7 @@ function syncA5(){let l=[];try{l=JSON.parse(localStorage.getItem("a5envoi")||"[]
     if(ex)Object.assign(ex,doc);else notesA5.push(Object.assign({id:x.id},doc));ecrire("notes_a5",x.id,doc)})}
 setInterval(syncA5,10000);
 /* nouvelle version publiée pendant la séance : grand bandeau « Recharger l'application » (rien n'est perdu : tout est sur le serveur) */
-const APP_VERSION="20261110-1140";let versionEnLigne=APP_VERSION;
+const APP_VERSION="20261110-1145";let versionEnLigne=APP_VERSION;
 function verifierVersion(){fetch("version.json?t="+Date.now(),{cache:"no-store"}).then(r=>r.ok?r.json():null).then(j=>{if(j&&j.v&&j.v!==versionEnLigne){versionEnLigne=j.v;bandeauVersion()}}).catch(()=>{})}
 function bandeauVersion(){if(versionEnLigne===APP_VERSION||document.getElementById("rechargerApp"))return;
   const b=document.createElement("div");b.id="rechargerApp";
@@ -4063,6 +4063,12 @@ function bandeauVersion(){if(versionEnLigne===APP_VERSION||document.getElementBy
   b.innerHTML='<span>🔄 RECHARGER L\'APPLICATION</span><span style="font:500 15px system-ui,sans-serif;flex-basis:100%">Une correction a été publiée. Rien n\'est perdu : vos notes sont enregistrées. Si vous êtes au milieu d\'un quiz, finissez-le d\'abord.</span><button type="button" style="font:800 20px system-ui,sans-serif;padding:12px 22px;border-radius:999px;border:0;background:#fff;color:#c0262d;cursor:pointer">Recharger maintenant</button>';
   b.querySelector("button").addEventListener("click",()=>{try{const u=new URL(location.href);u.searchParams.set("v",versionEnLigne);location.replace(u.toString())}catch(e){location.reload()}});document.body.appendChild(b)}
 setInterval(verifierVersion,60000);setTimeout(verifierVersion,8000);
+/* maquette à noter (atelier 1) attribuée à mon équipe et pas encore notée : fenêtre de rappel (toutes les 8 min), sauf pendant un duel ou dans l'atelier 1 */
+let rappelEvalT=0;
+setInterval(()=>{try{if(!moiE||!monGid||monGid==="TEST"||vue==="a1"||vue==="prof")return;if(["salle","decompte","m1","m2","demo","attente"].includes(vue)||document.querySelector(".modale"))return;
+  if(Date.now()-rappelEvalT<8*60e3)return;const g=grp(monGid);if(!g)return;const t=monEquipe(g,"a1");if(!t)return;
+  const e=evals.find(x=>x.evaluateur===t.id&&a1Pend(x));if(!e)return;rappelEvalT=Date.now();const c=grp(String(e.cible).replace(/-a1-e\d+$/,""))||{};const num=(String(e.cible).match(/-e(\d+)$/)||[])[1]||"";
+  modale("📝 Une maquette attend votre note",`<p style="font-size:18px">Votre équipe doit encore noter la maquette du <b>groupe « ${esc(c.nom||"")} »${c.mascotte?" · les "+esc(c.mascotte):""}, équipe ${num}</b> (atelier 1).</p><p>Elle compte dans votre note. Allez à la table de l'atelier 1, trouvez la maquette (papier avec le nom du groupe), puis notez-la.</p>`,"Noter maintenant",()=>{const tt=monEquipe(grp(monGid),"a1");if(tt){ctxEquipe=tt;vue="a1";a1Form=null;a1Photo=null;rendre();window.scrollTo(0,0)}},"","Plus tard")}catch(e){}},20000);
 /* rechargement automatique pendant le changement de table (ou la pause) : personne n'est en plein atelier, rien n'est perdu */
 setInterval(()=>{try{if(versionEnLigne===APP_VERSION||vue==="prof"||!moiE)return;const g=monGid&&monGid!=="TEST"?grp(monGid):null;if(!g)return;
   const p=phaseSeance(g.seance);if(p.phase!=="pause"||!(p.reste>20e3))return;
