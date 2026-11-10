@@ -2665,7 +2665,7 @@ function vA3(){const g=monGroupe();if(!g){vue="hub";return vHub()}const duos=duo
 function syncA3(){let d=null;try{d=JSON.parse(localStorage.getItem("tp-digestif-eval-v1")||"null")}catch(e){}if(!d||!d.binomes)return;
   Object.values(d.binomes).forEach(b=>{if(!b.quiz||!b.reperage||!b.id)return;const note=Math.round((b.reperage.score/b.reperage.total*10+b.quiz.score/b.quiz.total*10)*10)/10;
     if(String(b.id).startsWith("TEST")){if(testE){testE.a3=testE.a3||{};testE.a3[b.id]=note}return}
-    const ex=notesA3.find(x=>x.id===b.id);if(ex&&+ex.note===note)return;
+    const ex=notesA3.find(x=>x.id===b.id);if(ex&&+ex.note>=note)return;
     const doc={note,reperage:b.reperage,quiz:b.quiz,maj:Date.now()};
     if(ex)ex.note=note;else notesA3.push(Object.assign({id:b.id},doc)); ecrire("notes_a3",b.id,doc)})}
 window.addEventListener("visibilitychange",()=>{if(!document.hidden){syncA3();if(["hub","a3"].includes(vue))rendre()}});
@@ -4041,7 +4041,7 @@ function syncA5(){let l=[];try{l=JSON.parse(localStorage.getItem("a5envoi")||"[]
     if(ex)Object.assign(ex,doc);else notesA5.push(Object.assign({id:x.id},doc));ecrire("notes_a5",x.id,doc)})}
 setInterval(syncA5,10000);
 /* nouvelle version publiée pendant la séance : grand bandeau « Recharger l'application » (rien n'est perdu : tout est sur le serveur) */
-const APP_VERSION="20261110-1055";let versionEnLigne=APP_VERSION;
+const APP_VERSION="20261110-1100";let versionEnLigne=APP_VERSION;
 function verifierVersion(){fetch("version.json?t="+Date.now(),{cache:"no-store"}).then(r=>r.ok?r.json():null).then(j=>{if(j&&j.v&&j.v!==versionEnLigne){versionEnLigne=j.v;bandeauVersion()}}).catch(()=>{})}
 function bandeauVersion(){if(versionEnLigne===APP_VERSION||document.getElementById("rechargerApp"))return;
   const b=document.createElement("div");b.id="rechargerApp";
