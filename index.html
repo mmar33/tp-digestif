@@ -2349,6 +2349,13 @@ document.addEventListener("click",ev=>{const b=ev.target.closest&&ev.target.clos
         await db.collection("familles").doc(fid).set({groupe:g.id,seance:g.seance,statut:"attente",duos,ordre:[],mains:{},poses:{},pioche:[],tour:null,evt:{n:0},journal:[],duree:famDuree(g),cree:Date.now()})}
       LS.set(cle,"zero");rendre();toast("Atelier remis à zéro")}catch(e){toast("Remise à zéro impossible, réessayez")}},"","Annuler")});
 /* fin du TP : consigne en gros et en rouge */
+/* fin de séance : ateliers non terminés avec une note provisoire (R) sous 10 : l'équipe peut les reprendre automatiquement, où elle en était */
+function aReprendre(g){if(!g||g.id==="TEST"||!moiE||phaseSeance(g.seance).phase!=="fin")return [];
+  return ["a3","a4","a6"].filter(aid=>atelierActif(aid)).map(aid=>{let r=null;try{r=noteEtuInfo(g,moiE.eid,aid)}catch(e){}return r&&r.src==="repli"&&r.v!=null&&r.v<10?{aid,v:r.v}:null}).filter(Boolean)}
+function boiteReprendre(g){const L=aReprendre(g);if(!L.length)return "";
+  return `<div style="margin:0 0 16px;padding:18px;border:4px solid #1F3A5F;border-radius:18px;background:#eef3fa;text-align:center"><div style="font-size:24px;font-weight:800">⏯️ À reprendre maintenant</div>
+    <p style="font-size:17px;margin:8px 0 12px">${L.length>1?"Ces ateliers ne sont":"Cet atelier n'est"} pas terminé${L.length>1?"s":""} : votre note n'est que provisoire. Reprenez là où vous vous étiez arrêtés (rien n'est effacé), en équipe, sur le même téléphone qu'avant.</p>
+    <div class="row" style="justify-content:center;gap:10px;flex-wrap:wrap">${L.map(x=>{const at=ATELIERS.find(a=>a.id===x.aid)||{};return `<button class="btn pen gros" data-at="${x.aid}">Reprendre l'atelier ${at.n} (${fr(x.v)}/20 provisoire)</button>`}).join("")}</div></div>`}
 function finRouge(){return `<div style="margin:0 0 16px;padding:22px 20px;border:4px solid #c0262d;border-radius:18px;background:#fbe9e8;color:#c0262d;text-align:center">
   <div style="font-size:clamp(26px,6vw,40px);font-weight:800;line-height:1.15">Vous avez terminé !</div>
   <div style="font-size:clamp(20px,4.6vw,28px);font-weight:800;margin-top:10px;line-height:1.3">NE FERMEZ PAS l'application<br>NE RECHARGEZ PAS la page<br>VENEZ VOIR LES ENSEIGNANTS</div>
@@ -2525,7 +2532,7 @@ function vHub(){
          :`<p class="note" style="margin-top:10px">Cet atelier se déroule hors de l'application : suivez les consignes sur la table.</p>`}
        ${p.r===NB_ROT-1&&(pret||e.st==="fait")?finRouge():""}${choixApresPause(g,a)}${aideEcran(a)}${t&&g.id!=="TEST"?`<p class="note" style="margin:10px 0 0">Code de votre ${(BESOIN[a.id]||{}).type==="duos"?"binôme":"équipe"} (à donner à l'enseignant si vous devez refaire l'atelier) : <b>${codeEquipe(t.id)}</b></p>`:""}<div class="pretbox"><span>Changement au plus tard dans <b id="cptRot">${fmt(p.reste)}</b> · ${gs.filter(x=>p.prets[x.id]).length}/${gs.length} groupes prêts</span>
        <button class="btn ${pret?"ghost":"blue"}" id="pretChanger" ${pret?"disabled":""}>${pret?"Prêts à changer ✓":"Atelier terminé : prêts à changer"}</button></div></div>`}}
-  else if(p.phase==="fin")centre=finRouge()+`<div class="maint"><span class="eyebrow">Séance terminée</span><h2>Fin des ateliers</h2><p>${pendEq?"<b>Dernière mission : évaluez une maquette (atelier 1). Elle compte dans votre note !</b>":b.complet?"Toutes vos notes sont prêtes.":"Les dernières notes arrivent dès que toutes les évaluations sont faites."}</p></div>`;
+  else if(p.phase==="fin")centre=boiteReprendre(g)+finRouge()+`<div class="maint"><span class="eyebrow">Séance terminée</span><h2>Fin des ateliers</h2><p>${pendEq?"<b>Dernière mission : évaluez une maquette (atelier 1). Elle compte dans votre note !</b>":b.complet?"Toutes vos notes sont prêtes.":"Les dernières notes arrivent dès que toutes les évaluations sont faites."}</p></div>`;
   else centre=`<div class="maint"><h2>Formation des groupes…</h2></div>`;
   const parcours=test?ATELIERS:(p.phase==="rot"||p.phase==="fin")?Array.from({length:NB_ROT},(_,r)=>atelierDe(g.k,r)):[];
   const cartes=parcours.map((a,r)=>{const app=AVEC_CONTENU.includes(a.id)&&atelierActif(a.id), e=etatAt(g,a.id), cour=!test&&p.phase==="rot"&&p.r===r, passe=!test&&(p.phase==="fin"||(p.phase==="rot"&&r<p.r));
@@ -3767,7 +3774,7 @@ function ouvrirAtelier(aid){const g=monGroupe();if(!g)return;
   const t=monEquipe(g,aid);if(!t){toast("Vous n'êtes dans aucune équipe de cet atelier");return}
   /* atelier terminé pour le groupe (sa rotation est passée) : plus personne ne peut le relancer.
      Seule exception : l'atelier 1 pour une équipe qui doit encore évaluer une maquette (premier groupe, évaluation en fin de séance). */
-  if(g.id!=="TEST"&&moiE&&!relancesOk[t.id]&&atelierPasse(g,aid)&&!(aid==="a1"&&!evals.some(e=>e.evaluateur===t.id&&e.statut==="envoyee"))){
+  if(g.id!=="TEST"&&moiE&&!relancesOk[t.id]&&atelierPasse(g,aid)&&!aReprendre(g).some(x=>x.aid===aid)&&!(aid==="a1"&&!evals.some(e=>e.evaluateur===t.id&&e.statut==="envoyee"))){
     const n=noteEtu(g,moiE.eid,aid);const at=ATELIERS.find(x=>x.id===aid)||{n:"",titre:""};
     const go=()=>modale("Atelier terminé",`L'atelier ${at.n} · ${esc(titreAt(at))} est terminé pour votre groupe${n!=null?` : votre note est <b>${fr(n)} / 20</b>`:""}. Il ne peut pas être relancé.<br><br>Si l'enseignant vous autorise à le refaire, donnez-lui ce code : <b style="font-size:22px;letter-spacing:1px">${codeEquipe(t.id)}</b>`,"Compris",()=>{},"","Fermer");
     /* relance autorisée par un encadrant pour cette équipe : on laisse passer */
@@ -4031,7 +4038,7 @@ function syncA5(){let l=[];try{l=JSON.parse(localStorage.getItem("a5envoi")||"[]
     if(ex)Object.assign(ex,doc);else notesA5.push(Object.assign({id:x.id},doc));ecrire("notes_a5",x.id,doc)})}
 setInterval(syncA5,10000);
 /* nouvelle version publiée pendant la séance : grand bandeau « Recharger l'application » (rien n'est perdu : tout est sur le serveur) */
-const APP_VERSION="20261110-1045";let versionEnLigne=APP_VERSION;
+const APP_VERSION="20261110-1050";let versionEnLigne=APP_VERSION;
 function verifierVersion(){fetch("version.json?t="+Date.now(),{cache:"no-store"}).then(r=>r.ok?r.json():null).then(j=>{if(j&&j.v&&j.v!==versionEnLigne){versionEnLigne=j.v;bandeauVersion()}}).catch(()=>{})}
 function bandeauVersion(){if(versionEnLigne===APP_VERSION||document.getElementById("rechargerApp"))return;
   const b=document.createElement("div");b.id="rechargerApp";
