@@ -2443,7 +2443,10 @@ function monEquipe(g,aid){const sd=subsDe(g.id,aid);if(!sd)return null;const me=
 
 /* ----- notes ----- */
 const moyenne=a=>a.length?Math.round(a.reduce((s,x)=>s+x,0)/a.length*2)/2:null;
-function noteA1Equipe(tid){const m=noteA1(tid);if(m==null)return null;const fait=evals.some(e=>e.evaluateur===tid&&e.statut==="envoyee");return Math.round((m/20*16+(fait?4:0))*2)/2}
+/* note de l'atelier 1 : toujours en faveur des étudiants. Maquette notée m/20 ; l'évaluation faite (par l'équipe ou une autre équipe de son groupe)
+   rapporte jusqu'à 4 points (m × 0,8 + 4), mais ne peut jamais faire baisser la note de la maquette : une maquette notée 20 donne toujours 20. */
+function a1EvalFaite(tid){const gid=String(tid).replace(/-a1-e\d+$/,"");return evals.some(e=>e.statut==="envoyee"&&(e.evaluateur===tid||String(e.evaluateur).startsWith(gid+"-a1-")))}
+function noteA1Equipe(tid){const m=noteA1(tid);if(m==null)return null;const fait=a1EvalFaite(tid);return Math.max(m,fait?Math.round((m/20*16+4)*2)/2:0)}
 function noteEtuCalc(g,eid,aid){const sd=subsDe(g.id,aid);if(!sd)return null;const i=sd.equipes.findIndex(e=>e.includes(eid));if(i<0)return null;const tid=g.id+"-"+aid+"-e"+(i+1);
   if(aid==="a1")return noteA1Equipe(tid);
   if(aid==="a2"){if(g.id==="TEST")return testE&&testE.a2!=null?testE.a2:null;const r=resultats.find(x=>x.groupe===tid);return r?+r.note:null}
@@ -3564,7 +3567,7 @@ function noteEtuInfoBrute(g,eid,aid){
   if(tid&&aid==="a3"&&atelierPasse(g,"a3")){const pr=a3prog[tid];if(pr){const parts=[pr.reperage,pr.quiz].filter(x=>x&&x.total);if(parts.length)return {v:Math.round(parts.reduce((s,x)=>s+x.score/x.total,0)/parts.length*20*2)/2,src:"repli"}}}
   if(tid&&aid==="a1"&&phaseSeance(g.seance).phase==="fin"&&(a1docs[tid]||{}).maquette){
     const autres=[...new Set(evals.filter(e=>e.statut==="envoyee"&&e.seance===g.seance&&e.cible!==tid).map(e=>e.cible))].map(x=>noteA1(x)).filter(x=>x!=null);
-    if(autres.length){const m=autres.reduce((s,x)=>s+x,0)/autres.length;const fait=evals.some(e=>e.evaluateur===tid&&e.statut==="envoyee");return {v:Math.round((m/20*16+(fait?4:0))*2)/2,src:"repli"}}}
+    if(autres.length){const m=autres.reduce((s,x)=>s+x,0)/autres.length;const fait=a1EvalFaite(tid);return {v:Math.max(m,fait?Math.round((m/20*16+4)*2)/2:0),src:"repli"}}}
   const sc=secoursDocs[g.seance+"~"+eid];if(sc&&sc.n&&sc.n[aid]!=null)return {v:+sc.n[aid],src:"secours"};
   return {v:null,src:""}}
 function noteEtu(g,eid,aid){return noteEtuInfo(g,eid,aid).v}
@@ -4038,7 +4041,7 @@ function syncA5(){let l=[];try{l=JSON.parse(localStorage.getItem("a5envoi")||"[]
     if(ex)Object.assign(ex,doc);else notesA5.push(Object.assign({id:x.id},doc));ecrire("notes_a5",x.id,doc)})}
 setInterval(syncA5,10000);
 /* nouvelle version publiée pendant la séance : grand bandeau « Recharger l'application » (rien n'est perdu : tout est sur le serveur) */
-const APP_VERSION="20261110-1050";let versionEnLigne=APP_VERSION;
+const APP_VERSION="20261110-1055";let versionEnLigne=APP_VERSION;
 function verifierVersion(){fetch("version.json?t="+Date.now(),{cache:"no-store"}).then(r=>r.ok?r.json():null).then(j=>{if(j&&j.v&&j.v!==versionEnLigne){versionEnLigne=j.v;bandeauVersion()}}).catch(()=>{})}
 function bandeauVersion(){if(versionEnLigne===APP_VERSION||document.getElementById("rechargerApp"))return;
   const b=document.createElement("div");b.id="rechargerApp";
