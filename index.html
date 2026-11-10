@@ -2440,7 +2440,9 @@ function noteA1Equipe(tid){const m=noteA1(tid);if(m==null)return null;const fait
 function noteEtuCalc(g,eid,aid){const sd=subsDe(g.id,aid);if(!sd)return null;const i=sd.equipes.findIndex(e=>e.includes(eid));if(i<0)return null;const tid=g.id+"-"+aid+"-e"+(i+1);
   if(aid==="a1")return noteA1Equipe(tid);
   if(aid==="a2"){if(g.id==="TEST")return testE&&testE.a2!=null?testE.a2:null;const r=resultats.find(x=>x.groupe===tid);return r?+r.note:null}
-  if(aid==="a4")return a4Note(g.id==="TEST"?((testE&&testE.a4)||{})[tid]:a4docs[tid]);
+  if(aid==="a4"){if(g.id==="TEST")return a4Note(((testE&&testE.a4)||{})[tid]);
+    /* toujours en faveur des étudiants : chacun reçoit la meilleure note des équipes de son groupe */
+    const v=sd.equipes.map((_,j)=>a4Note(a4docs[g.id+"-a4-e"+(j+1)])).filter(x=>x!=null);return v.length?Math.max(...v):null}
   if(aid==="a6")return a6NoteGroupe(g);
   if(aid==="a3"){if(g.id==="TEST")return testE&&testE.a3&&testE.a3[tid]!=null?testE.a3[tid]:null;const n=notesA3.find(x=>x.id===tid);return n?noteA3Corrigee(n):null}
   return null}
@@ -2776,7 +2778,9 @@ function vA4(){const g=monGroupe();if(!g){vue="hub";return vHub()}const t=monEqu
   let e=a4Etape;if(!e||!etapes.includes(e)){e=d.fini?"fin":d.concl?"fin":d.carte?"concl":A4_PIECES.every(p=>d[p.id])?"reunion":(A4_PIECES.find(p=>!d[p.id])||{}).id;if(e==="p1"&&!d.vuIntro)e="intro"}
   a4Etape=e;
   const k=etapes.indexOf(e), barre=`<div class="a4prog">${etapes.slice(1,-1).map((x,i)=>`<i class="${i<k-1?"ok":i===k-1?"cur":""}"></i>`).join("")}</div>`;
-  const tete=`<div class="bar a1bar"><span class="tag" style="background:${g.couleur};color:#fff">ATELIER 4</span><b style="font-size:18px">Enquête aux Acacias</b><span class="sp"></span><button class="btn ghost sm" id="retourHub">Retour aux ateliers</button></div><p class="ecran att" style="max-width:860px;margin:12px auto 0;font-size:17px">⚠️ <b>Un seul téléphone ou tablette par équipe</b>, de préférence le plus grand écran : toute l’équipe répond ensemble sur le même appareil. Les réponses sont enregistrées pour l’équipe ; si deux téléphones répondent en même temps, l’une des réponses peut effacer l’autre.</p>`;
+  let tete=`<div class="bar a1bar"><span class="tag" style="background:${g.couleur};color:#fff">ATELIER 4</span><b style="font-size:18px">Enquête aux Acacias</b><span class="sp"></span><button class="btn ghost sm" id="retourHub">Retour aux ateliers</button></div><p class="ecran att" style="max-width:860px;margin:12px auto 0;font-size:17px">⚠️ <b>Un seul téléphone ou tablette par équipe</b>, de préférence le plus grand écran : toute l’équipe répond ensemble sur le même appareil. Les réponses sont enregistrées pour l’équipe ; si deux téléphones répondent en même temps, l’une des réponses peut effacer l’autre.</p>`;
+  {const sd=subsDe(g.id,"a4")||{equipes:[]},num=(String(t.id).match(/-e(\d+)$/)||[])[1]||"1",noms=(t.membres||[]).map(x=>g.id==="TEST"?x:esc(nomCourt(g.seance,x))).join(", ");
+   tete+=`<div style="max-width:860px;margin:12px auto 0;border:4px solid #c0262d;border-radius:16px;background:#fff4f2;color:#7a1a1e;padding:12px 16px;text-align:center;line-height:1.4"><b style="font-size:23px">📱 1 seul téléphone pour les ${(t.membres||[]).length} personnes de l'équipe ${num}</b><br><span style="font-size:17px">${noms}</span><br><span style="font-size:17px">Votre groupe a <b>${sd.equipes.length} équipe${sd.equipes.length>1?"s":""}</b>, donc <b>${sd.equipes.length} téléphone${sd.equipes.length>1?"s":""} en tout</b>. Les autres téléphones restent fermés.</span></div>`}
   let c="";
   if(e==="intro")c=`<div class="card a4dossier"><span class="eyebrow">Dossier n°1 · quartier « Les Acacias »</span><h2 style="margin:6px 0 10px">Les chiens morts du quartier</h2>
     <p>Un lundi matin, les habitants signalent un événement inquiétant : <b>cinq chiens</b> ont été retrouvés morts dans différents jardins du voisinage. Tous étaient en bonne santé la veille.</p>
@@ -3544,7 +3548,7 @@ function noteEtuInfoBrute(g,eid,aid){
   const v=noteEtuCalc(g,eid,aid);if(v!=null)return {v,src:""};
   const sd=subsDe(g.id,aid),i=sd?sd.equipes.findIndex(e=>e.includes(eid)):-1,tid=i>=0?g.id+"-"+aid+"-e"+(i+1):null;
   if(tid&&aid==="a6"&&atelierPasse(g,"a6")){const v=a6NoteGroupe(g,true);if(v!=null)return {v,src:"repli"}}
-  if(tid&&aid==="a4"&&atelierPasse(g,"a4")){const d=a4docs[tid];if(d&&(A4_PIECES.some(p=>d[p.id])||d.vuIntro))return {v:a4Note(Object.assign({},d,{fini:true})),src:"repli"}}
+  if(tid&&aid==="a4"&&atelierPasse(g,"a4")){const v=sd.equipes.map((_,j)=>a4docs[g.id+"-a4-e"+(j+1)]).filter(d=>d&&(A4_PIECES.some(p=>d[p.id])||d.vuIntro)).map(d=>a4Note(Object.assign({},d,{fini:true})));if(v.length)return {v:Math.max(...v),src:"repli"}}
   if(tid&&aid==="a3"&&atelierPasse(g,"a3")){const pr=a3prog[tid];if(pr){const parts=[pr.reperage,pr.quiz].filter(x=>x&&x.total);if(parts.length)return {v:Math.round(parts.reduce((s,x)=>s+x.score/x.total,0)/parts.length*20*2)/2,src:"repli"}}}
   if(tid&&aid==="a1"&&phaseSeance(g.seance).phase==="fin"&&(a1docs[tid]||{}).maquette){
     const autres=[...new Set(evals.filter(e=>e.statut==="envoyee"&&e.seance===g.seance&&e.cible!==tid).map(e=>e.cible))].map(x=>noteA1(x)).filter(x=>x!=null);
@@ -3983,7 +3987,9 @@ function noteEtuCalc(g,eid,aid){const sd=subsDe(g.id,aid);if(!sd)return null;con
   if(aid==="a1")return noteA1Equipe(tid);
   if(aid==="a2"){if(g.id==="TEST")return testE&&testE.a2!=null?testE.a2:null;const parDuel={};resA2(tid).forEach(r=>parDuel[r.duel]=+r.note);const v=Object.values(parDuel);
     if(!v.length)return null;if(v.length<2&&!atelierPasse(g,"a2"))return null;return Math.max(...v)}
-  if(aid==="a4")return a4Note(g.id==="TEST"?((testE&&testE.a4)||{})[tid]:a4docs[tid]);
+  if(aid==="a4"){if(g.id==="TEST")return a4Note(((testE&&testE.a4)||{})[tid]);
+    /* toujours en faveur des étudiants : chacun reçoit la meilleure note des équipes de son groupe */
+    const v=sd.equipes.map((_,j)=>a4Note(a4docs[g.id+"-a4-e"+(j+1)])).filter(x=>x!=null);return v.length?Math.max(...v):null}
   if(aid==="a3"){if(g.id==="TEST")return testE&&testE.a3&&testE.a3[tid]!=null?testE.a3[tid]:null;const n=notesA3.find(x=>x.id===tid);return n?noteA3Corrigee(n):null}
   if(aid==="a6")return a6NoteGroupe(g);
   if(aid==="a5"){if(g.id==="TEST")return testE&&testE.a5&&testE.a5[tid]!=null?testE.a5[tid]:null;const n=notesA5.find(x=>x.id===tid&&a5Valide(x));return n?noteA5Corrigee(n):null}
@@ -4006,7 +4012,7 @@ function syncA5(){let l=[];try{l=JSON.parse(localStorage.getItem("a5envoi")||"[]
     if(ex)Object.assign(ex,doc);else notesA5.push(Object.assign({id:x.id},doc));ecrire("notes_a5",x.id,doc)})}
 setInterval(syncA5,10000);
 /* nouvelle version publiée pendant la séance : grand bandeau « Recharger l'application » (rien n'est perdu : tout est sur le serveur) */
-const APP_VERSION="20261110-0945";let versionEnLigne=APP_VERSION;
+const APP_VERSION="20261110-0950";let versionEnLigne=APP_VERSION;
 function verifierVersion(){fetch("version.json?t="+Date.now(),{cache:"no-store"}).then(r=>r.ok?r.json():null).then(j=>{if(j&&j.v&&j.v!==versionEnLigne){versionEnLigne=j.v;bandeauVersion()}}).catch(()=>{})}
 function bandeauVersion(){if(versionEnLigne===APP_VERSION||document.getElementById("rechargerApp"))return;
   const b=document.createElement("div");b.id="rechargerApp";
