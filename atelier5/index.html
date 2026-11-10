@@ -1008,8 +1008,13 @@ body.enc .auto-val{display:none}
     if(window.__corrRefresh) window.__corrRefresh();
     if(window.__corrPage) window.__corrPage(letter);
   }
-  function enterStep(i){
+  /* correction en cours quand son temps est écoulé : on ne retire pas la fiche de correction ;
+     le binôme correcteur termine, puis touche « Correction finie → » */
+  var corrRetenue=false;
+  function enterStep(i,force){
     var a=ACTIONS[i];
+    if(!force && a!=="A" && a!=="B" && a!=="C" && !$("corr").classList.contains("hidden")){ corrRetenue=true; return; }
+    corrRetenue=false;
     if(window.__flowStep && window.__flowStep(i,a,{launchDefi:launchDefi,showCorrAt:showCorrAt,showChrono:showChrono})) return;
     if(a==="defi") launchDefi();
     else if(a) showCorrAt(a);
@@ -1044,7 +1049,8 @@ body.enc .auto-val{display:none}
     $("sbTime").textContent = done ? "Merci !" : mmss(stepLeft)+(st.running?"":" (pause)");
     $("sbTime").classList.toggle("warn", !done && stepLeft<=30000/(st.speed||1));
     $("sbNext").classList.toggle("hidden", done);
-    $("sbNext").textContent = i===STEPS.length-1 ? "Terminer l’atelier ✓" : "Étape terminée →";
+    $("sbNext").textContent = corrRetenue ? "Correction finie →" : (i===STEPS.length-1 ? "Terminer l’atelier ✓" : "Étape terminée →");
+    if(corrRetenue){ $("sbStep").textContent="Temps de correction écoulé : finissez de noter"; $("sbTime").textContent="puis touchez « Correction finie »"; }
     mini.textContent = done ? "Atelier terminé" : STEPS[i].t+" · "+mmss(stepLeft)+(st.running?"":" (pause)");
     mini.classList.toggle("warn", !done && stepLeft<=30000);
     if(st.running && lastIdx!==null && i!==lastIdx) beep(2);
@@ -1074,6 +1080,7 @@ body.enc .auto-val{display:none}
   $("chronoBack").addEventListener("click",backHome);
   document.addEventListener("click",function(){ setTimeout(render,0); });
   $("sbNext").addEventListener("click",function(){
+    if(corrRetenue){ enterStep(idxAt(elapsed()),true); render(); return; }
     var cur=idxAt(elapsed()), last = cur===STEPS.length-1;
     if(last && !confirm("Terminer l’atelier ?")) return;
     /* éviter de sauter une correction par erreur (un appui en trop, ou un binôme qui a fini avant les autres) */
