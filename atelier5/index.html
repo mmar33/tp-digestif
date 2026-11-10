@@ -913,6 +913,8 @@ body.enc .auto-val{display:none}
   window.__corrValidate=function(){ return doSave(true); };
   /* défi terminé APRÈS la validation de la fiche (temps écoulé) : on reporte le score du défi s'il est meilleur */
   window.__a5Defi=function(sc){ try{ var list=load(); if(!list.length||!sc||!sc.total) return; var r=list[list.length-1];
+    /* D8 : seulement si la dernière fiche est bien celle du binôme propriétaire de la tablette */
+    try{ var du=new URLSearchParams(location.search).get("duo")||localStorage.getItem("a5-duo-tablette")||""; var nm=(String(r.noted||"").match(/\d+/)||[])[0]; if(du&&nm&&!new RegExp("-a5-e"+nm+"$").test(du)) return; }catch(e){}
     var c=Math.round(Math.min(20,sc.score/sc.total*20)*0.6*2)/2; if(c<=(+r.c||0)) return;
     var n=Object.assign({},r,{c:c,total:(+r.a||0)+(+r.b||0)+c,date:new Date().toLocaleDateString("fr-FR")}); list.push(n); store(list); renderRecap();
     window.__lastNote=n; try{ localStorage.setItem("binome-note", JSON.stringify(n)); }catch(e){} }catch(e){} };
