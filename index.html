@@ -1942,11 +1942,15 @@ function popupTailleA1(id){if(LS.get("a1taille_"+id,false)||document.getElementB
 function vA1(){
   const g=monGroupe(); if(!g){vue="hub";return vHub()}
   const a=a1docs[g.id]||{}, mes=evals.filter(e=>e.evaluateur===g.id), pend=mes.find(e=>e.statut!=="envoyee"), faites=mes.filter(e=>e.statut==="envoyee");
-  const etape=!a.maquette?1:pend?3:faites.length?4:2;
+  const etape=pend?3:!a.maquette?1:faites.length?4:2;
+  /* depuis le 10/11 : en arrivant, on note d'abord la maquette du groupe passé juste avant (sauf le 1er groupe, qui note en fin de séance) */
+  let evalDabord="";if(etape===1&&!faites.length&&g.seance&&g.seance!=="s20261106"&&g.seance!=="TEST"){let cb=null;try{cb=cibleBoucleA1(g)}catch(e){}
+    if(cb&&!cb.premier){const pg=grp(cb.gid)||{};
+      evalDabord=`<div style="border:4px solid var(--rouge,#c0392b);border-radius:16px;padding:16px;margin:0 0 14px;background:#fff4f2;text-align:center"><b style="font-size:22px">1re étape : évaluez d'abord la maquette du groupe passé avant vous</b><p style="font-size:17px;margin:8px 0 12px">Groupe « ${esc(pg.nom||"")} »${pg.mascotte?" · les "+esc(pg.mascotte):""}. Elle est posée à part sur la table, avec le nom du groupe. Notez-la maintenant, puis faites votre propre maquette.</p><button class="btn pen gros" id="recevoirEval">Évaluer la maquette du groupe précédent</button></div>`}}
   if(etape===1&&!LS.get("a1taille_"+g.id,false))setTimeout(()=>popupTailleA1(g.id),250);
   const pas=[["Modeler",1],["Maquette terminée",2],["Évaluer une maquette",3]].map(([t,n])=>`<span class="pas ${etape>n?"fait":etape===n||(n===3&&etape===4)?"ici":""}"><i>${etape>n||(n===3&&etape===4)?ico("coche"):n}</i>${t}</span>`).join("<span class='trait'></span>");
   let corps="";
-  if(etape===1)corps=`<div class="a1grid"><div class="card fiche">
+  if(etape===1)corps=evalDabord+`<div class="a1grid"><div class="card fiche">
      <div style="border:3px solid var(--rouge,#c0392b);border-radius:14px;padding:12px 14px;margin:0 0 14px;background:#fff4f2;font-size:18px;line-height:1.4">📏 <b>Taille demandée : environ 5 à 10 cm par portion</b>, soit un modèle <b>compact</b> qui tient sur la table et se manipule facilement. Une maquette trop grande ou trop petite perd le point « Respect des consignes ».</div>
      <h3>Objectif</h3><p>Réaliser une maquette en trois dimensions du <b>côlon ascendant du cheval</b> pour comprendre l'enchaînement des portions, leur disposition dans l'espace et la forme des courbures.</p>
      <h3>Les 7 structures, dans l'ordre</h3><div class="segs">${SEGMENTS.map((s,i)=>`<span class="seg ${s.startsWith("Courbure")?"courb":""}"><i>${i+1}</i>${s}</span>`).join(`<span class="fl">→</span>`)}</div>
@@ -2018,7 +2022,7 @@ function envoyerEval(){lireForm();const f=a1Form, g=monGroupe(), ev=evals.find(e
     if(!photo.photoId)photo={photoData:a1Photo.dataSmall}}
     const pts={};CRITERES.forEach(c=>pts[c.id]=c.liste?f.portions.length:f.pts[c.id]);
     const doc=Object.assign({evaluateur:ev.evaluateur,cible:ev.cible,seance:ev.seance,statut:"envoyee",t:ev.t,envoi:Date.now(),pts,portions:f.portions,coms:f.coms,final:f.final.trim(),total:tot},photo);
-    Object.assign(ev,doc); a1Form=null; a1Photo=null; rendre(); feter("Évaluation envoyée !","Atelier 1 validé"); confettis();
+    Object.assign(ev,doc); a1Form=null; a1Photo=null; rendre(); feter("Évaluation envoyée !",(a1docs[ev.evaluateur]||{}).maquette?"Atelier 1 validé":"À vous maintenant : faites votre maquette"); confettis();
     await ecrire("a1eval",ev.id,doc)},"","Non, je relis")}
 
 /* ----- espace encadrants : séance, atelier 1, ateliers ----- */
