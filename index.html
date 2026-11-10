@@ -2260,7 +2260,7 @@ function brancherPortail(){
   all("[data-at]",b=>ouvrirAtelier(b.dataset.at));
   on("#changerGroupe","click",()=>modale("Changer de groupe ?","Cette tablette n'affichera plus votre groupe. Rien n'est effacé : vous pourrez le reprendre à tout moment depuis l'accueil.","Oui, changer",()=>{monGid=null;LS.set("monGroupe",null);rendre()},"","Non"));
   document.querySelectorAll("#retourHub").forEach(b=>b.addEventListener("click",()=>{lireForm();vue="hub";rendre();window.scrollTo(0,0)}));
-  on("#maquetteFinie","click",()=>{if(!a1Photo){toast("Prenez d'abord la photo de votre côlon");const l=document.querySelector("label.photo");if(l)l.scrollIntoView({behavior:"smooth",block:"center"});return}modale("Votre maquette est terminée ?","Après validation, <b>ne touchez plus votre maquette</b> : un autre groupe va l'évaluer. Posez à côté un papier avec le nom de votre groupe.","Oui, elle est terminée",async()=>{const g=monGroupe();a1docs[g.id]=Object.assign({},a1docs[g.id],{maquette:Date.now()});rendre();await ecrire("a1",g.id,{debut:(a1docs[g.id]||{}).debut||Date.now(),maquette:Date.now()},"set");
+  on("#maquetteFinie","click",()=>{if(!a1Photo){toast("Prenez d'abord la photo de votre côlon");const l=document.querySelector("label.photo");if(l)l.scrollIntoView({behavior:"smooth",block:"center"});return}modale("Votre maquette est terminée ?",(()=>{let lib=[];try{lib=prevA1Libres(monGroupe())}catch(e){}return (lib.length?"<p style='color:#c0262d;font-size:18px'><b>⚠️ Ce bouton est pour VOTRE propre maquette.</b> Pour noter la maquette du groupe précédent, utilisez le bouton rouge « Évaluer la maquette du groupe précédent » en haut de la page.</p>":"")+"<p>La photo doit être celle de <b>la maquette que votre équipe a modelée</b>. Après validation, <b>ne touchez plus votre maquette</b> : un autre groupe va l'évaluer. Posez à côté un papier avec le nom de votre groupe.</p>"})(),"Oui, c'est notre maquette, elle est terminée",async()=>{const g=monGroupe();a1docs[g.id]=Object.assign({},a1docs[g.id],{maquette:Date.now()});rendre();await ecrire("a1",g.id,{debut:(a1docs[g.id]||{}).debut||Date.now(),maquette:Date.now()},"set");
     /* photo de l'équipe : envoyée après la validation (sans bloquer), comme pour l'évaluation */
     const ph=a1Photo;a1Photo=null;let photo={};if(ph&&!enTest()){try{const as=await window.claude.use("assets");if(as){const r=await avecDelai(as.upload(ph.blob),20000);photo={photoId:r.id}}}catch(e){}if(!photo.photoId)photo={photoData:ph.dataSmall};
       a1docs[g.id]=Object.assign({},a1docs[g.id],photo);await ecrire("a1",g.id,Object.assign({},a1docs[g.id]),"set");rendre()}},"","Pas encore")});
@@ -4022,7 +4022,7 @@ function syncA5(){let l=[];try{l=JSON.parse(localStorage.getItem("a5envoi")||"[]
     if(ex)Object.assign(ex,doc);else notesA5.push(Object.assign({id:x.id},doc));ecrire("notes_a5",x.id,doc)})}
 setInterval(syncA5,10000);
 /* nouvelle version publiée pendant la séance : grand bandeau « Recharger l'application » (rien n'est perdu : tout est sur le serveur) */
-const APP_VERSION="20261110-1035";let versionEnLigne=APP_VERSION;
+const APP_VERSION="20261110-1040";let versionEnLigne=APP_VERSION;
 function verifierVersion(){fetch("version.json?t="+Date.now(),{cache:"no-store"}).then(r=>r.ok?r.json():null).then(j=>{if(j&&j.v&&j.v!==versionEnLigne){versionEnLigne=j.v;bandeauVersion()}}).catch(()=>{})}
 function bandeauVersion(){if(versionEnLigne===APP_VERSION||document.getElementById("rechargerApp"))return;
   const b=document.createElement("div");b.id="rechargerApp";
