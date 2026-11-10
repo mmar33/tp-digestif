@@ -4012,14 +4012,20 @@ function syncA5(){let l=[];try{l=JSON.parse(localStorage.getItem("a5envoi")||"[]
     if(ex)Object.assign(ex,doc);else notesA5.push(Object.assign({id:x.id},doc));ecrire("notes_a5",x.id,doc)})}
 setInterval(syncA5,10000);
 /* nouvelle version publiée pendant la séance : grand bandeau « Recharger l'application » (rien n'est perdu : tout est sur le serveur) */
-const APP_VERSION="20261110-0950";let versionEnLigne=APP_VERSION;
+const APP_VERSION="20261110-1000";let versionEnLigne=APP_VERSION;
 function verifierVersion(){fetch("version.json?t="+Date.now(),{cache:"no-store"}).then(r=>r.ok?r.json():null).then(j=>{if(j&&j.v&&j.v!==versionEnLigne){versionEnLigne=j.v;bandeauVersion()}}).catch(()=>{})}
 function bandeauVersion(){if(versionEnLigne===APP_VERSION||document.getElementById("rechargerApp"))return;
   const b=document.createElement("div");b.id="rechargerApp";
   b.style.cssText="position:fixed;left:0;right:0;top:0;z-index:9000;background:#c0262d;color:#fff;padding:14px 16px;display:flex;gap:12px;align-items:center;justify-content:center;flex-wrap:wrap;box-shadow:0 4px 16px rgba(0,0,0,.3);font:700 22px system-ui,sans-serif;text-align:center";
   b.innerHTML='<span>🔄 RECHARGER L\'APPLICATION</span><span style="font:500 15px system-ui,sans-serif;flex-basis:100%">Une correction a été publiée. Rien n\'est perdu : vos notes sont enregistrées. Si vous êtes au milieu d\'un quiz, finissez-le d\'abord.</span><button type="button" style="font:800 20px system-ui,sans-serif;padding:12px 22px;border-radius:999px;border:0;background:#fff;color:#c0262d;cursor:pointer">Recharger maintenant</button>';
-  b.querySelector("button").addEventListener("click",()=>location.reload());document.body.appendChild(b)}
+  b.querySelector("button").addEventListener("click",()=>{try{const u=new URL(location.href);u.searchParams.set("v",versionEnLigne);location.replace(u.toString())}catch(e){location.reload()}});document.body.appendChild(b)}
 setInterval(verifierVersion,60000);setTimeout(verifierVersion,8000);
+/* rechargement automatique pendant le changement de table (ou la pause) : personne n'est en plein atelier, rien n'est perdu */
+setInterval(()=>{try{if(versionEnLigne===APP_VERSION||vue==="prof"||!moiE)return;const g=monGid&&monGid!=="TEST"?grp(monGid):null;if(!g)return;
+  const p=phaseSeance(g.seance);if(p.phase!=="pause"||!(p.reste>20e3))return;
+  if(typeof saisieEnCours==="function"&&saisieEnCours())return;if(["salle","decompte","m1","m2","demo","attente"].includes(vue))return;
+  const k="autoRecharge_"+versionEnLigne;if(LS.get(k,false))return;LS.set(k,true);
+  const u=new URL(location.href);u.searchParams.set("v",versionEnLigne);location.replace(u.toString())}catch(e){}},10000);
 /* rappel 3 min avant la fin de chaque atelier : noter / valider ce qui manque (une fois par rotation) */
 setInterval(()=>{try{if(!moiE||!monGid||monGid==="TEST")return;const g=grp(monGid);if(!g)return;const p=phaseSeance(g.seance);
   if(p.phase!=="rot"||p.reste==null||p.reste>3*60e3||p.reste<5e3)return;
