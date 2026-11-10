@@ -754,6 +754,7 @@ body.enc .auto-val{display:none}
     if(!window.__defiMem){ window.__defiMem={score:state.score,total:state.total}; firstTry=true; }
     try{ if(!localStorage.getItem("defi-foie-score")){ localStorage.setItem("defi-foie-score", JSON.stringify({score:state.score,total:state.total})); } }catch(e){}
     var kept=null; try{ kept=JSON.parse(localStorage.getItem("defi-foie-score")||"null"); }catch(e){} if(!kept) kept=window.__defiMem;
+    try{ if(kept && window.__a5Defi) window.__a5Defi(kept); }catch(e){}
     $("pts12").textContent = kept ? (firstTry ? "Score retenu pour la note : "+kept.score+" / 20, soit "+String(Math.round(kept.score/kept.total*20*0.6*2)/2).replace(".",",")+" / 12 (il sera reporté automatiquement dans la fiche)." : "Partie d’entraînement : seul le premier essai compte ("+kept.score+" / 20).") : "";
     var r = state.score/state.total;
     $("verdict").textContent = r>=0.85 ? "Excellent : le foie n’a plus de secrets pour vous."
@@ -910,6 +911,12 @@ body.enc .auto-val{display:none}
     resetForm(); return true;
   }
   window.__corrValidate=function(){ return doSave(true); };
+  /* défi terminé APRÈS la validation de la fiche (temps écoulé) : on reporte le score du défi s'il est meilleur */
+  window.__a5Defi=function(sc){ try{ var list=load(); if(!list.length||!sc||!sc.total) return; var r=list[list.length-1];
+    var c=Math.round(Math.min(20,sc.score/sc.total*20)*0.6*2)/2; if(c<=(+r.c||0)) return;
+    var n=Object.assign({},r,{c:c,total:(+r.a||0)+(+r.b||0)+c,date:new Date().toLocaleDateString("fr-FR")}); list.push(n); store(list); renderRecap();
+    window.__lastNote=n; try{ localStorage.setItem("binome-note", JSON.stringify(n)); }catch(e){} }catch(e){} };
+  setTimeout(function(){ try{ var sc=JSON.parse(localStorage.getItem("defi-foie-score")||"null"); if(sc) window.__a5Defi(sc); }catch(e){} },3000);
   window.__corrNew=function(){ resetForm(); };
   $("copy").onclick=function(){
     var list=load(); if(!list.length) return;
