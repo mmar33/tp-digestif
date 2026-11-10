@@ -4055,7 +4055,7 @@ function syncA5(){let l=[];try{l=JSON.parse(localStorage.getItem("a5envoi")||"[]
     if(ex)Object.assign(ex,doc);else notesA5.push(Object.assign({id:x.id},doc));ecrire("notes_a5",x.id,doc)})}
 setInterval(syncA5,10000);
 /* nouvelle version publiée pendant la séance : grand bandeau « Recharger l'application » (rien n'est perdu : tout est sur le serveur) */
-const APP_VERSION="20261110-1145";let versionEnLigne=APP_VERSION;
+const APP_VERSION="20261110-1150";let versionEnLigne=APP_VERSION;
 function verifierVersion(){fetch("version.json?t="+Date.now(),{cache:"no-store"}).then(r=>r.ok?r.json():null).then(j=>{if(j&&j.v&&j.v!==versionEnLigne){versionEnLigne=j.v;bandeauVersion()}}).catch(()=>{})}
 function bandeauVersion(){if(versionEnLigne===APP_VERSION||document.getElementById("rechargerApp"))return;
   const b=document.createElement("div");b.id="rechargerApp";
@@ -4063,6 +4063,10 @@ function bandeauVersion(){if(versionEnLigne===APP_VERSION||document.getElementBy
   b.innerHTML='<span>🔄 RECHARGER L\'APPLICATION</span><span style="font:500 15px system-ui,sans-serif;flex-basis:100%">Une correction a été publiée. Rien n\'est perdu : vos notes sont enregistrées. Si vous êtes au milieu d\'un quiz, finissez-le d\'abord.</span><button type="button" style="font:800 20px system-ui,sans-serif;padding:12px 22px;border-radius:999px;border:0;background:#fff;color:#c0262d;cursor:pointer">Recharger maintenant</button>';
   b.querySelector("button").addEventListener("click",()=>{try{const u=new URL(location.href);u.searchParams.set("v",versionEnLigne);location.replace(u.toString())}catch(e){location.reload()}});document.body.appendChild(b)}
 setInterval(verifierVersion,60000);setTimeout(verifierVersion,8000);
+/* corrections de notes publiées par l'équipe enseignante : relues toutes les minutes, sans recharger l'appli */
+let correctionsSig="";function rafraichirCorrections(){try{const sc=document.createElement("script");sc.src="corrections.js?t="+Date.now();
+  sc.onload=()=>{sc.remove();const sig=JSON.stringify(window.CORRECTIONS||{});if(sig!==correctionsSig){correctionsSig=sig;try{rendrePortail()}catch(e){}}};sc.onerror=()=>sc.remove();document.head.appendChild(sc)}catch(e){}}
+setInterval(rafraichirCorrections,60000);setTimeout(()=>{correctionsSig=JSON.stringify(window.CORRECTIONS||{})},0);
 /* maquette à noter (atelier 1) attribuée à mon équipe et pas encore notée : fenêtre de rappel (toutes les 8 min), sauf pendant un duel ou dans l'atelier 1 */
 let rappelEvalT=0;
 setInterval(()=>{try{if(!moiE||!monGid||monGid==="TEST"||vue==="a1"||vue==="prof")return;if(["salle","decompte","m1","m2","demo","attente"].includes(vue)||document.querySelector(".modale"))return;
