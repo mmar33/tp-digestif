@@ -1074,8 +1074,15 @@ body.enc .auto-val{display:none}
   $("chronoBack").addEventListener("click",backHome);
   document.addEventListener("click",function(){ setTimeout(render,0); });
   $("sbNext").addEventListener("click",function(){
-    var last = idxAt(elapsed())===STEPS.length-1;
+    var cur=idxAt(elapsed()), last = cur===STEPS.length-1;
     if(last && !confirm("Terminer l’atelier ?")) return;
+    /* éviter de sauter une correction par erreur (un appui en trop, ou un binôme qui a fini avant les autres) */
+    var MSG={1:"Passer tout de suite à la correction du puzzle 1 ?\n\nFaites-le seulement si TOUS les binômes ont fini leur puzzle.",
+             2:"La correction du puzzle 1 est-elle terminée ?\n\nLe binôme correcteur doit avoir noté chaque pièce. Une fois passé, on ne peut plus revenir.",
+             3:"Passer tout de suite à la correction du puzzle 2 ?\n\nFaites-le seulement si TOUS les binômes ont fini leur puzzle 2.",
+             4:"La correction du puzzle 2 est-elle terminée ?\n\nLe binôme correcteur doit avoir noté chaque pièce. Une fois passé, on ne peut plus revenir.",
+             0:"Les consignes sont lues et les binômes formés ? On commence le puzzle 1."};
+    if(!last && MSG[cur] && !confirm(MSG[cur])) return;
     if(!st.running && !last){ st.startedAt=Date.now(); st.running=true; }
     $("chronoNext").click();
   });
