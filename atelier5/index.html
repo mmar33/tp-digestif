@@ -327,9 +327,22 @@ body.has-mini main{padding-top:5rem}
 #again{display:none!important}
 body.enc .auto-val{display:none}
 .auto-val{align-self:center;font-size:.9rem}
+/* Charte UniLaSalle Rouen */
+:root{--uls:#9A4D9F;--uls-fonce:#78206E}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--uls:#C58BC9;--uls-fonce:#D9A6DC}}
+:root[data-theme="dark"]{--uls:#C58BC9;--uls-fonce:#D9A6DC}
+.uls-tete{display:flex;align-items:center;justify-content:space-between;gap:12px;background:#fff;border-bottom:4px solid #9A4D9F;padding:8px max(16px,env(safe-area-inset-left,0px))}
+.uls-tete img{height:38px;width:auto;display:block}
+.uls-tete span{font-family:Spectral,Georgia,serif;font-weight:700;color:#78206E;font-size:15px;text-align:right}
+@media (max-width:420px){.uls-tete img{height:30px}.uls-tete span{font-size:13px}}
+h1{color:var(--uls-fonce)}
+.primary{background:var(--uls-fonce);border-color:var(--uls-fonce);color:#fff}
+#corr .seg button[aria-pressed="true"],.corr-tabs button[aria-selected="true"]{background:var(--uls-fonce);border-color:var(--uls-fonce);color:#fff}
+button:focus-visible,input:focus-visible{outline-color:var(--uls)}
 </style>
 </head>
 <body>
+<header class="uls-tete"><img src="../uls-logo.png" alt="UniLaSalle Rouen, École vétérinaire et bio-ingénieurs"><span>Défi foie</span></header>
 <main>
   <section id="start" class="stack">
     <h1>Défi foie</h1>

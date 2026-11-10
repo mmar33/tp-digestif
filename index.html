@@ -823,8 +823,22 @@ html[data-format="tel"] .home,html[data-format="tel"] .game,html[data-format="te
 @keyframes badgeOut{to{transform:scale(.6);opacity:0}}
 @keyframes badgeTourne{0%{transform:rotateY(0)}100%{transform:rotateY(720deg)}}
 @media (prefers-reduced-motion: reduce){.badgepop .badgecard,.badgepop .bic{animation:none}}
+/* Charte UniLaSalle Rouen (école vétérinaire) : violets de la charte, logo en en-tête */
+:root{--uls:#9A4D9F;--uls-fonce:#78206E;--uls-profond:#5D1957;--uls-lav:#EED9EF}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--uls:#C58BC9;--uls-fonce:#D9A6DC;--uls-profond:#E7C3E9;--uls-lav:#3A2339}}
+:root[data-theme="dark"]{--uls:#C58BC9;--uls-fonce:#D9A6DC;--uls-profond:#E7C3E9;--uls-lav:#3A2339}
+.uls-tete{display:flex;align-items:center;justify-content:space-between;gap:12px;background:#fff;border-bottom:4px solid #9A4D9F;
+  margin-inline:calc(-1 * max(16px, env(safe-area-inset-left,0px)));padding:8px max(16px, env(safe-area-inset-left,0px));padding-top:calc(8px + env(safe-area-inset-top,0px))}
+.uls-tete img{height:40px;width:auto;display:block}
+.uls-tete span{font-family:var(--display);font-weight:700;color:#78206E;font-size:15px;text-align:right;line-height:1.15}
+@media (max-width:420px){.uls-tete img{height:32px}.uls-tete span{font-size:13px}}
+:focus-visible{outline-color:var(--uls)}
+.btn{background:var(--uls-fonce);border-color:var(--uls-fonce);color:#fff}
+.card{border-top:3px solid var(--uls-lav)}
+.tabs button[aria-selected="true"],.tabs button.on,.sousnav button.on{border-color:var(--uls);color:var(--uls-fonce)}
 </style>
 
+<header class="uls-tete" role="banner"><img src="uls-logo.png" alt="UniLaSalle Rouen, École vétérinaire et bio-ingénieurs"></header>
 <div class="wrap" id="app"></div>
 
 <script>
@@ -4073,7 +4087,7 @@ function syncA5(){let l=[];try{l=JSON.parse(localStorage.getItem("a5envoi")||"[]
     if(ex)Object.assign(ex,doc);else notesA5.push(Object.assign({id:x.id},doc));ecrire("notes_a5",x.id,doc)})}
 setInterval(syncA5,10000);
 /* nouvelle version publiée pendant la séance : grand bandeau « Recharger l'application » (rien n'est perdu : tout est sur le serveur) */
-const APP_VERSION="20261110-1300";let versionEnLigne=APP_VERSION;
+const APP_VERSION="20261110-1445";let versionEnLigne=APP_VERSION;
 function verifierVersion(){fetch("version.json?t="+Date.now(),{cache:"no-store"}).then(r=>r.ok?r.json():null).then(j=>{if(j&&j.v&&j.v!==versionEnLigne){versionEnLigne=j.v;bandeauVersion()}}).catch(()=>{})}
 function bandeauVersion(){if(versionEnLigne===APP_VERSION||document.getElementById("rechargerApp"))return;
   const b=document.createElement("div");b.id="rechargerApp";

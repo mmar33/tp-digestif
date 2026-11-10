@@ -153,18 +153,18 @@
 /* Layout : visualiseur 3D plein cadre, bandeau d'en-tête et panneau d'action en bas (empilé sur téléphone, latéral sur grand écran) */
 :root{
   --bg:#F3F4F2; --surface:#FFFFFF; --ink:#1C2321; --muted:#5B6662; --line:#D5DAD7;
-  --accent:#2D5F8E; --accent-ink:#FFFFFF; --ok:#1F7A4D; --ok-bg:#E3F3EA; --ko:#B3362B; --ko-bg:#FBE7E4;
+  --accent:#78206E; --accent-ink:#FFFFFF; --ok:#1F7A4D; --ok-bg:#E3F3EA; --ko:#B3362B; --ko-bg:#FBE7E4;
   --stage:#E7EAE8;
   --display:'Barlow Condensed','Arial Narrow',Arial,sans-serif;
   --body:'Source Sans 3','Segoe UI',system-ui,sans-serif;
 }
 @media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
   --bg:#141917; --surface:#1D2421; --ink:#E7ECE9; --muted:#9DA9A4; --line:#33403B;
-  --accent:#6FA3D6; --accent-ink:#0E1A26; --ok:#5BC48E; --ok-bg:#16301F; --ko:#F08A7E; --ko-bg:#3A1C18;
+  --accent:#D9A6DC; --accent-ink:#2A0F27; --ok:#5BC48E; --ok-bg:#16301F; --ko:#F08A7E; --ko-bg:#3A1C18;
   --stage:#0F1412; color-scheme:dark}}
 :root[data-theme="dark"]{
   --bg:#141917; --surface:#1D2421; --ink:#E7ECE9; --muted:#9DA9A4; --line:#33403B;
-  --accent:#6FA3D6; --accent-ink:#0E1A26; --ok:#5BC48E; --ok-bg:#16301F; --ko:#F08A7E; --ko-bg:#3A1C18;
+  --accent:#D9A6DC; --accent-ink:#2A0F27; --ok:#5BC48E; --ok-bg:#16301F; --ko:#F08A7E; --ko-bg:#3A1C18;
   --stage:#0F1412; color-scheme:dark}
 *,*::before,*::after{box-sizing:border-box}
 html,body{height:100%}
@@ -353,11 +353,15 @@ body[data-embed] header{display:none}
 .stats{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:8px}.stats>div{border:1px solid var(--line);border-radius:12px;padding:10px;display:flex;flex-direction:column;gap:2px}.stats b{font-family:var(--display);font-size:26px;line-height:1}.stats small{color:var(--muted);font-size:12px;line-height:1.25}
 .moi{padding:10px 12px;border-radius:10px;background:var(--bg);font-size:15px}
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+header{border-bottom:4px solid #9A4D9F}
+.uls-logo{height:30px;width:auto;display:block;background:#fff;border-radius:6px;padding:3px 6px}
+h1{color:var(--accent)}
 </style>
 
 <div class="app">
   <header>
     <button class="btn secondary portail-retour" id="portail-retour" type="button" hidden>← Ateliers</button>
+    <img class="uls-logo" src="../uls-logo.png" alt="UniLaSalle Rouen, École vétérinaire">
     <h1>Validation 3D</h1>
     <button class="joueur" id="joueur" type="button" aria-label="Mon carnet de jeu"></button>
     <span class="chrono" id="chrono" hidden></span>
