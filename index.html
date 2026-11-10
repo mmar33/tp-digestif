@@ -1656,7 +1656,7 @@ function vProf(){
   const sous=SOUS_AT[ongletProf]?`<div class="sousnav">${SOUS_AT[ongletProf].map(([x,l])=>`<button data-sousat="${x}" aria-pressed="${sousAt[ongletProf]===x}">${l}</button>`).join("")}</div>`:ongletProf==="a2"?`<div class="sousnav">${[["notes","Notes"],["synthese","Synthèse"],["corrige","Corrigés des planches"],["questions","Questions"],["test","Essayer une planche"]].map(([x,l])=>`<button data-sous="${x}" aria-pressed="${sousA2===x}">${l}</button>`).join("")}</div>`:"";
   return `<div style="display:grid;gap:18px;padding-top:20px">
    <div class="row" style="justify-content:space-between"><h2 style="font-size:34px">Espace encadrants</h2><button class="btn ghost" id="retour">Retour à l'accueil</button></div>
-   ${bandeauTirage()}${(()=>{const sid=profSeance||seanceSel,b=sid&&seances[sid]?progressionTP(sid):"";return b?`<div class="card" style="margin:12px 0;padding:12px 16px">${b}</div>`:""})()}${chronoProf()}${carteRelance()}
+   ${bandeauTirage()}${(()=>{const sid=profSeance||seanceSel,b=sid&&seances[sid]?progressionTP(sid):"";return b?`<div class="card" style="margin:12px 0;padding:12px 16px">${b}</div>`:""})()}${chronoProf()}${carteNotesR()}${carteRelance()}
    <button class="testbig" id="testEtudiant">${ico("main")}<span><b>Tester les ateliers comme un étudiant</b><span>Un groupe fictif, sur cette tablette. Rien n'est enregistré ni compté.</span></span></button>
    <div class="tabs nav4">${[["seance","Suivi de la séance"],["a1","Atelier 1 · maquettes"],["a2","Atelier 2 · duel"],["a3","Atelier 3 · 7 familles"],["a4","Atelier 4 · enquête"],["a5","Atelier 5 · défi foie"],["a6","Atelier 6 · rumen"],["reglages","Réglages et QR code"]].filter(([x])=>!/^a\d$/.test(x)||atelierActif(x)).map(([x,l])=>`<button data-tab="${x}" aria-pressed="${ongletProf===x}">${l}</button>`).join("")}</div>
    ${sous}${corps}</div>`;
@@ -3954,11 +3954,19 @@ const codeEquipe=tid=>String(tid).replace(/^[^-]*-/,"").toUpperCase();
 function tidDeCode(code,sid){const m=String(code||"").trim().toUpperCase().replace(/[\s·.]+/g,"-").match(/^G(\d+)-A(\d)-E(\d+)$/);if(!m)return null;return sid+"-G"+m[1]+"-a"+m[2]+"-e"+m[3]}
 const PARTIES_RELANCE={
   a1:[["maquette","La maquette (refaite, puis réévaluée par une autre équipe)"],["evaluation","L'évaluation que l'équipe a faite d'une autre maquette"]],
-  a3:[["tout","L'évaluation 3D complète (repérage et quiz)"]],
-  a4:[["tout","Toute l'enquête"],["p1","La pièce 1 (puis réunion, carte et conclusion)"],["p2","La pièce 2 (puis réunion, carte et conclusion)"],["p3","La pièce 3 (puis réunion, carte et conclusion)"],["concl","La carte surprise et la conclusion"]],
+  a3:[["reprendre","Rouvrir l'atelier : reprendre où l'équipe en était (rien n'est effacé)"],["tout","L'évaluation 3D complète (repérage et quiz)"]],
+  a4:[["reprendre","Rouvrir l'atelier : reprendre où l'équipe en était (rien n'est effacé)"],["tout","Toute l'enquête"],["p1","La pièce 1 (puis réunion, carte et conclusion)"],["p2","La pièce 2 (puis réunion, carte et conclusion)"],["p3","La pièce 3 (puis réunion, carte et conclusion)"],["concl","La carte surprise et la conclusion"]],
   a5:[["tout","Le Défi foie complet du binôme (puzzles, corrections et défi)"]],
-  a6:[["tout","Tout l'atelier"],["m1","La mission 1"],["m2","La mission 2"],["m3","La mission 3"],["quiz","Le quiz final"]]};
+  a6:[["reprendre","Rouvrir l'atelier : reprendre où l'équipe en était (rien n'est effacé)"],["tout","Tout l'atelier"],["m1","La mission 1"],["m2","La mission 2"],["m3","La mission 3"],["quiz","Le quiz final"]]};
 let relanceSel=null;
+/* notes provisoires (R : atelier non terminé, note calculée sur ce qui a été fait) sous 10 : à rouvrir en fin de séance */
+function carteNotesR(){const sid=profSeance||seanceSel;if(!sid||!seances[sid])return "";const L=[];
+  groupesDe(sid).forEach(g=>["a3","a4","a6"].forEach(aid=>{const sd=subsDe(g.id,aid);if(!sd)return;sd.equipes.forEach((m,i)=>{if(!m||!m.length)return;
+    let r=null;try{r=noteEtuInfo(g,m[0],aid)}catch(e){}if(r&&(r.src==="repli")&&r.v!=null&&r.v<10)L.push({g,aid,tid:g.id+"-"+aid+"-e"+(i+1),v:r.v})})}));
+  if(!L.length)return "";
+  return `<details class="card" style="margin:12px 0;border-left:8px solid var(--warn)" open><summary><b>Notes provisoires (R) sous 10 : ${L.length} équipe${L.length>1?"s":""} à faire reprendre</b> <span class="note">(atelier non terminé ; à rouvrir en fin de séance)</span></summary>
+    <div style="display:grid;gap:6px;margin-top:8px">${L.map(x=>{const at=ATELIERS.find(a=>a.id===x.aid)||{};return `<div class="row" style="justify-content:space-between;flex-wrap:wrap;gap:6px;border-bottom:1px solid var(--rule);padding:4px 0"><span><b>${esc(x.g.nom)}</b> · atelier ${at.n} · ${esc(codeEquipe(x.tid))} · <b>${fr(x.v)}/20</b> (R)</span><button class="btn ghost sm" data-relance="reprendre" data-rtid="${x.tid}">Rouvrir (reprendre où ils en étaient)</button></div>`}).join("")}</div>
+    <p class="note" style="margin:8px 0 0">Après réouverture, l'équipe touche l'atelier dans l'appli et reprend là où elle s'était arrêtée. Si ce n'est pas possible, utilisez « Relancer un atelier pour une équipe » ci-dessous pour tout refaire.</p></details>`}
 function carteRelance(){const sid=profSeance||seanceSel;if(!sid)return "";const tid=relanceSel&&tidDeCode(relanceSel,sid);
   let res="";if(relanceSel){if(!tid)res=`<p class="note" style="margin:8px 0 0">Code non reconnu. Il ressemble à <b>G1-A5-E2</b> (groupe, atelier, équipe ou binôme).</p>`;
     else{const m=tid.match(/-G(\d+)-a(\d)-e(\d+)$/),gid=sid+"-G"+m[1],aid="a"+m[2],g=grp(gid),sd=subsDe(gid,aid),mem=sd&&sd.equipes[+m[3]-1];
@@ -3971,8 +3979,9 @@ function carteRelance(){const sid=profSeance||seanceSel;if(!sid)return "";const 
     <form class="row" id="relanceForm" style="gap:8px;margin-top:10px;align-items:end"><label class="field" for="relanceCode">Code de l'équipe<input id="relanceCode" placeholder="G1-A5-E2" value="${esc(relanceSel||"")}" style="text-transform:uppercase"></label><button class="btn" type="submit">Chercher</button></form>${res}</details>`}
 document.addEventListener("submit",e=>{if(e.target&&e.target.id==="relanceForm"){e.preventDefault();relanceSel=($("#relanceCode")||{}).value||"";rendre()}});
 document.addEventListener("click",ev=>{const b=ev.target.closest&&ev.target.closest("[data-relance]");if(!b||!db)return;const part=b.dataset.relance,tid=b.dataset.rtid,aid=tid.match(/-(a\d)-e\d+$/)[1];
-  modale("Relancer ?",`${esc(b.textContent)} : ce qui a été fait sera effacé, puis l'équipe pourra recommencer cette partie. Sa note se mettra à jour avec la nouvelle tentative.`,"Oui, relancer",async()=>{
+  modale(part==="reprendre"?"Rouvrir l'atelier ?":"Relancer ?",part==="reprendre"?"L'équipe pourra rouvrir l'atelier et <b>reprendre où elle en était</b> : rien n'est effacé. Sa note se mettra à jour quand elle aura terminé (on garde la meilleure).":`${esc(b.textContent)} : ce qui a été fait sera effacé, puis l'équipe pourra recommencer cette partie. Sa note se mettra à jour avec la nouvelle tentative.`,part==="reprendre"?"Oui, rouvrir":"Oui, relancer",async()=>{
     try{const now=Date.now(),col=n=>db.collection(n);
+      if(part==="reprendre"){await col("config").doc("relances").set({[tid]:now},{merge:true});toast("Rouvert : l'équipe peut reprendre l'atelier");rendre();return}
       if(aid==="a1"){if(part==="maquette"){for(const e of evals.filter(x=>x.cible===tid)){await col("a1eval").doc(e.id).delete()}evals=evals.filter(x=>x.cible!==tid);a1docs[tid]={debut:now};await col("a1").doc(tid).set({debut:now})}
         else{for(const e of evals.filter(x=>x.evaluateur===tid)){await col("a1eval").doc(e.id).delete()}evals=evals.filter(x=>x.evaluateur!==tid)}}
       if(aid==="a3"){await col("notes_a3").doc(tid).delete();await col("a3prog").doc(tid).delete();await col("config").doc("a3raz").set({[tid]:now},{merge:true});notesA3=notesA3.filter(x=>x.id!==tid);delete a3prog[tid]}
@@ -4022,7 +4031,7 @@ function syncA5(){let l=[];try{l=JSON.parse(localStorage.getItem("a5envoi")||"[]
     if(ex)Object.assign(ex,doc);else notesA5.push(Object.assign({id:x.id},doc));ecrire("notes_a5",x.id,doc)})}
 setInterval(syncA5,10000);
 /* nouvelle version publiée pendant la séance : grand bandeau « Recharger l'application » (rien n'est perdu : tout est sur le serveur) */
-const APP_VERSION="20261110-1040";let versionEnLigne=APP_VERSION;
+const APP_VERSION="20261110-1045";let versionEnLigne=APP_VERSION;
 function verifierVersion(){fetch("version.json?t="+Date.now(),{cache:"no-store"}).then(r=>r.ok?r.json():null).then(j=>{if(j&&j.v&&j.v!==versionEnLigne){versionEnLigne=j.v;bandeauVersion()}}).catch(()=>{})}
 function bandeauVersion(){if(versionEnLigne===APP_VERSION||document.getElementById("rechargerApp"))return;
   const b=document.createElement("div");b.id="rechargerApp";
