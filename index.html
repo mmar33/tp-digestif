@@ -10,7 +10,7 @@ var p=[];try{if(navigator.serviceWorker)p.push(navigator.serviceWorker.getRegist
 try{if(window.caches)p.push(caches.keys().then(function(k){return Promise.all(k.map(function(x){return caches.delete(x)}))}))}catch(e){}
 try{if(indexedDB.databases)p.push(indexedDB.databases().then(function(d){d.forEach(function(x){if(x.name)indexedDB.deleteDatabase(x.name)})}))}catch(e){}
 Promise.all(p).then(fin,fin);setTimeout(fin,3000)})();</script>
-<script src="firebase-config.js"></script><script src="vendor/firebase-app-compat.js"></script><script src="vendor/firebase-firestore-compat.js"></script><script src="vendor/qrcode.js"></script><script src="adapter.js"></script><script src="feuille.js"></script>
+<script src="firebase-config.js"></script><script src="vendor/firebase-app-compat.js"></script><script src="vendor/firebase-firestore-compat.js"></script><script src="vendor/qrcode.js"></script><script src="adapter.js"></script><script src="feuille.js"></script><script src="corrections.js"></script>
 <script>
 /* Mode local : remplace les services claude.ai (db, user, downloads) quand l'application
    est ouverte hors de claude.ai (fichier, Moodle, serveur web). Les données sont enregistrées
@@ -3533,7 +3533,13 @@ function majSurete(){const el=document.getElementById("sureteEtat");if(el)el.out
 /* ----- repli quand un atelier n'a pas pu être fini ----- */
 function atelierPasse(g,aid){if(!g||g.id==="TEST")return false;const p=phaseSeance(g.seance);if(p.phase==="fin")return true;if(p.phase!=="rot"&&p.phase!=="pause")return false;
   for(let r=0;r<p.r;r++)if(atelierDe(g.k,r).id===aid)return true;return false}
-function noteEtuInfo(g,eid,aid){
+/* corrections décidées après lecture des signalements (fichier corrections.js, par équipe, sans nom) : toujours en faveur de l'étudiant */
+function corrigerNote(g,eid,aid,r){try{const C=window.CORRECTIONS||{};if(!g||r.src==="manuelle")return r;const sd=subsDe(g.id,aid);if(!sd)return r;
+  const i=sd.equipes.findIndex(e=>e.includes(eid));if(i<0)return r;const c=C[g.id+"-"+aid+"-e"+(i+1)];if(!c)return r;
+  let v=r.v;if(v==null){if(c.note==null)return r;v=+c.note}else{if(c.plus)v+=+c.plus;if(c.note!=null)v=Math.max(v,+c.note)}
+  return {v:Math.min(20,Math.round(v*100)/100),src:"corrigee"}}catch(e){return r}}
+function noteEtuInfo(g,eid,aid){return corrigerNote(g,eid,aid,noteEtuInfoBrute(g,eid,aid))}
+function noteEtuInfoBrute(g,eid,aid){
   const m=notesManu[g.seance+"~"+eid+"~"+aid];if(m&&m.note!=null&&m.note!=="")return {v:+m.note,src:"manuelle"};
   const v=noteEtuCalc(g,eid,aid);if(v!=null)return {v,src:""};
   const sd=subsDe(g.id,aid),i=sd?sd.equipes.findIndex(e=>e.includes(eid)):-1,tid=i>=0?g.id+"-"+aid+"-e"+(i+1):null;
