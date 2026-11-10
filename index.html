@@ -3640,6 +3640,8 @@ function reabonner(){if(!db)return;const c=portee();if(c===aboCle)return;aboCle=
   const [,sid,gid]=c.split(":");
   S(db.collection("groupes").where("seance","==",sid),coll("groupes",d=>{groupes=d.map(x=>Object.assign({id:x.id},x.data()))}));
   S(db.collection("deroule").doc(sid),s=>{if(s.exists)deroules[sid]=s.data();rendrePortail()});
+  /* notes mises à la main par un encadrant : visibles tout de suite sur le téléphone de l'étudiant */
+  if(moiE&&moiE.sid===sid)ATELIERS.forEach(at=>{const k=sid+"~"+moiE.eid+"~"+at.id;S(db.collection("notes_manuelles").doc(k),s=>{if(s&&s.exists)notesManu[k]=s.data();else delete notesManu[k];rendrePortail()})});
   if(moiE)S(db.collection("profils").doc((moiE.sid+"~"+moiE.eid).replace(/[\/]/g,"_")),s=>{if(s.exists){pfProfil=s.data();LS.set("monAvatar_"+pfCle(),pfProfil);rendrePortail()}});
   S(db.collection("a1eval").where("seance","==",sid),coll("a1eval",d=>{evals=d.map(x=>Object.assign({id:x.id},x.data()))}));
   S(db.collection("resultats").where("seance","==",sid),coll("resultats",d=>{resultats=d.map(x=>Object.assign({},x.data()))}));
@@ -4004,7 +4006,7 @@ function syncA5(){let l=[];try{l=JSON.parse(localStorage.getItem("a5envoi")||"[]
     if(ex)Object.assign(ex,doc);else notesA5.push(Object.assign({id:x.id},doc));ecrire("notes_a5",x.id,doc)})}
 setInterval(syncA5,10000);
 /* nouvelle version publiée pendant la séance : grand bandeau « Recharger l'application » (rien n'est perdu : tout est sur le serveur) */
-const APP_VERSION="20261110-0940";let versionEnLigne=APP_VERSION;
+const APP_VERSION="20261110-0945";let versionEnLigne=APP_VERSION;
 function verifierVersion(){fetch("version.json?t="+Date.now(),{cache:"no-store"}).then(r=>r.ok?r.json():null).then(j=>{if(j&&j.v&&j.v!==versionEnLigne){versionEnLigne=j.v;bandeauVersion()}}).catch(()=>{})}
 function bandeauVersion(){if(versionEnLigne===APP_VERSION||document.getElementById("rechargerApp"))return;
   const b=document.createElement("div");b.id="rechargerApp";
