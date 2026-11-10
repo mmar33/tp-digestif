@@ -3981,9 +3981,23 @@ function groupeAFini(g,aid){if(!atelierActif(aid))return false;const sd=subsDe(g
 /* notes du Défi foie gardées sur ce téléphone par la page de l'atelier : envoyées ici aussi (double sécurité) */
 function syncA5(){let l=[];try{l=JSON.parse(localStorage.getItem("a5envoi")||"[]")}catch(e){}if(!l.length)return;
   l.forEach(x=>{if(!x||!x.id)return;if(String(x.id).startsWith("TEST")){if(testE){testE.a5=testE.a5||{};testE.a5[x.id]=x.note}return}
-    const ex=notesA5.find(n=>n.id===x.id);if(ex&&+ex.note===+x.note)return;const doc={note:x.note,a:x.a,b:x.b,c:x.c,correcteur:x.correcteur||"",maj:x.t||Date.now()};
+    /* on garde la meilleure fiche : une copie locale moins bonne (autre tablette, fiche vide) n'écrase jamais la note enregistrée */
+    const rz=a5RazDe(x.id);if(rz&&(+x.t||0)<rz)return;
+    const ex=notesA5.find(n=>n.id===x.id);if(ex&&!(rz&&+ex.maj<rz)&&+ex.note>=+x.note)return;const doc={note:x.note,a:x.a,b:x.b,c:x.c,correcteur:x.correcteur||"",maj:x.t||Date.now()};
     if(ex)Object.assign(ex,doc);else notesA5.push(Object.assign({id:x.id},doc));ecrire("notes_a5",x.id,doc)})}
-setInterval(syncA5,10000);window.addEventListener("visibilitychange",()=>{if(!document.hidden)syncA5()});
+setInterval(syncA5,10000);
+/* rappel 3 min avant la fin de chaque atelier : noter / valider ce qui manque (une fois par rotation) */
+setInterval(()=>{try{if(!moiE||!monGid||monGid==="TEST")return;const g=grp(monGid);if(!g)return;const p=phaseSeance(g.seance);
+  if(p.phase!=="rot"||p.reste==null||p.reste>3*60e3||p.reste<5e3)return;
+  if(["salle","decompte","m1","m2","demo","attente","fin"].includes(vue)||document.querySelector(".modale"))return;
+  const a=atelierDe(g.k,p.r);if(!a||!a.id||a.id==="a2")return;const cle="rappel_"+g.id+"_"+p.r;if(LS.get(cle,false))return;
+  const t=monEquipe(g,a.id);let msg="";
+  if(a.id==="a1"){if(!t)return;const fait=evals.some(e=>e.evaluateur===t.id&&e.statut==="envoyee");let cb=null;try{cb=cibleBoucleA1(t)}catch(e){}
+    if(!fait&&!(cb&&cb.premier))msg+=`<li><b>Notez la maquette du groupe passé avant vous</b> : bouton « Évaluer la maquette du groupe précédent » dans l'atelier 1.</li>`;
+    if(!(a1docs[t.id]||{}).maquette)msg+=`<li><b>Prenez la photo de votre maquette</b>, puis touchez « Notre maquette est terminée ».</li>`}
+  else if(etatAt(g,a.id).st!=="fait")msg=`<li>Votre équipe n'a pas encore terminé ou validé cet atelier : <b>finissez et validez vos réponses</b> avant de changer de table, sinon il ne sera pas noté.</li>`;
+  if(!msg)return;LS.set(cle,true);
+  modale("⏰ Plus que 3 minutes",`<p style="font-size:18px;margin:0 0 8px"><b>Atelier ${esc(String(a.n||""))}</b> : avant de partir, pensez à</p><ul style="font-size:17px;line-height:1.45;margin:0;padding-left:20px">${msg}</ul>`,"Compris",()=>{},"","Fermer")}catch(e){}},15000);window.addEventListener("visibilitychange",()=>{if(!document.hidden)syncA5()});
 
 /* ----- composition d'un atelier : affichée (plus rien à former à la main) ----- */
 function vRepartition(){const g=monGroupe(),aid=repart&&repart.aid;if(!g||!aid){vue="hub";return vHub()}
