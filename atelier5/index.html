@@ -528,6 +528,21 @@ body.enc .auto-val{display:none}
     }
     return null;
   }
+  function couleurA(info,x,y){
+    if(x<0||y<0||x>=info.w||y>=info.h) return null;
+    var i=(y*info.w+x)*4, r=info.data[i], g=info.data[i+1], b=info.data[i+2], best=null, bd=1e9;
+    for(var k in PALETTE){ var p=PALETTE[k], d=(p[0]-r)*(p[0]-r)+(p[1]-g)*(p[1]-g)+(p[2]-b)*(p[2]-b); if(d<bd){bd=d;best=k;} }
+    return bd<900 ? best : null;
+  }
+  function procheDe(info,px,py,part,R){
+    for(var dy=-R; dy<=R; dy+=2){ for(var dx=-R; dx<=R; dx+=2){ if(dx*dx+dy*dy>R*R) continue; if(couleurA(info,px+dx,py+dy)===part) return true; } }
+    return false;
+  }
+  function plusProche(info,px,py,parts,R){
+    for(var rad=2; rad<=R; rad+=2){ for(var dx=-rad; dx<=rad; dx+=2){ for(var dy=-rad; dy<=rad; dy+=2){
+      if(Math.abs(dx)!==rad && Math.abs(dy)!==rad) continue; var h=couleurA(info,px+dx,py+dy); if(h && parts.indexOf(h)>=0) return h; } } }
+    return null;
+  }
   function paint(canvas, info, right, wrong, cross){
     var x=canvas.getContext("2d");
     if(!right){ x.drawImage(info.img,0,0); return; }
@@ -653,7 +668,11 @@ body.enc .auto-val{display:none}
           var r=cv.getBoundingClientRect();
           var px=Math.floor((e.clientX-r.left)*info.w/r.width), py=Math.floor((e.clientY-r.top)*info.h/r.height);
           var hit=partAt(info,px,py);
-          if(!hit || item.sp.parts.indexOf(hit)<0){ var fb=$("fb"); fb.textContent="Touchez l’intérieur d’une zone colorée du foie."; fb.className="feedback"; return; }
+          /* tolérance : un appui juste à côté de la bonne zone (petits lobes, bords) compte juste ; un appui dans le blanc prend la zone la plus proche */
+          var R=Math.max(10,Math.round(info.w*0.035));
+          if(hit!==item.target && procheDe(info,px,py,item.target,R)) hit=item.target;
+          if(!hit || item.sp.parts.indexOf(hit)<0){ var h2=plusProche(info,px,py,item.sp.parts,Math.round(R*1.5)); if(h2) hit=h2; }
+          if(!hit || item.sp.parts.indexOf(hit)<0){ var fb=$("fb"); fb.textContent="Touchez l’intérieur d’une zone colorée du foie."; fb.className="feedback ko"; try{fb.scrollIntoView({block:"nearest"})}catch(_){} return; }
           answered=true;
           var ok = hit===item.target;
           paint(cv, info, item.target, ok?null:hit, ok?null:[px,py]);
