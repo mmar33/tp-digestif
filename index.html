@@ -3556,13 +3556,20 @@ function majSurete(){const el=document.getElementById("sureteEtat");if(el)el.out
 function atelierPasse(g,aid){if(!g||g.id==="TEST")return false;const p=phaseSeance(g.seance);if(p.phase==="fin")return true;if(p.phase!=="rot"&&p.phase!=="pause")return false;
   for(let r=0;r<p.r;r++)if(atelierDe(g.k,r).id===aid)return true;return false}
 /* corrections décidées après lecture des signalements (fichier corrections.js, par équipe, sans nom) : toujours en faveur de l'étudiant */
-function corrigerNote(g,eid,aid,r){try{const C=window.CORRECTIONS||{};if(!g||r.src==="manuelle")return r;const sd=subsDe(g.id,aid);if(!sd)return r;
-  const i=sd.equipes.findIndex(e=>e.includes(eid));if(i<0)return r;const c=C[g.id+"-"+aid+"-e"+(i+1)];if(!c)return r;
-  let v=r.v;
-  /* atelier 3 : repérage 3D compté entièrement juste (écran bloqué pendant le repérage) ; le quiz garde son score */
-  if(aid==="a3"&&c.a3RepPlein){const tid=g.id+"-a3-e"+(i+1),n=notesA3.find(x=>x.id===tid)||{},pr=a3prog[tid]||{},q=(n.quiz&&n.quiz.total?n.quiz:null)||(pr.quiz&&pr.quiz.total?pr.quiz:null);
-    const w=Math.round((10+(q?q.score/q.total*10:0))*10)/10;v=v==null?w:Math.max(v,w)}
-  if(v==null){if(c.note==null)return r;v=+c.note}else{if(c.plus)v+=+c.plus;if(c.note!=null)v=Math.max(v,+c.note)}
+function hEtu(x){let h=2166136261;x=String(x);for(let k=0;k<x.length;k++){h^=x.charCodeAt(k);h=Math.imul(h,16777619)>>>0}return h.toString(16)}
+function corrigerNote(g,eid,aid,r){try{const C=window.CORRECTIONS||{};if(!g||r.src==="manuelle")return r;const sd=subsDe(g.id,aid);
+  const i=sd?sd.equipes.findIndex(e=>e.includes(eid)):-1,tid=i>=0?g.id+"-"+aid+"-e"+(i+1):null;
+  /* correction par équipe, ou par étudiant (clé = séance~empreinte de l'identifiant~atelier, sans nom) */
+  const c=Object.assign({},tid&&C[tid]||{},C[g.seance+"~"+hEtu(eid)+"~"+aid]||{});if(!Object.keys(c).length)return r;
+  let v=r.v;const up=w=>{if(w!=null)v=v==null?w:Math.max(v,w)};
+  if(aid==="a3"&&tid&&(c.a3RepPlein||c.a3QuizPlein)){const n=notesA3.find(x=>x.id===tid)||{},pr=a3prog[tid]||{};
+    const rp=(n.reperage&&n.reperage.total?n.reperage:null)||(pr.reperage&&pr.reperage.total?pr.reperage:null),q=(n.quiz&&n.quiz.total?n.quiz:null)||(pr.quiz&&pr.quiz.total?pr.quiz:null);
+    up(Math.round(((c.a3RepPlein?10:rp?rp.score/rp.total*10:0)+(c.a3QuizPlein?10:q?q.score/q.total*10:0))*10)/10)}
+  if(aid==="a5"&&tid&&(c.a5A!=null||c.a5B!=null||c.a5C!=null)){const n=notesA5.find(x=>x.id===tid)||{};
+    up(Math.max(+n.a||0,+c.a5A||0)+Math.max(+n.b||0,+c.a5B||0)+Math.max(+n.c||0,+c.a5C||0))}
+  if(c.meilleurGroupe&&sd){sd.equipes.forEach(m=>{if(m&&m.length){try{up(noteEtuInfoBrute(g,m[0],aid).v)}catch(e){}}})}
+  if(c.note!=null)up(+c.note);
+  if(v==null)return r;if(c.plus)v+=+c.plus;
   return {v:Math.min(20,Math.round(v*100)/100),src:"corrigee"}}catch(e){return r}}
 function noteEtuInfo(g,eid,aid){return corrigerNote(g,eid,aid,noteEtuInfoBrute(g,eid,aid))}
 function noteEtuInfoBrute(g,eid,aid){
@@ -4048,7 +4055,7 @@ function syncA5(){let l=[];try{l=JSON.parse(localStorage.getItem("a5envoi")||"[]
     if(ex)Object.assign(ex,doc);else notesA5.push(Object.assign({id:x.id},doc));ecrire("notes_a5",x.id,doc)})}
 setInterval(syncA5,10000);
 /* nouvelle version publiée pendant la séance : grand bandeau « Recharger l'application » (rien n'est perdu : tout est sur le serveur) */
-const APP_VERSION="20261110-1130";let versionEnLigne=APP_VERSION;
+const APP_VERSION="20261110-1140";let versionEnLigne=APP_VERSION;
 function verifierVersion(){fetch("version.json?t="+Date.now(),{cache:"no-store"}).then(r=>r.ok?r.json():null).then(j=>{if(j&&j.v&&j.v!==versionEnLigne){versionEnLigne=j.v;bandeauVersion()}}).catch(()=>{})}
 function bandeauVersion(){if(versionEnLigne===APP_VERSION||document.getElementById("rechargerApp"))return;
   const b=document.createElement("div");b.id="rechargerApp";
