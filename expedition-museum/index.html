@@ -440,7 +440,7 @@ html.tablette .menmap{max-width:900px;margin-left:auto;margin-right:auto}
 .pdot{width:12px;height:12px;border-radius:50%;background:var(--line);flex:none}.pdot.on{background:#2e9b5f;box-shadow:0 0 0 4px #2e9b5f33}.pdot.idle{background:#d38a1f}
 .urgbtn{border:0;background:transparent;font-size:20px;cursor:pointer;padding:2px}
 </style></head><body><div id="app"></div>
-<script src="config.js?v=1795262640"></script><script>if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js", { scope: "./" }).catch(function () {});</script>
+<script src="config.js?v=1795263264"></script><script>if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js", { scope: "./" }).catch(function () {});</script>
 <script>
 /* ==== Contenu pédagogique (énoncés) : partagé client + serveur ==== */
 /* GGE : « Le spécimen disparu ». Chaque question réussie (au moins la moitié des points) dévoile l'indice du même rang. */
@@ -4017,10 +4017,10 @@ var ART = (function () {
   function hash(s) { var h = 0; for (var i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0; return h; }
   function shuffled(arr, id) { var r = rng((S.group || 1) * 7919 + hash(id)), a = arr.slice(); for (var i = a.length - 1; i > 0; i--) { var j = Math.floor(r() * (i + 1)); var t = a[i]; a[i] = a[j]; a[j] = t; } return a; }
 
-  function saveLocal() { try { localStorage.setItem(LS, JSON.stringify({ group: S.group, pin: S.pin, state: S.state, dirty: S.dirty, offset: S.offset, thumbs: S.thumbs || {}, info: S.info || null })); } catch (e) {} }
+  function saveLocal() { try { localStorage.setItem(LS, JSON.stringify({ group: S.group, pin: S.pin, state: S.state, dirty: S.dirty, offset: S.offset, thumbs: S.thumbs || {}, info: S.info || null, appUrl: S.appUrl || '' })); } catch (e) {} }
   function loadLocal() { try { S.mq = JSON.parse(localStorage.getItem(LS + '-mimes') || '{}') || {}; } catch (e) { S.mq = {}; }
     loadLocal0(); }
-  function loadLocal0() { try { var d = JSON.parse(localStorage.getItem(LS) || 'null'); if (d) { S.group = d.group; S.pin = d.pin; S.state = d.state || {}; S.dirty = d.dirty || {}; S.offset = d.offset || 0; S.thumbs = d.thumbs || {}; S.info = d.info || null; } } catch (e) {} }
+  function loadLocal0() { try { var d = JSON.parse(localStorage.getItem(LS) || 'null'); if (d) { S.group = d.group; S.pin = d.pin; S.state = d.state || {}; S.dirty = d.dirty || {}; S.offset = d.offset || 0; S.thumbs = d.thumbs || {}; S.info = d.info || null; if (d.appUrl) S.appUrl = d.appUrl; } } catch (e) {} }
 
   function toast(msg) { var t = document.createElement('div'); t.className = 'toast'; t.textContent = msg; document.body.appendChild(t); setTimeout(function () { t.remove(); }, 2200); }
   function confetti() {
@@ -4085,13 +4085,30 @@ var ART = (function () {
       if (!loc || srv.t >= loc.t) S.state[k] = srv;
     });
   }
+  /* réponses pas encore envoyées d'une équipe quittée sur ce téléphone : elles partent quand même */
+  var LSO = LS + '-orphelins';
+  function orphans() { try { return JSON.parse(localStorage.getItem(LSO) || '[]') || []; } catch (e) { return []; } }
+  function keepOrphans() {
+    if (!S.group || !S.dirty || !Object.keys(S.dirty).length) return;
+    var o = orphans(); o.push({ g: S.group, pin: S.pin, dirty: S.dirty });
+    try { localStorage.setItem(LSO, JSON.stringify(o)); } catch (e) {}
+  }
+  var flushingO = false;
+  function flushOrphans() {
+    var o = orphans(); if (!o.length || flushingO) return; flushingO = true; var x = o[0];
+    api('apiSync', x.g, x.pin, x.dirty, deviceId()).then(function (r) {
+      flushingO = false;
+      if (r && (r.status === 'ok' || r.status === 'badpin' || r.status === 'unknown')) { var n = orphans(); n.shift(); try { localStorage.setItem(LSO, JSON.stringify(n)); } catch (e) {} flushOrphans(); }
+    }, function () { flushingO = false; });
+  }
   function sync() {
+    flushOrphans();
     if (!S.group || S.syncing || S.mode === 'ecran' || S.authError) return;
     S.syncing = true; lastAttempt = Date.now();
     var sent = {}; Object.keys(S.dirty).forEach(function (k) { sent[k] = S.dirty[k]; });
     api('apiSync', S.group, S.pin, sent, deviceId()).then(function (r) {
       S.syncing = false;
-      if (r.status === 'badpin' || r.status === 'unknown') { S.authError = true; S.online = false; render(true); return; }
+      if (r.status === 'badpin' || r.status === 'unknown') { S.authError = r.status; S.online = false; render(true); return; }
       S.authError = false; if (r.info) setInfo(r.info);
       // une clé n'est retirée de la file que si le serveur l'a bien enregistrée
       Object.keys(sent).forEach(function (k) { if (S.dirty[k] === sent[k] && r.state[k] && r.state[k].t >= sent[k].t) delete S.dirty[k]; });
@@ -4145,7 +4162,7 @@ var ART = (function () {
       case 'prop': body = (r[1] === 'gge' || r[1] === 'men') && access(r[1]) !== 'later' ? propView(r[1]) : homeView(); break;
       default: body = homeView();
     }
-    if (S.authError) body = '<div class="fb ko" style="margin-bottom:12px">⚠️ Le serveur ne reconnaît plus votre équipe. Vos réponses sont conservées sur ce téléphone : signalez-le avec le bouton ⚠️ Signaler.<div style="margin-top:8px"><button class="btn amber" data-act="recreate">Renvoyer toute l\'équipe au serveur</button></div></div>' + body;
+    if (S.authError) body = '<div class="fb ko" style="margin-bottom:12px">⚠️ Le serveur ne reconnaît plus votre équipe. Vos réponses sont conservées sur ce téléphone.' + (S.authError === 'badpin' ? '<div style="margin-top:8px">Le code de l\'équipe a changé : entrez le nouveau code.<div class="row" style="margin-top:6px"><input id="np-pin" inputmode="numeric" maxlength="4" placeholder="Nouveau code" style="max-width:140px"><button class="btn" data-act="newpin">Valider</button></div></div>' : '<div style="margin-top:8px"><button class="btn amber" data-act="recreate">Renvoyer toute l\'équipe au serveur</button></div>') + '<div class="small" style="margin-top:6px">Sinon, signalez-le avec le bouton ⚠️ Signaler.</div></div>' + body;
     var html = topBar() + '<main class="wrap">' + body + '</main>' + navBar(r[0]) + mimeModal() + reportBtn() + reportModal() + urgentModal() + (r[0] === 'who' ? '' : rulesModal());
     if (soft) {
       // rafraîchissement discret : ne pas casser une saisie en cours
@@ -4882,7 +4899,7 @@ var ART = (function () {
     if (S.locked) return toast('Les envois sont fermés.');
     if (!isMain()) { input.value = ''; return notMainToast(); }
     S.ui.up = card; S.ui.upMsg = 'Préparation…'; render();
-    var done = function (blob) { if (!blob) { S.ui.up = null; render(); return; } var fr = new FileReader(); fr.onload = function () { var b64 = String(fr.result).split(',')[1]; S.mq = S.mq || {}; S.mq[card] = { type: blob.type.split(';')[0] || 'application/octet-stream', b64: b64 }; saveMq(); sendMedia(card, true); }; fr.readAsDataURL(blob); };
+    var done = function (blob) { if (!blob) { S.ui.up = null; render(); return; } var fr = new FileReader(); fr.onload = function () { var b64 = String(fr.result).split(',')[1]; S.mq = S.mq || {}; S.mq[card] = { type: blob.type.split(';')[0] || 'application/octet-stream', b64: b64, g: S.group, pin: S.pin }; saveMq(); sendMedia(card, true); }; fr.readAsDataURL(blob); };
     if (f.type.indexOf('image') === 0) {
       var img = new Image(), url = URL.createObjectURL(f);
       img.onload = function () { var c = document.createElement('canvas'), k = Math.min(1, 1100 / Math.max(img.width, img.height)); c.width = Math.round(img.width * k); c.height = Math.round(img.height * k); c.getContext('2d').drawImage(img, 0, 0, c.width, c.height); URL.revokeObjectURL(url); c.toBlob(done, 'image/jpeg', 0.75); };
@@ -4924,10 +4941,12 @@ var ART = (function () {
     var PART = 400000, n = Math.ceil(q.b64.length / PART);
     var step = function (i) {
       S.ui.upMsg = 'Envoi… ' + Math.round(100 * i / n) + ' %'; render(true);
-      api('apiMediaPart', S.group, S.pin, card, i, n, q.type, q.b64.substr(i * PART, PART), deviceId()).then(function (r) {
+      api('apiMediaPart', q.g || S.group, q.pin || S.pin, card, i, n, q.type, q.b64.substr(i * PART, PART), deviceId()).then(function (r) {
         if (r.status === 'part') return step(i + 1);
         S.sendingMedia = null; S.ui.up = null;
-        if (r.status === 'ok') { delete S.mq[card]; saveMq(); mergeServer(r.state); saveLocal(); toast(card === 'b1' ? 'Photo-preuve envoyée 📷' : (card === 'f1' || card === 'p1' || card === 'p2' ? 'Photo envoyée ! 📷' : 'Mime envoyé ! +15 pts')); confetti(); flushMedia(); }
+        var mine = !q.g || String(q.g) === String(S.group);
+        if (r.status === 'ok') { delete S.mq[card]; saveMq(); if (mine) mergeServer(r.state); saveLocal(); toast(card === 'b1' ? 'Photo-preuve envoyée 📷' : (card === 'f1' || card === 'p1' || card === 'p2' ? 'Photo envoyée ! 📷' : 'Mime envoyé ! +15 pts')); confetti(); flushMedia(); }
+        else if (!mine && r.status !== 'missing') { delete S.mq[card]; saveMq(); flushMedia(); }
         else if (r.status === 'notmain') { delete S.mq[card]; saveMq(); notMainToast(); }
         else if (r.status === 'locked' || r.status === 'closedsec') { delete S.mq[card]; saveMq(); toast(r.status === 'closedsec' ? 'Mission fermée.' : 'Envois fermés.'); }
         else if (r.status === 'toobig') { delete S.mq[card]; saveMq(); toast('Fichier trop lourd.'); }
@@ -5201,8 +5220,12 @@ var ART = (function () {
       case 'membersave': { var RM2 = readMembers(); if (RM2.err) return toast(RM2.err); set('meta.members', RM2.text); toast('Membres enregistrés'); break; }
       case 'takeover': doJoin(null, true); break;
       case 'takeback': S.ui = { g: S.group, pin: S.pin }; S.replaced = false; doJoin(null, true); break;
-      case 'logout2': S.replaced = false; S.group = null; S.pin = null; S.state = {}; S.dirty = {}; S.ui = {}; saveLocal(); render(); break;
+      case 'logout2': keepOrphans(); S.replaced = false; S.group = null; S.pin = null; S.state = {}; S.dirty = {}; S.ui = {}; saveLocal(); render(); break;
       case 'syncnow': sync(); toast('Synchronisation…'); break;
+      case 'newpin':
+        var np = (document.getElementById('np-pin') || {}).value || '';
+        if (!/^\d{4}$/.test(np.trim())) return toast('Le code fait 4 chiffres.');
+        S.pin = np.trim(); S.authError = false; saveLocal(); sync(); break;
       case 'recreate':
         api('apiJoin', S.group, S.pin, { team: v('meta.team') || ('Groupe ' + S.group), mascot: v('meta.mascot') || '🧭', members: v('meta.members') || '', start: v('meta.start') || 'gge' }).then(function (r) {
           if (r.status !== 'ok') return toast(r.status === 'badpin' ? 'Ce numéro est déjà pris avec un autre code.' : 'Échec, réessayez.');
@@ -5210,7 +5233,7 @@ var ART = (function () {
           saveLocal(); scheduleSync(0); toast('Réponses renvoyées.'); render();
         }, function () { toast('Pas de réseau.'); });
         break;
-      case 'logout': if (Object.keys(S.dirty).length || Object.keys(S.mq || {}).length) { sync(); return toast('Des réponses ne sont pas encore envoyées : réessayez une fois en ligne.'); } logout(); break;
+      case 'logout': if (S.authError) { keepOrphans(); logout(); break; } if (Object.keys(S.dirty).length || Object.keys(S.mq || {}).length) { sync(); return toast('Des réponses ne sont pas encore envoyées : réessayez une fois en ligne.'); } logout(); break;
     }
   });
 
@@ -5426,7 +5449,7 @@ var ART = (function () {
   }
   function startTest(start) {
     api('apiProfTest', profCode(), start).then(function (r) {
-      S.mode = null; S.group = null; S.state = {}; S.dirty = {}; S.ui = { g: r.g, pin: r.pin }; S.route = 'home';
+      keepOrphans(); S.mode = null; S.group = null; S.state = {}; S.dirty = {}; S.ui = { g: r.g, pin: r.pin }; S.route = 'home';
       try { localStorage.setItem(LSR, JSON.stringify({})); } catch (e) {}
       render(); doJoin(null, true);
     }, function (e) { toast(String(e && e.message || e)); });
@@ -5531,7 +5554,12 @@ var ART = (function () {
     var params = {};
     try { (location.search || '').slice(1).split('&').forEach(function (kv) { var p = kv.split('='); if (p[0]) params[p[0]] = decodeURIComponent(p[1] || ''); }); } catch (e) {}
     var boot = function (prm) {
-      if (prm.g && prm.p && /^\d{4}$/.test(prm.p) && String(S.group) !== String(prm.g)) { S.group = null; S.state = {}; S.dirty = {}; S.ui = { g: prm.g, pin: prm.p }; render(); doJoin(null, true); return; }
+      if (prm.g && prm.p && /^\d{4}$/.test(prm.p)) {
+        // QR code de relais : on retire g et p de l'adresse pour qu'un simple rechargement ne reprenne pas la main
+        try { history.replaceState(null, '', location.pathname + location.hash); } catch (e) {}
+        if (String(S.group) !== String(prm.g)) { keepOrphans(); S.group = null; S.state = {}; S.dirty = {}; }
+        S.ui = { g: prm.g, pin: prm.p }; render(); doJoin(null, true); return;
+      }
       if (prm.mode === 'prof' || prm.prof !== undefined) { S.mode = 'prof'; }
       if (prm.mode === 'ecran' || prm.ecran !== undefined) { S.mode = 'ecran'; setInterval(function () { S.boardAt = 0; render(); }, 15000); }
       // lettres déjà dévoilées : pas de nouveau toast
