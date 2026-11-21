@@ -442,7 +442,7 @@ html.tablette .menmap{max-width:900px;margin-left:auto;margin-right:auto}
 .mimecard .row{flex-wrap:wrap;row-gap:6px}.mimecard .row .chip{max-width:100%;white-space:normal}
 @media (max-width:360px){.row{flex-wrap:wrap;row-gap:6px}.wrap{overflow-wrap:anywhere}}
 </style></head><body><div id="app"></div>
-<script src="config.js?v=1795272406"></script><script>if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js", { scope: "./" }).catch(function () {});</script>
+<script src="config.js?v=1795293950"></script><script>if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js", { scope: "./" }).catch(function () {});</script>
 <script>
 /* ==== Contenu pédagogique (énoncés) : partagé client + serveur ==== */
 /* GGE : « Le spécimen disparu ». Chaque question réussie (au moins la moitié des points) dévoile l'indice du même rang. */
@@ -1279,6 +1279,7 @@ var GR = (function () {
         if (m.answered) out.answered++;
       }
       var qmax = pmax + (q.place ? 0.25 : 0), qp = pp + mp;
+      if (neutral(st, q.id)) { qp = qmax; pp = pmax; qans = true; } // question neutralisée par l'enseignante : points accordés à toutes les équipes
       out.q[q.id] = { pts: r2(qp), max: qmax, answered: qans, partsPts: r2(pp), partsMax: pmax, letter: !!(q.letter && pp >= pmax / 2) };
       if (!q.bonus) out.max += qmax;
       out.total += qp;
@@ -1455,8 +1456,10 @@ var GR = (function () {
   }
   function codeOk(vid, code) { var r = judge(vid, code); return r.length > 0 && r.every(Boolean); }
   function wheelsRight(vid, code) { var r = judge(vid, code); return { n: r.filter(Boolean).length, of: r.length }; }
+  function neutral(st, id) { var n = val(st, 'meta.neutre'); return !!(n && n.indexOf && n.indexOf(id) >= 0); }
   function lockState(st, id) {
     var out = { opened: false, wrong: 0, tries: 0, hint: false, at: null, last: 0, via: null, obs: false };
+    if (neutral(st, id)) { out.opened = true; out.neutre = true; out.at = 0; return out; } // station neutralisée (animal absent…) : réussie d'office
     variantsOf(id).forEach(function (V) {
       var a = val(st, 'esc.' + V.vid) || [], first = -1;
       for (var i = 0; i < a.length; i++) if (V.fr ? a[i] === 'ok' : codeOk(V.vid, a[i])) { first = i; break; }
@@ -1544,7 +1547,7 @@ var GR = (function () {
   return {
     init: function (k) { KEY = k; },
     grade: grade, gradePart: gradePart, gradePlace: gradePlace, partOk: partOk, placeOk: placeOk,
-    gradeMen: gradeMen, menStations: menStations, frScore: frScore, frFull: frFull, lockState: lockState, wheelsRight: wheelsRight, codeOk: codeOk, judge: judge, mystMask: mystMask, latinScore: latinScore, norm: norm, num: num, mean: mean, sd: sd,
+    gradeMen: gradeMen, neutral: neutral, menStations: menStations, frScore: frScore, frFull: frFull, lockState: lockState, wheelsRight: wheelsRight, codeOk: codeOk, judge: judge, mystMask: mystMask, latinScore: latinScore, norm: norm, num: num, mean: mean, sd: sd,
     key: function () { return KEY; }
   };
 })();
@@ -4054,12 +4057,26 @@ var ART = (function () {
 
   /* demi-journées : 'open' (en cours), 'later' (cet après-midi), 'done' (mission du matin, figée) */
   function sectionOf(k) { return (k.indexOf('gge.') === 0 || k.indexOf('prop.gge') === 0) ? 'gge' : ((k.indexOf('esc.') === 0 || k.indexOf('prop.men') === 0) ? 'men' : null); }
+  /* heure de Paris « aaaa-mm-jj hh:mm » (comparée aux horaires de la sortie) */
+  function parisStr(t) {
+    try { var f = new Intl.DateTimeFormat('sv-SE', { timeZone: 'Europe/Paris', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false }).format(new Date(t)); return f.replace('T', ' ').replace(/[^\d :-]/g, '').slice(0, 16); }
+    catch (e) { var d = new Date(t), z = function (x) { return (x < 10 ? '0' : '') + x; }; return d.getFullYear() + '-' + z(d.getMonth() + 1) + '-' + z(d.getDate()) + ' ' + z(d.getHours()) + ':' + z(d.getMinutes()); }
+  }
+  function horaires() { return (S.phase || {}).horaires || {}; }
+  function moment() { // 'avant', 'fini' ou '' ; et échange de midi automatique, même hors réseau
+    var H = horaires(); if (!H.date) return ''; var s = parisStr(now());
+    if (H.debut && s < H.date + ' ' + H.debut) return 'avant';
+    if (H.fin && s >= H.date + ' ' + H.fin) return 'fini';
+    return '';
+  }
+  function hfr(x) { return String(x || '').replace(':', ' h '); }
   function access(sec) {
-    var start = v('meta.start'), ph = (S.phase || {}).phase || 'matin';
+    var start = v('meta.start'), ph = (S.phase || {}).phase || 'matin', H = horaires();
     if (!start || !sec) return 'open';
     if (v('meta.test') || (v('meta.open') || {})[sec]) return 'open'; // équipe de test, ou lieu rouvert par l'enseignante
-    if (ph !== 'apresmidi') return sec === start ? 'open' : 'later';
-    return sec === start ? 'done' : 'open';
+    if (ph !== 'apresmidi' && H.date && H.echange && parisStr(now()) >= H.date + ' ' + H.echange) ph = 'apresmidi';
+    var a = ph !== 'apresmidi' ? (sec === start ? 'open' : 'later') : (sec === start ? 'done' : 'open');
+    return a === 'open' ? (moment() || 'open') : a; // avant le début ou après la fin : lecture seule
   }
   var SEC_NAME = { gge: 'la Grande Galerie', men: 'la ménagerie' };
   function set(k, val, opts) {
@@ -4068,6 +4085,8 @@ var ART = (function () {
     var acc = access(sectionOf(k));
     if (acc === 'done') { toast('Mission du matin terminée : place à ' + SEC_NAME[sectionOf(k) === 'gge' ? 'men' : 'gge'] + ' !'); render(); return false; }
     if (acc === 'later') { toast('Cette mission s\'ouvrira cet après-midi.'); return false; }
+    if (acc === 'avant') { toast('L\'expédition commence à ' + hfr(horaires().debut) + ' : lisez les questions en attendant.'); return false; }
+    if (acc === 'fini') { toast('L\'expédition est terminée (' + hfr(horaires().fin) + ') : les réponses sont fermées.'); return false; }
     S.state[k] = { v: val, t: now() };
     S.dirty[k] = S.state[k];
     saveLocal();
@@ -4126,7 +4145,7 @@ var ART = (function () {
       flushMedia();
     }, function () { S.syncing = false; S.online = false; render(true); scheduleSync(15000); });
   }
-  setInterval(function () { if (S.group && document.visibilityState !== 'hidden' && Date.now() - lastAttempt > 40000) sync(); }, 10000);
+  setInterval(function () { if (S.group && document.visibilityState !== 'hidden' && Date.now() - lastAttempt > (isMain() ? 40000 : 60000)) sync(); }, 10000); // téléphones en consultation : une fois par minute (moins de charge pour le serveur)
   window.addEventListener('storage', function (e) { if (e.key !== LS || !e.newValue) return; try { var d = JSON.parse(e.newValue); if (!d || String(d.group) !== String(S.group)) return; Object.keys(d.dirty || {}).forEach(function (k) { var x = d.dirty[k]; if (!S.state[k] || x.t > S.state[k].t) { S.state[k] = x; S.dirty[k] = x; } }); render(true); } catch (x) {} });
   window.addEventListener('online', function () { scheduleSync(200); });
   window.addEventListener('beforeunload', function (e) { if (S.group && (Object.keys(S.dirty).length || Object.keys(S.mq || {}).length)) { e.preventDefault(); e.returnValue = ''; } });
@@ -4169,7 +4188,7 @@ var ART = (function () {
       default: body = homeView();
     }
     if (S.authError) body = '<div class="fb ko" style="margin-bottom:12px">⚠️ Le serveur ne reconnaît plus votre équipe. Vos réponses sont conservées sur ce téléphone.' + (S.authError === 'badpin' ? '<div style="margin-top:8px">Le code de l\'équipe a changé : entrez le nouveau code.<div class="row" style="margin-top:6px"><input id="np-pin" inputmode="numeric" maxlength="4" placeholder="Nouveau code" style="max-width:140px"><button class="btn" data-act="newpin">Valider</button></div></div>' : '<div style="margin-top:8px"><button class="btn amber" data-act="recreate">Renvoyer toute l\'équipe au serveur</button></div>') + '<div class="small" style="margin-top:6px">Sinon, signalez-le avec le bouton ⚠️ Signaler.</div></div>' + body;
-    var html = topBar() + '<main class="wrap">' + body + '</main>' + navBar(r[0]) + mimeModal() + reportBtn() + reportModal() + urgentModal() + (r[0] === 'who' ? '' : rulesModal());
+    var html = topBar() + '<main class="wrap">' + envWarn() + body + '</main>' + navBar(r[0]) + mimeModal() + reportBtn() + reportModal() + urgentModal() + (r[0] === 'who' ? '' : rulesModal());
     if (soft) {
       // rafraîchissement discret : ne pas casser une saisie en cours
       var a = document.activeElement;
@@ -4194,9 +4213,23 @@ var ART = (function () {
   }
 
   /* ---------- connexion ---------- */
+  /* Page ouverte dans le navigateur d'une autre appli (Snapchat, Instagram, Google…) ou sans mémoire (navigation privée) :
+     les réponses risqueraient d'être perdues, on demande d'ouvrir un vrai navigateur. */
+  var IN_APP = /FBAN|FBAV|FB_IAB|Instagram|Snapchat|musical_ly|TikTok|Bytedance|LinkedInApp|Line\/|MicroMessenger|Twitter|Pinterest|GSA\/|; wv\)/i.test(navigator.userAgent || '');
+  var ENV_OK = false, NO_STORE = (function () { try { localStorage.setItem('em-t', '1'); var ok = localStorage.getItem('em-t') === '1'; localStorage.removeItem('em-t'); return !ok; } catch (e) { return true; } })();
+  function envWarn() {
+    if (ENV_OK) return '';
+    var link = location.href.split('#')[0], android = /Android/i.test(navigator.userAgent || '');
+    if (IN_APP) return '<div class="fb ko" style="margin:10px 0">⚠️ <b>Ouvrez cette page dans ' + (android ? 'Chrome' : 'Safari') + '</b> : ici (lecteur de QR d\'une autre appli), vos réponses peuvent se perdre.' +
+      '<div class="small" style="margin-top:6px">' + (android ? 'Touchez le bouton ci-dessous, ou le menu ⋮ puis « Ouvrir dans Chrome ».' : 'Touchez le menu ⋯ ou ↗ puis « Ouvrir dans Safari ». Le plus simple : scannez le QR code avec l\'appareil photo.') + '</div>' +
+      '<div class="row" style="margin-top:8px;gap:6px;flex-wrap:wrap">' + (android ? '<a class="btn" href="intent://' + esc(link.replace(/^https?:\/\//, '')) + '#Intent;scheme=https;package=com.android.chrome;end">Ouvrir dans Chrome</a>' : '') +
+      '<button class="btn alt" data-act="copylink">Copier le lien</button><button class="btn ghost" data-act="envok">Continuer quand même</button></div></div>';
+    if (NO_STORE) return '<div class="fb ko" style="margin:10px 0">⚠️ <b>Navigation privée détectée</b> : ce téléphone ne peut pas garder vos réponses en cas de coupure de réseau. Ouvrez un <b>onglet normal</b> et scannez à nouveau le QR code.<div style="margin-top:8px"><button class="btn ghost" data-act="envok">Continuer quand même</button></div></div>';
+    return '';
+  }
   function joinView() {
     var u = S.ui;
-    var h = '<div class="hero" style="background-image:url(' + IMG.hero + ')"><div class="t"><div class="kick">Sortie MNHN · UniLaSalle Rouen</div><h1>Expédition Muséum</h1><div style="opacity:.9;margin-top:6px">Grande Galerie de l\'Évolution &amp; Ménagerie</div></div></div><main class="wrap stack">';
+    var h = envWarn() + '<div class="hero" style="background-image:url(' + IMG.hero + ')"><div class="t"><div class="kick">Sortie MNHN · UniLaSalle Rouen</div><h1>Expédition Muséum</h1><div style="opacity:.9;margin-top:6px">Grande Galerie de l\'Évolution &amp; Ménagerie</div></div></div><main class="wrap stack">';
     if (u.step === 'busy') {
       h += '<div class="card"><h2>📱 Un autre téléphone est connecté</h2><p class="small">L\'équipe « ' + esc(u.name || '') + ' » est déjà ouverte sur un autre téléphone. Un seul téléphone par groupe est autorisé : si vous continuez, l\'autre téléphone sera déconnecté (ses réponses déjà envoyées sont conservées).</p>' +
         '<button class="btn amber block" data-act="takeover">Continuer sur ce téléphone</button><button class="btn ghost block" data-act="back">Annuler</button></div>';
@@ -4233,16 +4266,39 @@ var ART = (function () {
   var MAX_MEMBRES = 4;
   var MIN_MEMBRES = 3;
   function splitMember(line) { var p = String(line).trim().split(/\s+/); return [p[0] || '', p.slice(1).join(' ')]; }
-  function memberDraft() { var o = []; for (var i = 0; i < 4; i++) o.push([(document.getElementById('m-p-' + i) || {}).value || '', (document.getElementById('m-n-' + i) || {}).value || '']); return o; }
+  /* liste des étudiants (onglet « Étudiants » du tableur) : si elle existe, on choisit son nom au lieu de le taper */
+  function nk(x) { return String(x || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, ' ').trim(); }
+  function etuMode() { return !!(S.etu && S.etu.length); }
+  function loadEtu() { api('apiEtudiants').then(function (r) { S.etu = (r && r.list) || []; S.etuAt = Date.now(); if (!S.group || S.route === 'team') render(true); }, function () {}); }
+  function memberDraft() { var o = []; for (var i = 0; i < 4; i++) o.push(etuMode() ? [(document.getElementById('m-x-' + i) || {}).value || '', ''] : [(document.getElementById('m-p-' + i) || {}).value || '', (document.getElementById('m-n-' + i) || {}).value || '']); return o; }
   function memberRows(str, dis, draft) {
     var L = draft || String(str || '').split('\n').filter(function (x) { return x.trim(); }).map(splitMember);
     var h = '<div class="members">';
+    if (etuMode()) {
+      var mine = {}; String(v('meta.members') || '').split('\n').forEach(function (x) { if (x.trim()) mine[nk(x)] = 1; });
+      h += '<datalist id="etu-dl">' + S.etu.filter(function (e) { return !e.team || mine[nk(e.name)]; }).map(function (e) { return '<option value="' + esc(e.name) + '">'; }).join('') + '</datalist>';
+      for (var j = 0; j < 4; j++) { var mm = L[j] || ['', '']; h += '<div class="mrow"><span class="wn">' + (j + 1) + '</span><input type="text" id="m-x-' + j + '" list="etu-dl" placeholder="Tapez les premières lettres du nom…" autocomplete="off" value="' + esc((mm[0] + ' ' + mm[1]).trim()) + '" ' + (dis ? 'disabled' : '') + '></div>'; }
+      return h + '<div class="small muted">' + MIN_MEMBRES + ' ou ' + MAX_MEMBRES + ' membres. Choisissez chaque nom dans la liste de la promo.</div></div>';
+    }
     for (var i = 0; i < 4; i++) { var m = L[i] || ['', '']; h += '<div class="mrow"><span class="wn">' + (i + 1) + '</span><input type="text" id="m-p-' + i + '" placeholder="Prénom" autocomplete="off" value="' + esc(m[0]) + '" ' + (dis ? 'disabled' : '') + '><input type="text" id="m-n-' + i + '" placeholder="Nom" autocomplete="off" value="' + esc(m[1]) + '" ' + (dis ? 'disabled' : '') + '></div>'; }
     return h + '<div class="small muted">' + MIN_MEMBRES + ' ou ' + MAX_MEMBRES + ' membres. Ces noms servent à la note : vérifiez l\'orthographe.</div></div>';
   }
   // lit les champs ; renvoie { text, err }
   function readMembers() {
     var out = [], err = '';
+    if (etuMode()) {
+      var byKey = {}; S.etu.forEach(function (e) { byKey[nk(e.name)] = e; });
+      for (var j = 0; j < 4; j++) {
+        var x = ((document.getElementById('m-x-' + j) || {}).value || '').trim(); if (!x) continue;
+        var e = byKey[nk(x)];
+        if (!e) { err = 'Ligne ' + (j + 1) + ' : « ' + x + ' » n\'est pas dans la liste de la promo. Choisissez le nom proposé.'; continue; }
+        if (e.team && String(e.team) !== String(S.group || '')) { err = e.name + ' est déjà dans l\'équipe n°' + e.team + '.'; continue; }
+        if (out.indexOf(e.name) >= 0) { err = e.name + ' est en double.'; continue; }
+        out.push(e.name);
+      }
+      if (!err && out.length < MIN_MEMBRES) err = 'Choisissez le nom d\'au moins ' + MIN_MEMBRES + ' membres.';
+      return { text: out.join('\n'), err: err, raw: out };
+    }
     for (var i = 0; i < 4; i++) {
       var p = (document.getElementById('m-p-' + i) || {}).value || '', n = (document.getElementById('m-n-' + i) || {}).value || '';
       p = p.trim().replace(/\s+/g, '-'); n = n.trim().replace(/\s+/g, ' ');
@@ -4253,7 +4309,7 @@ var ART = (function () {
     if (!err && out.length < MIN_MEMBRES) err = 'Entrez le prénom et le nom d\'au moins ' + MIN_MEMBRES + ' membres.';
     return { text: out.join('\n'), err: err, raw: out };
   }
-  function loadTaken() { S.takenAt = Date.now(); api('apiBoard').then(function (b) { var o = {}; (b || []).forEach(function (t) { o[t.g] = t; }); S.taken = o; S.takenErr = false; if (!S.group) render(); }, function () { S.takenErr = true; if (!S.group) render(); }); }
+  function loadTaken() { S.takenAt = Date.now(); loadEtu(); api('apiBoard').then(function (b) { var o = {}; (b || []).forEach(function (t) { o[t.g] = t; }); S.taken = o; S.takenErr = false; if (!S.group) render(); }, function () { S.takenErr = true; if (!S.group) render(); }); }
   function doJoin(meta, takeover) {
     var u = S.ui;
     if (!meta && !takeover && document.getElementById('j-pin')) { var ne = document.getElementById('j-name'); if (ne) u.name = ne.value.replace(/\s+/g, ' ').trim(); u.pin = document.getElementById('j-pin').value.trim(); }
@@ -4313,12 +4369,17 @@ var ART = (function () {
   }
 
   /* ---------- accueil ---------- */
+  function horairesCard() {
+    var H = horaires(), mo = moment(); if (!H.date || !(H.debut || H.echange || H.fin)) return '';
+    var t = [H.debut ? '▶️ début ' + hfr(H.debut) : '', H.echange ? '🔄 échange ' + hfr(H.echange) : '', H.fin ? '🏁 fin ' + hfr(H.fin) : ''].filter(String).join(' · ');
+    return '<div class="fb ' + (mo ? 'ko' : 'info') + '">' + (mo === 'avant' ? '⏳ <b>L\'expédition n\'a pas encore commencé.</b> Vous pouvez lire les questions, les réponses s\'ouvrent à ' + hfr(H.debut) + '.<br>' : mo === 'fini' ? '🏁 <b>L\'expédition est terminée.</b> Merci ! Les réponses sont fermées.<br>' : '') + '<span class="small">' + t + '</span></div>';
+  }
   function homeView() {
     var R = res(), g = R.gge;
     var ggeDone = g.answered, ggeTot = g.fields;
     var men = menProgress();
     return '<div class="stack">' +
-      '<div><h1>Vos missions</h1><p class="muted" style="margin:6px 0 0">Matin dans un lieu, après-midi dans l\'autre : la 2e mission s\'ouvre à l\'échange de midi.</p></div>' +
+      '<div><h1>Vos missions</h1><p class="muted" style="margin:6px 0 0">Matin dans un lieu, après-midi dans l\'autre : la 2e mission s\'ouvre à l\'échange de midi.</p></div>' + horairesCard() +
       missionCards(missionTag('gge') + '<a class="card mission ' + access('gge') + '" href="#gge"><div class="ico">' + (access('gge') === 'later' ? '🔒' : '🦴') + '</div><div class="grow"><h3>Grande Galerie de l\'Évolution</h3><div class="small muted">10 stations + bonus · plan à compléter · spécimen disparu</div><div class="bar"><i style="width:' + Math.round(100 * ggeDone / ggeTot) + '%"></i></div></div></a>', missionTag('men') + '<a class="card mission ' + access('men') + '" href="#men"><div class="ico">' + (access('men') === 'later' ? '🔒' : '🐾') + '</div><div class="grow"><h3>Ménagerie du Jardin des Plantes</h3><div class="small muted">L\'animal mystère · 4 roues, 4 stations et une photo</div><div class="bar"><i style="width:' + Math.round(100 * men) + '%"></i></div></div></a>') +
       '<a class="card mission" href="#jeux"><div class="ico">🎭</div><div class="grow"><h3>Jeux : mimes et Vrai ou bluff</h3><div class="small muted">' + R.mimes + ' / 2 mimes · Vrai ou bluff ' + (R.bluff ? '✓' : 'à faire') + '</div></div></a>' +
       '<div class="card small"><b>Comment gagner des points d\'expédition ?</b><br>Bonnes réponses · mime ou « Vrai ou bluff » envoyé +15, puis +5 par devinette réussie (pour vous et pour l\'équipe qui a mimé) et par pion bien placé · spécimen disparu jusqu\'à +100 (−20 par accusation fausse avant les 10 indices) · station réussie +20 (+15 avec l\'animal observé) · post-it bonus +10 · animal mystère trouvé +40 (plus s\'il est trouvé tôt), photo +15 · question proposée pour l\'an prochain (avec la photo de la réponse) +20 · indice −3 · erreur −2.<br>Le classement compte un tout petit peu dans la note finale : jusqu\'à +1 pt pour l\'équipe en tête, 0 pour la dernière.</div>' +
@@ -4328,7 +4389,7 @@ var ART = (function () {
       '</div>';
   }
   function missionCards(g, m) { var first = access('men') === 'open' && access('gge') !== 'open' ? 'men' : (access('gge') === 'open' && access('men') !== 'open' ? 'gge' : (v('meta.start') || 'gge')); return first === 'men' ? m + g : g + m; }
-  function missionTag(sec) { var a = access(sec), t = { open: (v('meta.start') === sec ? '☀️ Ce matin' : '🌙 Cet après-midi') + ' · en cours', later: '🌙 Cet après-midi', done: '☀️ Ce matin · terminée' }[a]; return v('meta.start') ? '<div class="small muted" style="margin:0 0 -6px 4px">' + t + '</div>' : ''; }
+  function missionTag(sec) { var a = access(sec), t = { open: (v('meta.start') === sec ? '☀️ Ce matin' : '🌙 Cet après-midi') + ' · en cours', later: '🌙 Cet après-midi', done: '☀️ Ce matin · terminée', avant: '⏳ Commence à ' + hfr(horaires().debut), fini: '🏁 Expédition terminée' }[a]; return v('meta.start') ? '<div class="small muted" style="margin:0 0 -6px 4px">' + t + '</div>' : ''; }
   function menProgress() { var M = GR.grade(S.state, GGE).men; return (M.nOpen + (M.locks.fin.opened ? 1 : 0) + (M.locks.fin.photo ? 1 : 0)) / 6; }
 
   /* ---------- GGE ---------- */
@@ -4372,6 +4433,7 @@ var ART = (function () {
     if (!q) return 'Question introuvable';
     var h = '<div class="stack"><a href="#gge" class="small">← Toutes les stations</a>' +
       '<div class="card qhead"><div class="row"><span class="loc">' + q.loc + '</span><div><div class="small muted">' + esc(q.level) + '</div><h2>' + esc(q.title) + '</h2></div></div><p style="margin:10px 0 0">' + esc(q.intro) + '</p>' + hintView(q) + '</div>' +
+      (GR.neutral(S.state, q.id) ? '<div class="fb ok">✅ <b>Question neutralisée par les enseignantes</b> : les points sont accordés à toutes les équipes. Passez à la suivante.</div>' : '') +
       '<div class="card">' + q.parts.map(function (p) { return '<div class="part">' + partView(p) + '</div>'; }).join('') + '</div>';
     if (q.place) h += '<div class="card"><b>📍 Où était-ce ?</b><span class="pts">0,25 pt</span><div class="small muted">Touchez le plan du 2e étage à l\'endroit du spécimen ou du panneau (lettre ' + q.place + '), puis validez. Faites glisser le plan pour le voir en entier.</div>' + placeView(q.place) + '</div>';
     h += '<div class="row">' + (idx > 0 ? '<a class="btn alt grow" href="#gge/' + GGE[idx - 1].id + '">‹ Précédente</a>' : '') + (idx < GGE.length - 1 ? '<a class="btn grow" href="#gge/' + GGE[idx + 1].id + '">Suivante ›</a>' : '<a class="btn grow" href="#gge">Terminer</a>') + '</div></div>';
@@ -5076,6 +5138,8 @@ var ART = (function () {
       case 'fixopen': profFix(S.ui.profTeam, 'open', { sec: d('s'), on: d('on') === '1' }); break;
       case 'fixwheel': { var sel = document.getElementById('fx-w' + d('i')); if (sel && sel.value) profFix(S.ui.profTeam, 'wheel', { slot: +d('i'), id: sel.value }); break; }
       case 'repdone': profFix(null, 'report', d('r')); break;
+      case 'profhoraires': { var hv = function (id) { return ((document.getElementById(id) || {}).value || '').trim(); }; profFix(null, 'horaires', { date: hv('hr-date'), debut: hv('hr-debut'), echange: hv('hr-echange'), fin: hv('hr-fin') }); break; }
+      case 'profneutre': { var nid = d('id') || ((document.getElementById('nt-id') || {}).value || ''); if (!nid) return toast('Choisissez une question.'); profFix(null, 'neutre', { id: nid, on: d('on') === '1', why: ((document.getElementById('nt-why') || {}).value || '').trim() }); break; }
       case 'testgo': startTest(d('s')); break;
       case 'testend': { var hasP = !!profCode(); logout(); try { localStorage.removeItem(LSR); } catch (e) {} if (hasP) { S.mode = 'prof'; render(); profLoad(); } break; }
       case 'scr': try { localStorage.setItem(LSE, d('m')); } catch (e) {} applyScreen(); render(); break;
@@ -5224,6 +5288,8 @@ var ART = (function () {
         set('avis.' + deviceId(), { note: A.note, liked: A.liked.slice(), improve: A.improve, comment: A.comment, sent: true }); toast('Merci pour votre avis !'); break;
       }
       case 'noop': break;
+      case 'envok': ENV_OK = true; render(); break;
+      case 'copylink': { var lk = location.href.split('#')[0]; try { navigator.clipboard.writeText(lk).then(function () { toast('Lien copié : collez-le dans ' + (/Android/i.test(navigator.userAgent) ? 'Chrome' : 'Safari') + '.'); }, function () { toast(lk); }); } catch (e) { toast(lk); } break; }
       case 'startpick': S.ui.mdraft = memberDraft(); S.ui.start = d('o'); render(); break;
       case 'membersave': { var RM2 = readMembers(); if (RM2.err) return toast(RM2.err); if (set('meta.members', RM2.text)) toast('Membres enregistrés'); break; }
       case 'takeover': doJoin(null, true); break;
@@ -5310,14 +5376,14 @@ var ART = (function () {
     var st = v('meta.start') || 'gge', other = st === 'gge' ? 'men' : 'gge';
     return [
       { ico: '📢', color: 'amber', title: 'À lire à voix haute', body: '<p><b>Un membre du groupe lit ces écrans à voix haute</b> pour tout le monde. Chacun touche ensuite « Oui, j\'ai bien compris » sur son téléphone.</p><p>Un seul téléphone (ou une tablette) répondra pour le groupe : c\'est lui qui enregistre vos réponses et votre note. Vous le choisirez juste après.</p>', ok: 'Oui, on lit à voix haute au groupe' },
-      { ico: '🗺️', color: 'green', title: 'Le programme de la journée', body: '<ul><li><b>Ce matin</b> : ' + lieuName(st) + '. <b>Cet après-midi</b> : ' + lieuName(other) + '. La 2e mission s\'ouvre à l\'échange de midi, la 1re est alors figée.</li><li><b>Grande Galerie</b> : 10 stations de questions à partir des spécimens, un plan à compléter, et l\'enquête du <b>spécimen disparu</b> (chaque bonne réponse donne un indice).</li><li><b>Ménagerie</b> : 4 roues tirent vos 4 animaux. Chaque station réussie dévoile des lettres du <b>nom latin de votre animal mystère</b>, qu\'il faudra ensuite photographier.</li><li><b>À la fin de chaque lieu</b> : vous proposez une question (avec la photo de la réponse) pour les étudiants de l\'an prochain.</li><li><b>Toute la journée</b> : 2 mimes et un « Vrai ou bluff », devinés par les autres équipes en fin de journée.</li></ul>', ok: 'Oui, j\'ai bien compris' },
+      { ico: '🗺️', color: 'green', title: 'Le programme de la journée', body: '<ul><li><b>Ce matin</b> : ' + lieuName(st) + '. <b>Cet après-midi</b> : ' + lieuName(other) + '. La 2e mission s\'ouvre à l\'échange de midi, la 1re est alors figée.</li>' + (horaires().date && (horaires().debut || horaires().echange || horaires().fin) ? '<li><b>Horaires</b> : ' + [horaires().debut ? 'début ' + hfr(horaires().debut) : '', horaires().echange ? 'échange des lieux ' + hfr(horaires().echange) : '', horaires().fin ? 'fin ' + hfr(horaires().fin) + ' (plus aucune réponse après)' : ''].filter(String).join(', ') + '.</li>' : '') + '<li><b>Grande Galerie</b> : 10 stations de questions à partir des spécimens, un plan à compléter, et l\'enquête du <b>spécimen disparu</b> (chaque bonne réponse donne un indice).</li><li><b>Ménagerie</b> : 4 roues tirent vos 4 animaux. Chaque station réussie dévoile des lettres du <b>nom latin de votre animal mystère</b>, qu\'il faudra ensuite photographier.</li><li><b>À la fin de chaque lieu</b> : vous proposez une question (avec la photo de la réponse) pour les étudiants de l\'an prochain.</li><li><b>Toute la journée</b> : 2 mimes et un « Vrai ou bluff », devinés par les autres équipes en fin de journée.</li></ul>', ok: 'Oui, j\'ai bien compris' },
       { ico: '✅', color: 'green', title: 'Ce qui est autorisé', body: '<ul><li>Vous déplacer <b>ensemble</b>, à votre rythme, dans l\'ordre que vous voulez.</li><li>Lire les panneaux, cartels et vitrines : beaucoup de réponses y sont.</li><li>Utiliser <b>vos cours et vos notes</b>.</li><li>En cas de souci (bug, question douteuse, animal absent) : le bouton ⚠️ Signaler. Les enseignants sont peu nombreux sur un très grand site : ne partez pas les chercher.</li><li>Utiliser les indices de l\'appli (ils coûtent quelques points d\'expédition).</li></ul>', ok: 'Oui, j\'ai bien compris' },
       { ico: '⛔', color: 'red', title: 'Ce qui est interdit', body: '<ul><li><b>Internet et l\'intelligence artificielle</b> (ChatGPT, etc.) pour trouver les réponses.</li><li>Recopier les réponses d\'une autre équipe ou donner les vôtres.</li><li>Se séparer du groupe ou laisser quelqu\'un seul.</li><li>Courir, crier, taper sur les vitres, utiliser le flash, <b>toucher ou nourrir les animaux</b>, passer les barrières.</li><li>Gêner les autres visiteurs (le Muséum reste ouvert au public).</li><li>Se connecter dans une autre équipe que la sienne, ou prêter son téléphone à une autre équipe.</li><li>Faire des captures d\'écran ou diffuser les mimes des autres équipes.</li></ul>', ok: 'Oui, j\'ai bien compris' },
-      { ico: '👥', color: 'green', title: 'Tout le monde se connecte', body: '<ul><li><b>Chaque membre</b> du groupe se connecte sur <b>son propre téléphone</b> (même numéro d\'équipe, même code) et choisit son nom.</li><li>Le groupe choisit ensuite <b>un seul téléphone principal</b> (ou une tablette) : c\'est lui qui répond et qui compte pour la note.</li><li>Les autres téléphones voient les questions et les réponses du groupe, en <b>consultation</b>.</li><li>Batterie faible ? Le téléphone principal confie son rôle à un autre membre (onglet Équipe ou QR code 🔋).</li></ul>', ok: 'Oui, j\'ai bien compris' },
+      { ico: '👥', color: 'green', title: 'Tout le monde se connecte', body: '<ul><li><b>Chaque membre</b> du groupe se connecte sur <b>son propre téléphone</b> (même numéro d\'équipe, même code) et choisit son nom.</li><li><b>Connectez-vous dehors ou dans le hall, avant d\'entrer</b> : il peut ne pas y avoir de réseau à l\'intérieur.</li><li>Le groupe choisit ensuite <b>un seul téléphone principal</b> (ou une tablette) : c\'est lui qui répond et qui compte pour la note.</li><li>Les autres téléphones voient les questions et les réponses du groupe, en <b>consultation</b>.</li><li>Batterie faible ? Le téléphone principal confie son rôle à un autre membre (onglet Équipe ou QR code 🔋).</li></ul>', ok: 'Oui, j\'ai bien compris' },
       { ico: '🔕', color: 'red', title: 'Restez dans l\'application', body: '<ul><li>Activez dès maintenant <b>« Ne pas déranger »</b> (ou le mode Concentration) sur votre téléphone : les messages et notifications ne doivent pas vous distraire.</li><li><b>Chaque sortie de l\'appli</b> (autre appli, Internet, messages…) est enregistrée et <b>signalée aux enseignants</b>, sur tous les téléphones du groupe.</li><li>Prendre une photo pour un défi ne compte pas comme une sortie.</li><li><b>Urgence</b> (appel d\'un proche, santé, perdu) ? Touchez 🚨 en haut de l\'écran avant de sortir : la sortie sera notée comme une urgence.</li></ul>', ok: 'Oui, j\'ai activé « Ne pas déranger »' },
       { ico: '⚠️', color: 'amber', title: 'Un problème ? Signalez-le', body: '<p>En bas à gauche de chaque écran, le bouton <span class="repdemo">⚠️ Signaler</span> envoie un message directement aux enseignants.</p><ul><li>L\'appli bloque, une réponse juste est refusée, une question vous paraît fausse ou ambiguë ?</li><li>Un animal est absent, un panneau a changé, une vitrine est fermée ?</li></ul><p>Décrivez <b>précisément</b> ce qui se passe (quelle question, ce que vous avez répondu). Chaque signalement est relu après la sortie et, en cas de doute, tranché en votre faveur.</p>', ok: 'Oui, j\'ai bien compris' },
-      { ico: '📱', color: 'green', title: 'Le téléphone et le réseau', body: '<ul><li><b>Pas de réseau ?</b> Continuez : tout est gardé sur le téléphone et part tout seul au retour du réseau. Ne fermez pas l\'onglet.</li><li><b>Plus de batterie ?</b> Bouton 🔋 en haut : un camarade scanne le QR code et continue sur son téléphone.</li><li>Notez bien le <b>numéro (' + esc(String(S.group || '')) + ')</b> et le <b>code</b> de votre équipe.</li></ul>', ok: 'Oui, j\'ai bien compris' },
-      { ico: '🏆', color: 'amber', title: 'Note et points', body: '<ul><li>Chaque lieu donne une <b>note sur 20</b>, calculée automatiquement, la même pour tout le groupe.</li><li>Les <b>points d\'expédition</b> font le classement : bonnes réponses, jeux, animal trouvé… Les erreurs et les indices en font perdre un peu.</li><li>Le classement ajoute jusqu\'à <b>+1 point</b> à la note finale pour l\'équipe en tête (0 pour la dernière, personne n\'est pénalisé).</li></ul><p><b>Bonne expédition !</b></p>', ok: 'Oui, c\'est parti !' }
+      { ico: '📱', color: 'green', title: 'Le téléphone et le réseau', body: '<ul><li><b>Pas de réseau ?</b> Continuez : tout est gardé sur le téléphone et part tout seul au retour du réseau. Ne fermez pas l\'onglet.</li><li><b>Plus de batterie ?</b> Bouton 🔋 en haut : un camarade scanne le QR code et continue sur son téléphone. Une batterie externe par groupe, c\'est l\'idéal.</li><li>Notez bien le <b>numéro (' + esc(String(S.group || '')) + ')</b> et le <b>code</b> de votre équipe.</li></ul>', ok: 'Oui, j\'ai bien compris' },
+      { ico: '🏆', color: 'amber', title: 'Note et points', body: '<ul><li>Chaque lieu donne une <b>note sur 20</b>, calculée automatiquement, la même pour tout le groupe.</li><li>Les <b>points d\'expédition</b> font le classement : bonnes réponses, jeux, animal trouvé… Les erreurs et les indices en font perdre un peu.</li><li>Le classement ajoute jusqu\'à <b>+1 point</b> à la note finale pour l\'équipe en tête (0 pour la dernière, personne n\'est pénalisé).</li></ul><p class="small muted">Les photos et vidéos prises dans l\'application servent uniquement à la sortie (notes et jeux) et sont supprimées ensuite.</p><p><b>Bonne expédition !</b></p>', ok: 'Oui, c\'est parti !' }
     ];
   }
   function pmSteps() {
@@ -5411,8 +5477,10 @@ var ART = (function () {
     var nRules = T.filter(function (t) { return t.rules; }).length, stale = T.filter(function (t) { return t.last && Date.now() - t.last > 20 * 60000; }).length;
     h += '<div class="card"><div class="row" style="flex-wrap:wrap;gap:6px"><span class="chip i">' + (ph ? '🌙 Après-midi' : '☀️ Matin') + '</span><span class="chip i">🎭 Devinettes : ' + ({ off: 'pas ouvertes', open: 'ouvertes', closed: 'closes' }[P.vote] || P.vote) + '</span><span class="chip ' + (P.locked ? '' : 'i') + '">' + (P.locked ? '🔒 Envois bloqués' : '🔓 Envois ouverts') + '</span><span class="chip i">' + T.length + ' équipes</span><span class="chip i">📢 Règles lues : ' + nRules + '/' + T.length + '</span>' + (stale ? '<span class="chip">⏸ ' + stale + ' inactive(s) > 20 min</span>' : '') + '</div>' +
       '<div class="small muted" style="margin-top:8px">Mis à jour ' + ago(S.profAt) + ' (toutes les 20 s). ' + (P.url ? '<a href="' + esc(P.url) + '" target="_blank" rel="noopener">Ouvrir le tableur</a>' : '') + '</div></div>';
+    h += profAlerts(T, P);
     var A = [['apresmidi', '☀️→🌙 Échanger les lieux (midi)', !ph], ['matin', '↩️ Revenir au matin', ph], ['ouvrir', '🎭 Ouvrir les devinettes', P.vote !== 'open'], ['clore', '🏁 Clore les devinettes', P.vote === 'open'], ['notes', '🎓 Mettre à jour « Notes par étudiant »', true], ['correction', '📋 Mettre à jour les feuilles de correction', true], ['bloquer', '🔒 Bloquer les envois (fin)', !P.locked], ['rouvrir', '🔓 Rouvrir les envois', P.locked], ['cleartests', '🧪 Supprimer les équipes de test', T.some(function (t) { return t.test; })]];
     h += '<div class="card"><h3>Commandes</h3>' + (S.ui.profAsk ? '<div class="fb info">Confirmer : <b>' + esc((A.filter(function (x) { return x[0] === S.ui.profAsk; })[0] || [])[1] || '') + '</b> ?<div class="row" style="margin-top:8px"><button class="btn amber" data-act="profdo" data-a="' + S.ui.profAsk + '">Oui</button><button class="btn ghost" data-act="profno">Non</button></div></div>' : '<div class="pacts">' + A.filter(function (x) { return x[2]; }).map(function (x) { return '<button class="btn alt" data-act="profask" data-a="' + x[0] + '">' + x[1] + '</button>'; }).join('') + '</div>') + '</div>';
+    h += profHorairesCard(P) + profNeutreCard(P);
     h += '<div class="card"><h3>🧪 Tester l\'application</h3><p class="small muted" style="margin:4px 0 0">Crée une équipe de test (n° 51 à 60) avec les deux lieux ouverts. Elle n\'apparaît ni dans le classement ni dans les notes.</p><div class="pacts"><button class="btn alt" data-act="testgo" data-s="gge">🦴 Tester en commençant par la Grande Galerie</button><button class="btn alt" data-act="testgo" data-s="men">🐾 Tester en commençant par la Ménagerie</button></div></div>';
     h += '<div class="card"><h3>Avancement des groupes</h3><div class="small muted">GGE et Ménagerie : note actuelle /20. 📢 = règles lues. 💡 = question proposée (G = GGE, M = Ménagerie).</div></div>' +
       T.map(function (t) {
@@ -5430,6 +5498,35 @@ var ART = (function () {
     return h + '</main>';
   }
 
+  /* ce qui bloque vraiment un groupe, en haut de l'écran */
+  function profAlerts(T, P) {
+    var L = [], nowT = Date.now();
+    T.forEach(function (t) {
+      if (t.test) return; var D = t.devs || [], main = D.filter(function (x) { return x.main; })[0], on = D.filter(function (x) { return x.online; }).length;
+      var lab = '<b>n°' + t.g + '</b> ' + esc(t.team);
+      if (main && !main.online && on) L.push(['📵', lab + ' : téléphone principal (' + esc(main.name) + ') hors ligne depuis ' + Math.round((nowT - main.seen) / 60000) + ' min. Les membres connectés peuvent reprendre le rôle (onglet Équipe).', t.g]);
+      else if (main && !main.online && !on && t.last && nowT - t.last < 3 * 3600000) L.push(['📴', lab + ' : plus aucun téléphone connecté depuis ' + Math.round((nowT - main.seen) / 60000) + ' min (réseau ? batterie ?).', t.g]);
+      if (!t.mainSet && D.length && t.last && nowT - t.last > 15 * 60000) L.push(['❓', lab + ' : pas encore de téléphone principal choisi.', t.g]);
+      var ur = D.filter(function (x) { return x.urg; }); if (ur.length) L.push(['🚨', lab + ' : urgence déclarée (' + ur.map(function (x) { return esc(x.name); }).join(', ') + ').', t.g]);
+    });
+    var nr = (P.reports || []).filter(function (r) { return !r.done; }).length;
+    if (!L.length && !nr) return '<div class="card"><h3>✅ Rien de bloquant</h3><p class="small muted" style="margin:4px 0 0">Les téléphones principaux sont en ligne et aucune urgence n\'est déclarée.</p></div>';
+    return '<div class="card" style="border:2px solid #b5462f"><h3>🚨 À regarder en priorité</h3>' + (nr ? '<div class="fb ko">⚠️ ' + nr + ' signalement' + (nr > 1 ? 's' : '') + ' non traité' + (nr > 1 ? 's' : '') + ' (en bas de la page).</div>' : '') +
+      L.map(function (x) { return '<div class="row small" style="gap:8px;margin-top:8px;align-items:flex-start"><span style="font-size:18px">' + x[0] + '</span><div class="grow">' + x[1] + '</div><button class="btn alt" style="min-height:32px;padding:4px 10px;font-size:13px" data-act="profteam" data-g="' + x[2] + '">Voir</button></div>'; }).join('') + '</div>';
+  }
+  function profHorairesCard(P) {
+    var H = (P.phase || {}).horaires || {};
+    return '<div class="card"><h3>⏰ Horaires de la sortie</h3><p class="small muted" style="margin:4px 0 0">Heure de Paris. À l\'heure d\'échange, les lieux s\'échangent tout seuls (vous pouvez le faire avant avec le bouton). Avant le début, les équipes se connectent et lisent les règles mais ne peuvent pas répondre ; après la fin, plus aucune réponse n\'est acceptée. Laissez vide pour ne rien automatiser.</p>' +
+      '<div class="grid2"><label class="f">Date<input type="date" id="hr-date" value="' + esc(H.date || '') + '"></label><label class="f">Début<input type="time" id="hr-debut" value="' + esc(H.debut || '') + '"></label><label class="f">Échange des lieux<input type="time" id="hr-echange" value="' + esc(H.echange || '') + '"></label><label class="f">Fin<input type="time" id="hr-fin" value="' + esc(H.fin || '') + '"></label></div>' +
+      '<button class="btn block" style="margin-top:10px" data-act="profhoraires">Enregistrer les horaires</button></div>';
+  }
+  function profNeutreCard(P) {
+    var N = P.neutre || [], name = function (id) { var q = GGE.filter(function (x) { return x.id === id; })[0]; if (q) return 'GGE ' + id.toUpperCase() + ' · ' + q.title; var l = lockById(id); return l ? 'Ménagerie · ' + l.title : id; };
+    var opts = GGE.map(function (q) { return [q.id, name(q.id)]; }).concat(ESC.filter(function (x) { return /^c\d+$/.test(x.id); }).map(function (x) { return [x.id, name(x.id)]; })).filter(function (o) { return N.indexOf(o[0]) < 0; });
+    return '<div class="card"><h3>🚫 Neutraliser une question</h3><p class="small muted" style="margin:4px 0 0">Animal absent, panneau changé, spécimen déplacé… La question (ou la station de la ménagerie) est comptée juste pour <b>toutes les équipes</b>, d\'un coup. Les réponses déjà données sont gardées ; vous pouvez rétablir à tout moment.</p>' +
+      (N.length ? '<div style="margin-top:8px">' + N.map(function (id) { return '<div class="row small" style="gap:8px;margin-top:6px"><span class="grow">✅ ' + esc(name(id)) + '</span><button class="btn ghost" style="min-height:30px;padding:2px 10px;font-size:13px" data-act="profneutre" data-id="' + id + '" data-on="0">Rétablir</button></div>'; }).join('') + '</div>' : '') +
+      '<div class="row" style="gap:6px;margin-top:10px;flex-wrap:wrap"><select id="nt-id" style="flex:1;min-width:200px"><option value="">Choisir…</option>' + opts.map(function (o) { return '<option value="' + o[0] + '">' + esc(o[1]) + '</option>'; }).join('') + '</select><input type="text" id="nt-why" placeholder="Raison (journal)" style="flex:1;min-width:140px"><button class="btn amber" data-act="profneutre" data-on="1">Neutraliser</button></div></div>';
+  }
   function profTeamView(t, P) {
     var ov = t.override || {}, opt = function (a, b) { return '<option value="' + a + '"' + (a === b ? ' selected' : '') + '>'; };
     var h = '<div class="card"><button class="btn ghost" style="padding-left:0" data-act="profteamx">← Toutes les équipes</button><h2>' + esc(t.mascot || '') + ' n°' + t.g + ' · ' + esc(t.team) + (t.test ? ' (test)' : '') + '</h2>' +
@@ -5452,7 +5549,7 @@ var ART = (function () {
   }
   function profFix(g, action, arg) {
     S.profErr = ''; S.profBusy = true; render();
-    api('apiProfFix', profCode(), g, action, arg).then(function (r) { S.profBusy = false; S.prof = r; S.profAt = Date.now(); toast('Corrigé ✓ (le téléphone le recevra dans quelques secondes)'); render(); },
+    api('apiProfFix', profCode(), g, action, arg).then(function (r) { S.profBusy = false; if (r && r.teams) { S.prof = r; S.profAt = Date.now(); } else profLoad(); toast(action === 'horaires' ? 'Horaires enregistrés ✓' : action === 'neutre' ? 'Fait ✓ : toutes les équipes le reçoivent à leur prochaine synchronisation' : 'Corrigé ✓ (le téléphone le recevra dans moins d\'une minute)'); render(); },
       function (e) { S.profBusy = false; S.profErr = String(e && e.message || e).replace(/^Error: /, ''); render(); });
   }
   function startTest(start) {
@@ -5581,6 +5678,7 @@ var ART = (function () {
     window.__demoProf = function () { S.mode = 'prof'; render(); profLoad(); };
     window.__demoKick = function () { if (S.mode === 'prof') profLoad(); else if (S.group) scheduleSync(50); };
     setTimeout(flushReports, 3000);
+    setTimeout(loadEtu, 2500);
     if (!document.hidden) cameBack();
   }
   start();
