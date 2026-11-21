@@ -440,8 +440,9 @@ html.tablette .menmap{max-width:900px;margin-left:auto;margin-right:auto}
 .pdot{width:12px;height:12px;border-radius:50%;background:var(--line);flex:none}.pdot.on{background:#2e9b5f;box-shadow:0 0 0 4px #2e9b5f33}.pdot.idle{background:#d38a1f}
 .urgbtn{border:0;background:transparent;font-size:20px;cursor:pointer;padding:2px}
 .mimecard .row{flex-wrap:wrap;row-gap:6px}.mimecard .row .chip{max-width:100%;white-space:normal}
+@media (max-width:360px){.row{flex-wrap:wrap;row-gap:6px}.wrap{overflow-wrap:anywhere}}
 </style></head><body><div id="app"></div>
-<script src="config.js?v=1795263999"></script><script>if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js", { scope: "./" }).catch(function () {});</script>
+<script src="config.js?v=1795272406"></script><script>if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js", { scope: "./" }).catch(function () {});</script>
 <script>
 /* ==== Contenu pédagogique (énoncés) : partagé client + serveur ==== */
 /* GGE : « Le spécimen disparu ». Chaque question réussie (au moins la moitié des points) dévoile l'indice du même rang. */
@@ -4036,9 +4037,10 @@ var ART = (function () {
       var cfg = window.APP_CONFIG;
       if (cfg && cfg.api) {
         // page hébergée sur GitHub Pages : appel du serveur Google (Apps Script) en POST texte (pas de pré-vérification CORS)
-        fetch(cfg.api, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ fn: name, args: args }), redirect: 'follow' })
+        var ac = window.AbortController ? new AbortController() : null, to = ac && setTimeout(function () { ac.abort(); }, 45000);
+        fetch(cfg.api, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ fn: name, args: args }), redirect: 'follow', signal: ac ? ac.signal : undefined })
           .then(function (r) { return r.json(); })
-          .then(function (j) { if (j && j.ok) res(j.result); else rej(new Error((j && j.error) || 'Erreur serveur')); }, rej);
+          .then(function (j) { clearTimeout(to); if (j && j.ok) res(j.result); else rej(new Error((j && j.error) || 'Erreur serveur')); }, function (e) { clearTimeout(to); rej(e); });
       } else if (cfg && cfg.pret === false) {
         rej(new Error('Application pas encore ouverte'));
       } else if (window.google && google.script && google.script.run) {
@@ -4061,16 +4063,17 @@ var ART = (function () {
   }
   var SEC_NAME = { gge: 'la Grande Galerie', men: 'la ménagerie' };
   function set(k, val, opts) {
-    if (S.locked) { toast('Les envois sont fermés par l\'enseignante.'); return; }
-    if (k.indexOf('avis.') !== 0 && k.indexOf('meta.rules') !== 0 && !isMain()) { notMainToast(); render(); return; }
+    if (S.locked) { toast('Les envois sont fermés par l\'enseignante.'); return false; }
+    if (k.indexOf('avis.') !== 0 && k.indexOf('meta.rules') !== 0 && !isMain()) { notMainToast(); render(); return false; }
     var acc = access(sectionOf(k));
-    if (acc === 'done') { toast('Mission du matin terminée : place à ' + SEC_NAME[sectionOf(k) === 'gge' ? 'men' : 'gge'] + ' !'); render(); return; }
-    if (acc === 'later') { toast('Cette mission s\'ouvrira cet après-midi.'); return; }
+    if (acc === 'done') { toast('Mission du matin terminée : place à ' + SEC_NAME[sectionOf(k) === 'gge' ? 'men' : 'gge'] + ' !'); render(); return false; }
+    if (acc === 'later') { toast('Cette mission s\'ouvrira cet après-midi.'); return false; }
     S.state[k] = { v: val, t: now() };
     S.dirty[k] = S.state[k];
     saveLocal();
     scheduleSync();
     if (!opts || !opts.quiet) render();
+    return true;
   }
   var syncTimer = null;
   var lastAttempt = 0;
@@ -4109,6 +4112,7 @@ var ART = (function () {
     var sent = {}; Object.keys(S.dirty).forEach(function (k) { sent[k] = S.dirty[k]; });
     api('apiSync', S.group, S.pin, sent, deviceId()).then(function (r) {
       S.syncing = false;
+      if (r.status === 'wait') { S.online = false; render(true); scheduleSync(60000); return; }
       if (r.status === 'badpin' || r.status === 'unknown') { S.authError = r.status; S.online = false; render(true); return; }
       S.authError = false; if (r.info) setInfo(r.info);
       // une clé n'est retirée de la file que si le serveur l'a bien enregistrée
@@ -4123,6 +4127,7 @@ var ART = (function () {
     }, function () { S.syncing = false; S.online = false; render(true); scheduleSync(15000); });
   }
   setInterval(function () { if (S.group && document.visibilityState !== 'hidden' && Date.now() - lastAttempt > 40000) sync(); }, 10000);
+  window.addEventListener('storage', function (e) { if (e.key !== LS || !e.newValue) return; try { var d = JSON.parse(e.newValue); if (!d || String(d.group) !== String(S.group)) return; Object.keys(d.dirty || {}).forEach(function (k) { var x = d.dirty[k]; if (!S.state[k] || x.t > S.state[k].t) { S.state[k] = x; S.dirty[k] = x; } }); render(true); } catch (x) {} });
   window.addEventListener('online', function () { scheduleSync(200); });
   window.addEventListener('beforeunload', function (e) { if (S.group && (Object.keys(S.dirty).length || Object.keys(S.mq || {}).length)) { e.preventDefault(); e.returnValue = ''; } });
 
@@ -4145,7 +4150,7 @@ var ART = (function () {
     var mode = S.mode;
     if (window.APP_CONFIG && !window.APP_CONFIG.api) { $app.innerHTML = '<div class="hero" style="background-image:url(' + IMG.hero + ')"><div class="t"><div class="kick">Sortie MNHN · UniLaSalle Rouen</div><h1>Expédition Muséum</h1></div></div><main class="wrap"><div class="card center" style="padding:28px 16px"><div style="font-size:46px">🧭</div><h2>L\'application ouvrira le jour de la sortie</h2><p class="small">Gardez cette page : le jour J, scannez à nouveau le QR code ou rechargez la page.</p></div></main>'; return; }
     if (mode === 'ecran') { $app.innerHTML = screenBoard(); return; }
-    if (mode === 'prof') { var ph2 = profView(); if (ph2 !== lastHtml) { $app.innerHTML = ph2; lastHtml = ph2; } return; }
+    if (mode === 'prof') { var ph2 = profView(); if (ph2 !== lastHtml) { var kv = {}; $app.querySelectorAll('input[id],textarea[id]').forEach(function (e) { if (e.value !== e.defaultValue) kv[e.id] = e.value; }); $app.innerHTML = ph2; lastHtml = ph2; Object.keys(kv).forEach(function (id) { var e = document.getElementById(id); if (e) e.value = kv[id]; }); } return; }
     if (!S.group) { var jh = joinView() + reportBtn() + reportModal(); if (soft && document.activeElement && /INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName)) return; if (jh !== lastHtml) { $app.innerHTML = jh; lastHtml = jh; } return; }
     var r = route(), body;
     if (needWho()) r = ['who'];
@@ -4217,7 +4222,7 @@ var ART = (function () {
       if (!S.takenAt || Date.now() - S.takenAt > 15000) loadTaken();
       var max = 40, grid = '';
       for (var n = 1; n <= max; n++) { var t2 = (S.taken || {})[n]; grid += '<button class="gnum ' + (t2 ? 'taken' : '') + '" data-act="pickg" data-g="' + n + '"><b>' + n + '</b>' + (t2 ? '<small>' + esc(t2.mascot || '') + ' ' + esc(t2.team) + '</small>' : '') + '</button>'; }
-      h += '<div class="card"><h2>Votre numéro d\'équipe</h2><p class="muted small">Un seul téléphone par équipe. Prenez un numéro libre pour créer votre équipe. Les numéros grisés sont déjà pris : touchez le vôtre seulement pour reprendre votre équipe sur un autre téléphone.</p>' +
+      h += '<div class="card"><h2>Votre numéro d\'équipe</h2><p class="muted small">Une seule personne crée l\'équipe en prenant un numéro libre. Les autres membres touchent ensuite ce numéro (grisé) et entrent le même code : tout le monde se connecte.</p>' +
         (S.takenErr ? '<div class="fb ko">Liste des équipes indisponible (réseau ?). Réessayez dans un instant.</div>' : '') + (u.err ? '<div class="fb ko">' + esc(u.err) + '</div>' : '') +
         '<div class="gnums">' + grid + '</div></div>' +
         '<div class="card small muted">Rappel : l\'utilisation d\'outils d\'intelligence artificielle n\'est pas autorisée. Les réponses sont enregistrées automatiquement et notées par équipe.</div>' +
@@ -4272,6 +4277,7 @@ var ART = (function () {
       var keepLocal = (String(S.group) === String(u.g)) ? S.state : {};
       S.group = parseInt(u.g, 10); S.pin = u.pin; S.offset = r.now - Math.round((t0 + Date.now()) / 2);
       S.state = keepLocal; S.replaced = false; if (r.url) S.appUrl = r.url; if (r.phase) S.phase = r.phase; mergeServer(r.state); S.locked = !!r.locked; S.online = true; if (r.vote) S.vote = r.vote;
+      try { localStorage.setItem(LSO, JSON.stringify(orphans().filter(function (x) { if (String(x.g) !== String(S.group)) return true; Object.keys(x.dirty || {}).forEach(function (k) { var y = x.dirty[k]; if (!S.dirty[k] || S.dirty[k].t < y.t) S.dirty[k] = y; if (!S.state[k] || S.state[k].t < y.t) S.state[k] = y; }); return false; }))); } catch (e) {}
       S.ui = {}; if (r.info) S.info = r.info; saveLocal(); if (Object.keys(S.dirty).length) scheduleSync(300);
       go('home'); if (meta) confetti();
     }, function (e) { u.busy = false; u.err = 'Connexion impossible (réseau ?). Réessayez dans un instant.'; render(); });
@@ -4297,8 +4303,8 @@ var ART = (function () {
     var pend = Object.keys(S.dirty).length + Object.keys(S.mq || {}).length;
     if (pend && !S.syncing) scheduleSync(0);
     return '<div class="stack"><a href="#equipe" class="small">← Équipe</a><h1>🔋 Passer le relais</h1>' +
-      '<p class="muted" style="margin:0">Batterie à plat ? Un camarade scanne ce QR code avec l\'appareil photo de son téléphone : il retrouve toute l\'équipe et continue là où vous en êtes. Ce téléphone-ci sera alors déconnecté (un seul téléphone par groupe).</p>' +
-      (pend ? '<div class="fb ko">⚠️ ' + pend + ' réponse' + (pend > 1 ? 's' : '') + ' pas encore envoyée' + (pend > 1 ? 's' : '') + ' : ' + (S.online ? 'envoi en cours, patientez quelques secondes…' : 'approchez-vous d\'un endroit avec du réseau avant de passer le relais, sinon elles seront perdues.') + '</div>' : '<div class="fb ok">✓ Toutes vos réponses sont enregistrées sur le serveur.</div>') +
+      '<p class="muted" style="margin:0">Batterie à plat ? Un camarade scanne ce QR code avec l\'appareil photo de son téléphone : il retrouve toute l\'équipe et continue là où vous en êtes. Ce téléphone-ci passe alors en consultation (un seul téléphone principal par groupe).</p>' +
+      (pend ? '<div class="fb ko">⚠️ ' + pend + ' réponse' + (pend > 1 ? 's' : '') + ' pas encore envoyée' + (pend > 1 ? 's' : '') + ' : ' + (S.online ? 'envoi en cours, patientez quelques secondes…' : 'approchez-vous d\'un endroit avec du réseau dès que possible : elles partiront toutes seules au retour du réseau, même après le relais.') + '</div>' : '<div class="fb ok">✓ Toutes vos réponses sont enregistrées sur le serveur.</div>') +
       '<div class="card center"><div class="qr">' + qrSvg(relaisUrl()) + '</div><div class="small muted" style="margin-top:8px">Sans appareil photo : ouvrez l\'appli, touchez votre numéro (grisé) et entrez le code</div><div class="row" style="justify-content:center;margin-top:6px"><span class="chip i">N°' + S.group + ' · « ' + esc(v('meta.team') || '') + ' »</span><span class="chip i">Code ' + esc(S.pin) + '</span></div></div></div>';
   }
   function replacedView() {
@@ -4901,7 +4907,7 @@ var ART = (function () {
     if (S.locked) return toast('Les envois sont fermés.');
     if (!isMain()) { input.value = ''; return notMainToast(); }
     S.ui.up = card; S.ui.upMsg = 'Préparation…'; render();
-    var done = function (blob) { if (!blob) { S.ui.up = null; render(); return; } var fr = new FileReader(); fr.onload = function () { var b64 = String(fr.result).split(',')[1]; S.mq = S.mq || {}; S.mq[card] = { type: blob.type.split(';')[0] || 'application/octet-stream', b64: b64, g: S.group, pin: S.pin }; saveMq(); sendMedia(card, true); }; fr.readAsDataURL(blob); };
+    var done = function (blob) { if (!blob) { S.ui.up = null; render(); return; } var fr = new FileReader(); fr.onload = function () { var b64 = String(fr.result).split(',')[1]; S.mq = S.mq || {}; S.mq[card] = { type: blob.type.split(';')[0] || 'application/octet-stream', b64: b64, g: S.group, pin: S.pin, t: now() }; saveMq(); sendMedia(card, true); }; fr.readAsDataURL(blob); };
     if (f.type.indexOf('image') === 0) {
       var img = new Image(), url = URL.createObjectURL(f);
       img.onload = function () { var c = document.createElement('canvas'), k = Math.min(1, 1100 / Math.max(img.width, img.height)); c.width = Math.round(img.width * k); c.height = Math.round(img.height * k); c.getContext('2d').drawImage(img, 0, 0, c.width, c.height); URL.revokeObjectURL(url); c.toBlob(done, 'image/jpeg', 0.75); };
@@ -4936,14 +4942,14 @@ var ART = (function () {
     });
   }
   var LSM = LS + '-mimes';
-  function saveMq() { try { localStorage.setItem(LSM, JSON.stringify(S.mq || {})); } catch (e) { try { localStorage.removeItem(LSM); } catch (e2) {} } }
+  function saveMq() { try { localStorage.setItem(LSM, JSON.stringify(S.mq || {})); } catch (e) { var o = {}; Object.keys(S.mq || {}).forEach(function (k) { if (String(S.mq[k].type).indexOf('video') !== 0) o[k] = S.mq[k]; }); try { localStorage.setItem(LSM, JSON.stringify(o)); } catch (e2) { try { localStorage.removeItem(LSM); } catch (e3) {} } } } // trop gros (vidéo) : on garde au moins les photos
   function sendMedia(card, fromUser) {
     var q = (S.mq || {})[card]; if (!q || S.sendingMedia) return;
     S.sendingMedia = card; S.ui.up = card;
     var PART = 400000, n = Math.ceil(q.b64.length / PART);
     var step = function (i) {
       S.ui.upMsg = 'Envoi… ' + Math.round(100 * i / n) + ' %'; render(true);
-      api('apiMediaPart', q.g || S.group, q.pin || S.pin, card, i, n, q.type, q.b64.substr(i * PART, PART), deviceId()).then(function (r) {
+      api('apiMediaPart', q.g || S.group, q.pin || S.pin, card, i, n, q.type, q.b64.substr(i * PART, PART), deviceId(), q.t || 0).then(function (r) {
         if (r.status === 'part') return step(i + 1);
         S.sendingMedia = null; S.ui.up = null;
         var mine = !q.g || String(q.g) === String(S.group);
@@ -5119,11 +5125,11 @@ var ART = (function () {
       case 'accuse': {
         var spi = GR.grade(S.state, GGE).gge.spec; if (spi.done || !S.ui.accuse) break;
         var acc = (v('gge.spec') || []).slice(); acc.push(S.ui.accuse + ':' + spi.clues); var who = S.ui.accuse; S.ui.accuse = null;
-        set('gge.spec', acc, { quiet: true });
+        if (!set('gge.spec', acc, { quiet: true })) break;
         if (who === GR.key().spec.who) { confetti(); toast('Spécimen retrouvé ! 🐄'); } else toast('Mauvaise piste…');
         render(); break;
       }
-      case 'specname': if (!(v('gge.spec2') || []).length) { set('gge.spec2', [d('o')], { quiet: true }); if (d('o') === GR.key().spec.name) { confetti(); toast('+10 pts'); } render(); } break;
+      case 'specname': if (!(v('gge.spec2') || []).length) { if (!set('gge.spec2', [d('o')], { quiet: true })) break; if (d('o') === GR.key().spec.name) { confetti(); toast('+10 pts'); } render(); } break;
       case 'board': S.boardAt = 0; render(); break;
       case 'bmode': { S.ui.bmode = d('m'); var b = document.getElementById('breath'); if (b) b.className = 'breath m-' + d('m'); document.querySelectorAll('[data-act=bmode]').forEach(function (x) { x.className = 'btn ' + (x === el ? '' : 'alt'); x.style.cssText = 'min-height:36px;padding:6px 10px;font-size:13.5px'; }); break; }
       case 'chrono': {
@@ -5143,7 +5149,7 @@ var ART = (function () {
       case 'wtry': {
         var vid = d('l'), isFin = false, lid = vid.replace(/b$/, ''), code = wheelVals(variantByVid(vid)).join('-');
         var st0 = GR.lockState(S.state, lid); if (st0.opened || waitLeft(lid, st0) > 0) break;
-        var tries = (v('esc.' + vid) || []).slice(); tries.push(code); set('esc.' + vid, tries, { quiet: true });
+        var tries = (v('esc.' + vid) || []).slice(); tries.push(code); if (!set('esc.' + vid, tries, { quiet: true })) break;
         if (GR.codeOk(vid, code)) { confetti(); toast('Station réussie ! De nouvelles lettres apparaissent 🔍'); try { navigator.vibrate && navigator.vibrate([60, 40, 120]); } catch (e3) {} }
         else { var wr = GR.wheelsRight(vid, code); toast(wr.n + ' / ' + wr.of + ' justes… pas encore'); try { navigator.vibrate && navigator.vibrate(300); } catch (e4) {} }
         render(); break;
@@ -5160,20 +5166,20 @@ var ART = (function () {
       case 'mysttry': {
         var MF = GR.grade(S.state, GGE).men; if (MF.locks.fin.opened || !S.ui.myst || waitLeft('fin', MF.locks.fin) > 0) break;
         var at2 = (v('esc.fin') || []).slice(); at2.push(S.ui.myst); var guess2 = S.ui.myst; S.ui.myst = '';
-        set('esc.fin', at2, { quiet: true });
+        if (!set('esc.fin', at2, { quiet: true })) break;
         if (guess2 === MF.myst[1]) { confetti(); toast('Trouvé ! Allez le photographier 📷'); } else toast('Ce n\'est pas lui…');
         render(); break;
       }
       case 'frtry': {
         var stf = GR.lockState(S.state, 'c3'); if (stf.opened || waitLeft('c3', stf) > 0) break;
         var ok3 = GR.frFull(S.state), tf = (v('esc.c3') || []).slice(); tf.push(ok3 ? 'ok' : 'ko');
-        S.ui.frfb = ok3 ? '' : frFeedback(); set('esc.c3', tf, { quiet: true });
+        if (!set('esc.c3', tf, { quiet: true })) break; S.ui.frfb = ok3 ? '' : frFeedback();
         if (ok3) { confetti(); toast('Station réussie ! De nouvelles lettres apparaissent 🔍'); } else toast('Pas encore…');
         render(); break;
       }
       case 'pi': {
         if ((v('esc.pi.' + d('l')) || []).length) break;
-        set('esc.pi.' + d('l'), [d('o')], { quiet: true });
+        if (!set('esc.pi.' + d('l'), [d('o')], { quiet: true })) break;
         if (GR.key().pi[d('l')] === d('o')) { confetti(); toast('Bonus ! +10 pts'); }
         render(); break;
       }
@@ -5188,7 +5194,7 @@ var ART = (function () {
           if (left <= 0) {
             clearInterval(S.chT); var k = c.p + 'm.' + c.s + '.' + c.m;
             S.ui.chrono = null; try { navigator.vibrate && navigator.vibrate([200, 100, 200]); } catch (e) {}
-            set(k, String(c.n)); toast('Mesure enregistrée : ' + c.n + ' mvts/min');
+            if (set(k, String(c.n))) toast('Mesure enregistrée : ' + c.n + ' mvts/min');
           }
         }, 250);
         break;
@@ -5219,7 +5225,7 @@ var ART = (function () {
       }
       case 'noop': break;
       case 'startpick': S.ui.mdraft = memberDraft(); S.ui.start = d('o'); render(); break;
-      case 'membersave': { var RM2 = readMembers(); if (RM2.err) return toast(RM2.err); set('meta.members', RM2.text); toast('Membres enregistrés'); break; }
+      case 'membersave': { var RM2 = readMembers(); if (RM2.err) return toast(RM2.err); if (set('meta.members', RM2.text)) toast('Membres enregistrés'); break; }
       case 'takeover': doJoin(null, true); break;
       case 'takeback': S.ui = { g: S.group, pin: S.pin }; S.replaced = false; doJoin(null, true); break;
       case 'logout2': keepOrphans(); S.replaced = false; S.group = null; S.pin = null; S.state = {}; S.dirty = {}; S.ui = {}; saveLocal(); render(); break;
@@ -5227,7 +5233,7 @@ var ART = (function () {
       case 'newpin':
         var np = (document.getElementById('np-pin') || {}).value || '';
         if (!/^\d{4}$/.test(np.trim())) return toast('Le code fait 4 chiffres.');
-        S.pin = np.trim(); S.authError = false; saveLocal(); sync(); break;
+        S.pin = np.trim(); S.authError = false; Object.keys(S.mq || {}).forEach(function (k) { if (String(S.mq[k].g) === String(S.group)) S.mq[k].pin = S.pin; }); saveMq(); saveLocal(); sync(); break;
       case 'recreate':
         api('apiJoin', S.group, S.pin, { team: v('meta.team') || ('Groupe ' + S.group), mascot: v('meta.mascot') || '🧭', members: v('meta.members') || '', start: v('meta.start') || 'gge' }).then(function (r) {
           if (r.status !== 'ok') return toast(r.status === 'badpin' ? 'Ce numéro est déjà pris avec un autre code.' : 'Échec, réessayez.');
@@ -5235,7 +5241,7 @@ var ART = (function () {
           saveLocal(); scheduleSync(0); toast('Réponses renvoyées.'); render();
         }, function () { toast('Pas de réseau.'); });
         break;
-      case 'logout': if (S.authError) { keepOrphans(); logout(); break; } if (Object.keys(S.dirty).length || Object.keys(S.mq || {}).length) { sync(); return toast('Des réponses ne sont pas encore envoyées : réessayez une fois en ligne.'); } logout(); break;
+      case 'logout': if (S.authError || S.locked) { keepOrphans(); logout(); break; } if (Object.keys(S.dirty).length || Object.keys(S.mq || {}).length) { sync(); return toast('Des réponses ne sont pas encore envoyées : réessayez une fois en ligne.'); } logout(); break;
     }
   });
 
@@ -5306,7 +5312,7 @@ var ART = (function () {
       { ico: '📢', color: 'amber', title: 'À lire à voix haute', body: '<p><b>Un membre du groupe lit ces écrans à voix haute</b> pour tout le monde. Chacun touche ensuite « Oui, j\'ai bien compris » sur son téléphone.</p><p>Un seul téléphone (ou une tablette) répondra pour le groupe : c\'est lui qui enregistre vos réponses et votre note. Vous le choisirez juste après.</p>', ok: 'Oui, on lit à voix haute au groupe' },
       { ico: '🗺️', color: 'green', title: 'Le programme de la journée', body: '<ul><li><b>Ce matin</b> : ' + lieuName(st) + '. <b>Cet après-midi</b> : ' + lieuName(other) + '. La 2e mission s\'ouvre à l\'échange de midi, la 1re est alors figée.</li><li><b>Grande Galerie</b> : 10 stations de questions à partir des spécimens, un plan à compléter, et l\'enquête du <b>spécimen disparu</b> (chaque bonne réponse donne un indice).</li><li><b>Ménagerie</b> : 4 roues tirent vos 4 animaux. Chaque station réussie dévoile des lettres du <b>nom latin de votre animal mystère</b>, qu\'il faudra ensuite photographier.</li><li><b>À la fin de chaque lieu</b> : vous proposez une question (avec la photo de la réponse) pour les étudiants de l\'an prochain.</li><li><b>Toute la journée</b> : 2 mimes et un « Vrai ou bluff », devinés par les autres équipes en fin de journée.</li></ul>', ok: 'Oui, j\'ai bien compris' },
       { ico: '✅', color: 'green', title: 'Ce qui est autorisé', body: '<ul><li>Vous déplacer <b>ensemble</b>, à votre rythme, dans l\'ordre que vous voulez.</li><li>Lire les panneaux, cartels et vitrines : beaucoup de réponses y sont.</li><li>Utiliser <b>vos cours et vos notes</b>.</li><li>En cas de souci (bug, question douteuse, animal absent) : le bouton ⚠️ Signaler. Les enseignants sont peu nombreux sur un très grand site : ne partez pas les chercher.</li><li>Utiliser les indices de l\'appli (ils coûtent quelques points d\'expédition).</li></ul>', ok: 'Oui, j\'ai bien compris' },
-      { ico: '⛔', color: 'red', title: 'Ce qui est interdit', body: '<ul><li><b>Internet et l\'intelligence artificielle</b> (ChatGPT, etc.) pour trouver les réponses.</li><li>Recopier les réponses d\'une autre équipe ou donner les vôtres.</li><li>Se séparer du groupe ou laisser quelqu\'un seul.</li><li>Courir, crier, taper sur les vitres, utiliser le flash, <b>toucher ou nourrir les animaux</b>, passer les barrières.</li><li>Gêner les autres visiteurs (le Muséum reste ouvert au public).</li><li>Connecter l\'équipe sur un 2e téléphone (le premier est déconnecté).</li><li>Faire des captures d\'écran ou diffuser les mimes des autres équipes.</li></ul>', ok: 'Oui, j\'ai bien compris' },
+      { ico: '⛔', color: 'red', title: 'Ce qui est interdit', body: '<ul><li><b>Internet et l\'intelligence artificielle</b> (ChatGPT, etc.) pour trouver les réponses.</li><li>Recopier les réponses d\'une autre équipe ou donner les vôtres.</li><li>Se séparer du groupe ou laisser quelqu\'un seul.</li><li>Courir, crier, taper sur les vitres, utiliser le flash, <b>toucher ou nourrir les animaux</b>, passer les barrières.</li><li>Gêner les autres visiteurs (le Muséum reste ouvert au public).</li><li>Se connecter dans une autre équipe que la sienne, ou prêter son téléphone à une autre équipe.</li><li>Faire des captures d\'écran ou diffuser les mimes des autres équipes.</li></ul>', ok: 'Oui, j\'ai bien compris' },
       { ico: '👥', color: 'green', title: 'Tout le monde se connecte', body: '<ul><li><b>Chaque membre</b> du groupe se connecte sur <b>son propre téléphone</b> (même numéro d\'équipe, même code) et choisit son nom.</li><li>Le groupe choisit ensuite <b>un seul téléphone principal</b> (ou une tablette) : c\'est lui qui répond et qui compte pour la note.</li><li>Les autres téléphones voient les questions et les réponses du groupe, en <b>consultation</b>.</li><li>Batterie faible ? Le téléphone principal confie son rôle à un autre membre (onglet Équipe ou QR code 🔋).</li></ul>', ok: 'Oui, j\'ai bien compris' },
       { ico: '🔕', color: 'red', title: 'Restez dans l\'application', body: '<ul><li>Activez dès maintenant <b>« Ne pas déranger »</b> (ou le mode Concentration) sur votre téléphone : les messages et notifications ne doivent pas vous distraire.</li><li><b>Chaque sortie de l\'appli</b> (autre appli, Internet, messages…) est enregistrée et <b>signalée aux enseignants</b>, sur tous les téléphones du groupe.</li><li>Prendre une photo pour un défi ne compte pas comme une sortie.</li><li><b>Urgence</b> (appel d\'un proche, santé, perdu) ? Touchez 🚨 en haut de l\'écran avant de sortir : la sortie sera notée comme une urgence.</li></ul>', ok: 'Oui, j\'ai activé « Ne pas déranger »' },
       { ico: '⚠️', color: 'amber', title: 'Un problème ? Signalez-le', body: '<p>En bas à gauche de chaque écran, le bouton <span class="repdemo">⚠️ Signaler</span> envoie un message directement aux enseignants.</p><ul><li>L\'appli bloque, une réponse juste est refusée, une question vous paraît fausse ou ambiguë ?</li><li>Un animal est absent, un panneau a changé, une vitrine est fermée ?</li></ul><p>Décrivez <b>précisément</b> ce qui se passe (quelle question, ce que vous avez répondu). Chaque signalement est relu après la sortie et, en cas de doute, tranché en votre faveur.</p>', ok: 'Oui, j\'ai bien compris' },
@@ -5508,7 +5514,7 @@ var ART = (function () {
   }
   function memberCard() {
     var inf = S.info || {};
-    return '<div class="card"><h3>📱 Téléphone principal : ' + esc(inf.mainName || 'pas encore choisi') + '</h3><p class="small muted" style="margin:4px 0 0">' + (isMain() ? 'C\'est ce téléphone. Batterie faible ? Confiez le rôle à un autre membre connecté :' : 'Ce téléphone est en consultation. Pour devenir le téléphone principal, demandez à ' + esc(inf.mainName || 'lui') + ' de vous le confier, ou scannez son QR code 🔋.') + '</p>' + presenceList(isMain()) + '</div>';
+    return '<div class="card"><h3>📱 Téléphone principal : ' + esc(inf.mainName || 'pas encore choisi') + '</h3><p class="small muted" style="margin:4px 0 0">' + (isMain() ? 'C\'est ce téléphone. Batterie faible ? Confiez le rôle à un autre membre connecté :' : ((inf.devs || []).some(function (d) { return d.main && d.online; }) ? 'Ce téléphone est en consultation. Pour devenir le téléphone principal, demandez à ' + esc(inf.mainName || 'lui') + ' de vous le confier, ou scannez son QR code 🔋.' : 'Le téléphone principal ne répond plus (batterie ? réseau ?). Un membre peut reprendre le rôle ici :')) + '</p>' + presenceList(isMain() || !((inf.devs || []).some(function (d) { return d.main && d.online; }))) + '</div>';
   }
 
   /* --- sorties de l'appli (signalées aux enseignants, sans pénalité) --- */
@@ -5521,6 +5527,7 @@ var ART = (function () {
     if (!S.group || S.mode) return;
     var o = wq(); if (o.out) return;
     var photo = Date.now() - S.camAt < 8000;
+    if (S.urgent && Date.now() - S.urgent.at > 900000) S.urgent = null; // urgence déclarée il y a plus de 15 min : périmée
     o.out = { t0: Date.now(), photo: photo, urgent: !!S.urgent, reason: S.urgent ? S.urgent.reason : '' }; setWq(o);
   }
   function cameBack() {
@@ -5559,6 +5566,7 @@ var ART = (function () {
       if (prm.g && prm.p && /^\d{4}$/.test(prm.p)) {
         // QR code de relais : on retire g et p de l'adresse pour qu'un simple rechargement ne reprenne pas la main
         try { history.replaceState(null, '', location.pathname + location.hash); } catch (e) {}
+        try { if (window.google && google.script && google.script.history) google.script.history.replace(null, {}, ''); } catch (e) {}
         if (String(S.group) !== String(prm.g)) { keepOrphans(); S.group = null; S.state = {}; S.dirty = {}; }
         S.ui = { g: prm.g, pin: prm.p }; render(); doJoin(null, true); return;
       }
@@ -5573,6 +5581,7 @@ var ART = (function () {
     window.__demoProf = function () { S.mode = 'prof'; render(); profLoad(); };
     window.__demoKick = function () { if (S.mode === 'prof') profLoad(); else if (S.group) scheduleSync(50); };
     setTimeout(flushReports, 3000);
+    if (!document.hidden) cameBack();
   }
   start();
 })();
