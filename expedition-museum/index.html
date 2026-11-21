@@ -439,8 +439,9 @@ html.tablette .menmap{max-width:900px;margin-left:auto;margin-right:auto}
 .prow{display:flex;gap:10px;align-items:center;padding:8px 0;border-top:1px solid var(--line)}
 .pdot{width:12px;height:12px;border-radius:50%;background:var(--line);flex:none}.pdot.on{background:#2e9b5f;box-shadow:0 0 0 4px #2e9b5f33}.pdot.idle{background:#d38a1f}
 .urgbtn{border:0;background:transparent;font-size:20px;cursor:pointer;padding:2px}
+.mimecard .row{flex-wrap:wrap;row-gap:6px}.mimecard .row .chip{max-width:100%;white-space:normal}
 </style></head><body><div id="app"></div>
-<script src="config.js?v=1795263264"></script><script>if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js", { scope: "./" }).catch(function () {});</script>
+<script src="config.js?v=1795263999"></script><script>if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js", { scope: "./" }).catch(function () {});</script>
 <script>
 /* ==== Contenu pédagogique (énoncés) : partagé client + serveur ==== */
 /* GGE : « Le spécimen disparu ». Chaque question réussie (au moins la moitié des points) dévoile l'indice du même rang. */
@@ -1531,7 +1532,7 @@ var GR = (function () {
     var compl = clamp((g.answered / g.fields) * 0.5 + menCompl * 0.5, 0, 1);
     var propOk = function (l) { var im = val(st, 'prop.' + l + '.img'); return !!(String(val(st, 'prop.' + l + '.q') || '').trim().length >= 10 && String(val(st, 'prop.' + l + '.a') || '').trim() && im && im.id); };
     var props = (propOk('gge') ? 1 : 0) + (propOk('men') ? 1 : 0);
-    var xp = Math.round(10 * g.total + 20 * props + 10 * m.total + 15 * mimes + (pig ? 15 : 0) + g.spec.xp - 3 * (g.hints + m.hints) - 2 * g.wrong - 2 * m.wrong
+    var xp = Math.round(10 * (g.manual ? g.auto : g.total) + 20 * props + 10 * (m.manual ? m.auto : m.total) + 15 * mimes + (pig ? 15 : 0) + g.spec.xp - 3 * (g.hints + m.hints) - 2 * g.wrong - 2 * m.wrong
       + 20 * m.nOpen + 15 * m.nObs + 10 * m.postits + (m.locks.fin.opened ? 40 + 10 * Math.max(0, 4 - m.nOpen) : 0) + (m.locks.fin.photo ? 15 : 0));
     return {
       gge: g, men: m, mimes: mimes, bluff: pig, props: props, xpAdj: +ov.xp || 0, propGGE: propOk('gge'), propMen: propOk('men'), completion: r2(compl), xp: Math.max(0, xp + (+ov.xp || 0)),
@@ -4264,6 +4265,7 @@ var ART = (function () {
       if (r.status === 'start') { toast('Indiquez par quel lieu vous commencez ce matin.'); return render(); }
       if (r.status === 'members') { toast('Entrez le prénom et le nom d\'au moins 3 membres.'); return render(); }
       if (r.status === 'badpin') { u.step = null; if (meta || !(S.taken || {})[u.g]) { u.err = 'Ce numéro vient d\'être pris par une autre équipe : choisissez-en un autre.'; u.g = null; S.takenAt = 0; } else u.err = 'Code incorrect.'; return render(); }
+      if (r.status === 'wait') { u.err = 'Trop d\'essais de code : attendez 5 minutes.'; return render(); }
       if (r.status === 'full') { u.err = 'Nombre maximum d\'équipes atteint : signalez-le avec le bouton ⚠️ Signaler.'; return render(); }
       if (r.status === 'noname') { u.err = 'Entrez le nom de votre équipe.'; return render(); }
       if (r.g) u.g = r.g;
@@ -5000,7 +5002,7 @@ var ART = (function () {
       '<button class="card mission linkcard" data-act="rulesagain"><div class="ico">📢</div><div class="grow"><h3>Revoir les règles de la sortie</h3><div class="small muted">Programme, autorisé, interdit, signalements</div></div><span class="muted">›</span></button>' +
       '<a class="card mission" href="#relais"><div class="ico">🔋</div><div class="grow"><h3>Plus de batterie ?</h3><div class="small muted">Passer le relais à un camarade avec un QR code</div></div><span class="muted">›</span></a>' +
       '<a class="card mission" href="#avis"><div class="ico">📝</div><div class="grow"><h3>Donner mon avis</h3><div class="small muted">' + (v('avis.' + deviceId()) ? 'Merci, avis envoyé ✓' : '1 minute, en fin de journée') + '</div></div><span class="muted">›</span></a>' +
-      '<div class="card"><b>Bilan</b><table class="ref"><tr><td>Points d\'expédition</td><td><b>' + R.xp + '</b></td></tr><tr><td>GGE (auto)</td><td>' + fmt(R.gge.total) + ' / 20</td></tr><tr><td>Jeux (2 mimes + Vrai ou bluff)</td><td>' + (R.mimes + (R.bluff ? 1 : 0)) + ' / 3</td></tr><tr><td>Stations de la ménagerie</td><td>' + R.men.nOpen + ' / ' + ESC.length + (R.men.locks.fin.opened ? ' + animal trouvé ✓' : '') + '</td></tr><tr><td>Indices utilisés</td><td>' + (R.gge.hints + R.men.hints) + '</td></tr></table></div>' +
+      '<div class="card"><b>Bilan</b><table class="ref"><tr><td>Points d\'expédition</td><td><b>' + R.xp + '</b></td></tr><tr><td>GGE (auto)</td><td>' + fmt(R.gge.total) + ' / 20</td></tr><tr><td>Jeux (2 mimes + Vrai ou bluff)</td><td>' + (R.mimes + (R.bluff ? 1 : 0)) + ' / 3</td></tr><tr><td>Stations de la ménagerie</td><td>' + R.men.nOpen + ' / 4' + (R.men.locks.fin.opened ? ' + animal trouvé ✓' : '') + '</td></tr><tr><td>Indices utilisés</td><td>' + (R.gge.hints + R.men.hints) + '</td></tr></table></div>' +
       '<div class="card small"><b>Synchronisation</b><br>' + (S.online ? 'En ligne' : 'Hors-ligne : vos réponses sont gardées sur ce téléphone et partiront dès le retour du réseau.') + (S.lastSync ? '<br>Dernier envoi : ' + new Date(S.lastSync).toLocaleTimeString('fr-FR') : '') + '<div style="margin-top:10px"><button class="btn alt" data-act="syncnow">Synchroniser maintenant</button></div></div>' +
       screenToggle() + '<button class="btn ghost block" data-act="logout">Se déconnecter de ce téléphone</button></div>';
   }
@@ -5229,7 +5231,7 @@ var ART = (function () {
       case 'recreate':
         api('apiJoin', S.group, S.pin, { team: v('meta.team') || ('Groupe ' + S.group), mascot: v('meta.mascot') || '🧭', members: v('meta.members') || '', start: v('meta.start') || 'gge' }).then(function (r) {
           if (r.status !== 'ok') return toast(r.status === 'badpin' ? 'Ce numéro est déjà pris avec un autre code.' : 'Échec, réessayez.');
-          S.authError = false; S.online = true; Object.keys(S.state).forEach(function (k) { if (k.indexOf('photo.') !== 0) S.dirty[k] = S.state[k]; });
+          S.authError = false; S.online = true; Object.keys(S.state).forEach(function (k) { if (k.indexOf('photo.') !== 0 && k.indexOf('mime.') !== 0 && !/^(bluff\.img|esc\.img|esc\.wheel|meta\.(g|team|start|override|open|test)|prop\.(gge|men)\.img)$/.test(k)) S.dirty[k] = S.state[k]; });
           saveLocal(); scheduleSync(0); toast('Réponses renvoyées.'); render();
         }, function () { toast('Pas de réseau.'); });
         break;
