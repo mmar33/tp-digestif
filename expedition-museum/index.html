@@ -458,7 +458,7 @@ html.tablette .menmap{max-width:900px;margin-left:auto;margin-right:auto}
 details>summary{cursor:pointer}
 details.card>summary{font-size:15px}
 </style></head><body><div id="app"></div>
-<script src="config.js?v=1795428900"></script><script>if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js", { scope: "./" }).catch(function () {});</script>
+<script src="config.js?v=1795430094"></script><script>if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js", { scope: "./" }).catch(function () {});</script>
 <script>
 /* ==== Contenu pédagogique (énoncés) : partagé client + serveur ==== */
 /* GGE : « Le spécimen disparu ». Chaque question réussie (au moins la moitié des points) dévoile l'indice du même rang. */
@@ -4272,6 +4272,17 @@ var ART = (function () {
         '<button class="btn amber block" data-act="takeover">Continuer sur ce téléphone</button><button class="btn ghost block" data-act="back">Annuler</button></div>';
       return h + '</main>';
     }
+    if (u.step === 'testcreate') { // inscription d'un enseignant en mode test : comme les étudiants, sauf la liste des membres
+      h += '<div class="testbar">🧪 MODE TEST (non noté) <button data-act="testback">Retour à l\'espace enseignant</button></div>' +
+        '<div class="card"><h2>Nouvelle équipe 🎒</h2><p class="small muted" style="margin:6px 0 0">Vous voyez l\'appli exactement comme un étudiant. Équipe de test : elle n\'apparaît ni dans le classement ni dans les notes.</p>' +
+        '<label class="f">Nom de l\'équipe</label><input type="text" id="j-name" maxlength="28" autocomplete="off" placeholder="ex. Les Lynx de Rouen" value="' + esc(u.name || '') + '">' +
+        '<label class="f">Mascotte</label><div class="mascots">' + MASCOTS.map(function (m) { return '<button data-act="mascot" data-m="' + m + '" class="' + (u.mascot === m ? 'on' : '') + '">' + m + '</button>'; }).join('') + '</div>' +
+        '<label class="f">Ce matin, vous commencez par…</label><div class="grid2">' + [['gge', '🦴 La Grande Galerie'], ['men', '🐾 La ménagerie']].map(function (o) { return '<button class="startbtn ' + (u.start === o[0] ? 'on' : '') + '" data-act="startpick" data-o="' + o[0] + '">' + o[1] + '</button>'; }).join('') + '</div><div class="small muted" style="margin-top:4px">En test, les deux lieux restent ouverts toute la journée.</div>' +
+        '<label class="f">Membres de l\'équipe</label><div class="fb ok" style="margin-top:0">🧑‍🏫 <b>Enseignant</b> : pas de noms à choisir dans la liste de la promo.</div>' +
+        (u.err ? '<div class="fb ko">' + esc(u.err) + '</div>' : '') +
+        '<div style="margin-top:14px"><button class="btn block" data-act="testcreate">' + (u.busy ? 'Création…' : 'C\'est parti !') + '</button></div></div>';
+      return h + '</main>';
+    }
     if (u.step === 'create') {
       h += '<div class="card"><h2>Nouvelle équipe 🎒</h2><p class="small" style="margin:6px 0 0">Équipe <b>« ' + esc(u.name) + ' »</b> · code <b>' + esc(u.pin) + '</b>. Notez bien le nom et le code : ils servent à reprendre l\'équipe sur un autre téléphone.</p>' +
         '<label class="f">Mascotte</label><div class="mascots">' + MASCOTS.map(function (m) { return '<button data-act="mascot" data-m="' + m + '" class="' + (u.mascot === m ? 'on' : '') + '">' + m + '</button>'; }).join('') + '</div>' +
@@ -4526,7 +4537,7 @@ var ART = (function () {
   }
   function ggeHome() {
     var R = res(), g = R.gge;
-    var h = '<div class="stack"><div><a href="#home" class="small">← Missions</a><h1 style="margin-top:6px">Grande Galerie de l\'Évolution</h1></div>' +
+    var h = '<div class="stack"><div><a href="#home" class="small">← Missions</a><h1 style="margin-top:6px">Grande Galerie de l\'Évolution</h1>' + atelierBtn('gge') + '</div>' +
       '<div class="row" style="gap:6px;flex-wrap:wrap"><span class="chip i">📝 ' + GGE.filter(function (q) { return g.q[q.id] && g.q[q.id].answered; }).length + ' / ' + GGE.length + ' stations</span><span class="chip i">' + fmt(g.total) + ' / 20</span><span class="chip">🔍 ' + g.spec.clues + ' / 10 indices</span></div>' +
       ggeStartTip(g) + '<p class="small muted" style="margin:0">Pour chaque question : 2 essais (le 2e vaut la moitié des points), puis placez le spécimen sur le plan.</p>' +
       '<h3 style="margin-top:4px">📍 Les stations</h3><div class="card" style="padding:4px 0">';
@@ -4816,7 +4827,7 @@ var ART = (function () {
   }
   function menHome() {
     var M = GR.grade(S.state, GGE).men, fin = M.locks.fin, w = v('esc.wheel');
-    var h = '<div class="card mallette"><div class="kick">Ménagerie</div><h1>L\'animal mystère</h1><p style="margin:8px 0 0">' + esc(ESC_INTRO) + '</p>';
+    var h = '<div class="card mallette"><div class="kick">Ménagerie</div><h1>L\'animal mystère</h1><p style="margin:8px 0 0">' + esc(ESC_INTRO) + '</p>' + atelierBtn('men');
     if (!M.answered) h += '<details class="small" style="margin-top:8px"><summary><b>Comment ça marche ?</b></summary><ul class="small" style="margin:6px 0 0;padding-left:18px"><li>Un tour de roue par animal : 4 animaux, 4 stations, dans l\'ordre que vous voulez. À chaque fois de la génétique, de l\'évolution, de l\'ostéo, du bien-être… et de l\'observation.</li><li>Si l\'animal dort ou se cache, chaque station a une version qui s\'appuie sur le panneau, l\'enclos et vos cours.</li><li>Une erreur bloque la station 30 secondes, mais on vous dit combien de réponses sont justes.</li><li>Dès 2 stations réussies, vous pouvez proposer l\'animal mystère. Ensuite : allez le photographier !</li></ul></details>' + menOrderTip();
     h += '<div class="mask">' + esc(fin.opened ? M.myst[0] : M.mask) + '</div>' + (fin.opened ? '<div class="center" style="font-weight:700">' + esc(M.myst[1]) + '</div>' : '') +
       '<div class="row" style="margin-top:10px"><span class="chip i">✔ ' + M.nOpen + ' / 4 stations</span></div></div>';
@@ -4992,7 +5003,7 @@ var ART = (function () {
   /* ---------- jeux : mimes et Vrai ou bluff ---------- */
   function R0() { return res(); }
   function jeuxView() {
-    var st = S.vote || 'off', h = '<div class="stack"><div><h1>Jeux</h1><p class="muted" style="margin:6px 0 0">' + (st === 'off' ? '<b>Pendant la journée</b> : 2 mimes en photo ou vidéo et 1 « Vrai ou bluff ». <b>En fin de journée</b> : vous devinerez ceux des autres équipes.' : 'Devinez les mimes des autres équipes et démasquez leurs bluffs.') + '</p></div>';
+    var st = S.vote || 'off', h = '<div class="stack"><div><h1>Jeux</h1>' + atelierBtn(st === 'open' ? 'devin' : 'jeux') + '<p class="muted" style="margin:6px 0 0">' + (st === 'off' ? '<b>Pendant la journée</b> : 2 mimes en photo ou vidéo et 1 « Vrai ou bluff ». <b>En fin de journée</b> : vous devinerez ceux des autres équipes.' : 'Devinez les mimes des autres équipes et démasquez leurs bluffs.') + '</p></div>';
     if (st !== 'off') h += playView(st);
     h += '<h2 style="margin-top:6px">🎭 Vos mimes secrets</h2><p class="small muted" style="margin:0">Mimez la carte en photo ou en vidéo (10 s max). Gardez-la secrète : plus les autres équipes trouvent, plus vous gagnez de points.</p>';
     mimeCards(S.group).forEach(function (c) {
@@ -5292,13 +5303,14 @@ var ART = (function () {
         var key = d('k'), n = +d('n'), i = (S.ui.ruleStep || 0) + 1;
         if (i < n) { S.ui.ruleStep = i; render(); var b = document.querySelector('.rbox'); if (b) b.scrollTop = 0; break; }
         S.ui.ruleStep = 0;
-        if (key === 'revoir') { S.ui.rulesReview = false; render(); break; }
+        if (key === 'revoir') { S.ui.rulesReview = false; S.ui.atelierReview = null; render(); break; }
         setRulesAck(key);
         if (key.indexOf('accueil-') === 0 && !v('meta.rules')) set('meta.rules', { at: Date.now(), dev: deviceId() });
         if (key.indexOf('aprem-') === 0) set('meta.rulespm', { at: Date.now(), dev: deviceId() });
         render(); break;
       }
       case 'rulesagain': S.ui.rulesReview = true; S.ui.ruleStep = 0; render(); break;
+      case 'atelieragain': S.ui.atelierReview = d('k'); S.ui.ruleStep = 0; render(); break;
       case 'repopen': S.ui.rep = { kind: REP_KINDS[0], text: '' }; render(); setTimeout(function () { var t = document.getElementById('rep-text'); if (t) t.focus(); }, 50); break;
       case 'repclose': S.ui.rep = null; render(); break;
       case 'repsend': {
@@ -5361,13 +5373,22 @@ var ART = (function () {
       case 'msgok': try { localStorage.setItem(LS + '-msg-' + S.group, String(d('id'))); } catch (e) {} render(); break;
       case 'profhoraires': { var hv = function (id) { return ((document.getElementById(id) || {}).value || '').trim(); }; profFix(null, 'horaires', { date: hv('hr-date'), debut: hv('hr-debut'), echange: hv('hr-echange'), fin: hv('hr-fin') }); break; }
       case 'profneutre': { var nid = d('id') || ((document.getElementById('nt-id') || {}).value || ''); if (!nid) return toast('Choisissez une question.'); profFix(null, 'neutre', { id: nid, on: d('on') === '1', why: ((document.getElementById('nt-why') || {}).value || '').trim() }); break; }
-      case 'testgo': startTest(d('s'), d('j') === '1'); break;
+      case 'testgo': S.mode = null; S.ui = { step: 'testcreate', start: d('s') || '', tjeux: d('j') === '1' }; render(); window.scrollTo(0, 0); break;
+      case 'testback': S.ui = {}; S.mode = 'prof'; render(); profLoad(); break;
+      case 'testcreate': {
+        keepName(); var tn = String(S.ui.name || '').replace(/\s+/g, ' ').trim();
+        if (!tn) { S.ui.err = 'Donnez un nom à l\'équipe.'; return render(); }
+        if (!S.ui.mascot) { S.ui.err = 'Choisissez une mascotte !'; return render(); }
+        if (!S.ui.start) { S.ui.err = 'Indiquez par quel lieu vous commencez.'; return render(); }
+        if (S.ui.busy) break;
+        startTest(S.ui.start, S.ui.tjeux, tn, S.ui.mascot); break;
+      }
       case 'testend': { var hasP = !!profCode(); logout(); try { localStorage.removeItem(LSR); } catch (e) {} if (hasP) { S.mode = 'prof'; render(); profLoad(); } break; }
       case 'scr': try { localStorage.setItem(LSE, d('m')); } catch (e) {} applyScreen(); render(); break;
       case 'profdo': { var a = d('a'); S.ui.profAsk = null; S.profBusy = true; render(); api('apiProfAction', profCode(), a).then(function (r) { S.profBusy = false; S.prof = r; S.profAt = Date.now(); toast('Fait ✓'); render(); }, function (e) { S.profBusy = false; toast('Erreur : ' + (e && e.message || e)); render(); }); break; }
       case 'back': if (S.ui.step) S.ui.step = null; else S.ui.g = null; S.ui.err = ''; render(); break;
       case 'pickg': S.ui.g = +d('g'); S.ui.err = ''; S.ui.pin = ''; var tk2 = (S.taken || {})[S.ui.g]; S.ui.name = tk2 ? tk2.team : ''; render(); break;
-      case 'mascot': S.ui.mdraft = memberDraft(); S.ui.mascot = d('m'); render(); break;
+      case 'mascot': S.ui.mdraft = memberDraft(); keepName(); S.ui.mascot = d('m'); render(); break;
       case 'create':
         var RM = readMembers(); S.ui.members = RM.text;
         if (!S.ui.mascot) return toast('Choisissez une mascotte !');
@@ -5511,7 +5532,7 @@ var ART = (function () {
       case 'noop': break;
       case 'envok': ENV_OK = true; render(); break;
       case 'copylink': { var lk = location.href.split('#')[0]; try { navigator.clipboard.writeText(lk).then(function () { toast('Lien copié : collez-le dans ' + (/Android/i.test(navigator.userAgent) ? 'Chrome' : 'Safari') + '.'); }, function () { toast(lk); }); } catch (e) { toast(lk); } break; }
-      case 'startpick': S.ui.mdraft = memberDraft(); S.ui.start = d('o'); render(); break;
+      case 'startpick': S.ui.mdraft = memberDraft(); keepName(); S.ui.start = d('o'); render(); break;
       case 'membersave': { var RM2 = readMembers(); if (RM2.err) return toast(RM2.err); if (set('meta.members', RM2.text)) toast('Membres enregistrés'); break; }
       case 'takeover': doJoin(null, true); break;
       case 'takeback': S.ui = { g: S.group, pin: S.pin }; S.replaced = false; doJoin(null, true); break;
@@ -5611,11 +5632,35 @@ var ART = (function () {
     var st = v('meta.start') || 'gge', other = st === 'gge' ? 'men' : 'gge';
     return [{ ico: '🔄', color: 'amber', title: 'Changement de lieu', body: '<p><b>À lire à voix haute au groupe.</b></p><ul><li>Votre mission du matin (' + lieuName(st) + ') est maintenant <b>figée</b> : vos réponses sont enregistrées.</li><li>Place à <b>' + lieuName(other) + '</b>. Les mêmes règles s\'appliquent : en groupe, sans internet ni IA, dans le calme.</li><li>N\'oubliez pas la <b>question à proposer</b> en fin de mission, et le bouton <span class="repdemo">⚠️ Signaler</span> en cas de souci.</li></ul>', ok: 'Oui, j\'ai bien compris' }];
   }
+  /* pop-up « comment ça marche » au début de chaque atelier (Galerie, Ménagerie, jeux, devinettes), une fois par téléphone */
+  function atelierSteps(k) {
+    var vu = '<p class="small muted" style="margin:10px 0 0">Vous pourrez revoir ces explications avec le bouton « ❓ Comment ça marche » en haut de la page.</p>';
+    if (k === 'gge') return [
+      { ico: '🦴', color: 'green', title: 'Grande Galerie : les 10 stations', body: '<p><b>À lire à voix haute au groupe.</b></p><ul><li>10 stations, chacune devant un spécimen, une vitrine ou un panneau. <b>Commencez par la station indiquée</b> en haut de la page, puis suivez l\'ordre : chaque équipe a un départ différent, pour éviter la foule.</li><li>Pour chaque question, vous avez <b>2 essais</b>. Le 2e vaut la moitié des points.</li><li>Une fois la question faite, <b>placez le spécimen sur le plan</b>.</li><li>Bloqués ? Un <b>indice</b> est possible, il coûte quelques points d\'expédition.</li></ul>', ok: 'Oui, j\'ai bien compris' },
+      { ico: '🔍', color: 'amber', title: 'L\'enquête du spécimen disparu', body: '<ul><li>Un spécimen d\'animal domestique a disparu de sa vitrine. <b>Chaque question réussie vous donne un indice.</b></li><li>Dès <b>6 indices</b>, vous pouvez accuser (2 accusations maximum). Moins vous avez d\'indices quand vous trouvez, plus vous gagnez de points. Une accusation fausse fait perdre des points : ne tentez pas au hasard !</li><li><b>En fin de mission</b> : proposez une question pour l\'an prochain, avec la photo de la réponse.</li><li>Questions terminées ? Il vous reste normalement du temps pour <b>visiter librement</b> la Galerie.</li></ul>' + vu, ok: 'C\'est parti !' }];
+    if (k === 'men') return [
+      { ico: '🐾', color: 'green', title: 'Ménagerie : l\'animal mystère', body: '<p><b>À lire à voix haute au groupe.</b></p><ul><li>Le soigneur a perdu l\'étiquette d\'un animal : il ne reste qu\'un nom latin effacé.</li><li><b>Tournez les 4 roues dès le début</b> : elles vous donnent vos 4 animaux à étudier (une station par animal). Visitez-les dans l\'ordre proposé, pour éviter la foule.</li><li>À chaque station : génétique, évolution, ostéo, bien-être… et observation. Si l\'animal dort ou se cache, la station s\'appuie sur le panneau, l\'enclos et vos cours.</li><li>Une erreur bloque la station <b>30 secondes</b>, mais on vous dit combien de réponses sont justes.</li><li>Joker 🎲 : vous pouvez relancer <b>un</b> animal, une seule fois, avant d\'y avoir répondu.</li></ul>', ok: 'Oui, j\'ai bien compris' },
+      { ico: '📸', color: 'amber', title: 'Trouver l\'animal mystère', body: '<ul><li>Chaque station réussie fait réapparaître des lettres du nom latin.</li><li>Dès <b>2 stations réussies</b>, vous pouvez proposer l\'animal mystère.</li><li>Trouvé ? <b>Allez le voir et prenez-le en photo</b> dans l\'appli.</li><li><b>En fin de mission</b> : proposez une question pour l\'an prochain, avec la photo de la réponse.</li><li>Questions terminées ? Il vous reste normalement du temps pour <b>visiter librement</b> la Ménagerie.</li></ul>' + vu, ok: 'C\'est parti !' }];
+    if (k === 'jeux') return [
+      { ico: '🎭', color: 'green', title: 'Les jeux : à préparer pendant la journée', body: '<p><b>À lire à voix haute au groupe.</b></p><ul><li><b>2 mimes</b> : touchez une carte pour voir le mot (cachez l\'écran !), puis mimez-le en photo ou en vidéo (10 s max). Plus les autres équipes trouvent, plus vous gagnez de points.</li><li><b>1 « Vrai ou bluff »</b> : choisissez un lieu précis, écrivez 3 affirmations sur ce qu\'on y voit (1 vraie et 2 bluffs crédibles) et prenez la photo qui prouve la vraie.</li><li>Seulement <b>ce qui ne bouge pas</b> : panneaux, vitrines, enclos, statues (les animaux vivants changent de place).</li><li>À faire quand vous voulez dans la journée, <b>avant l\'ouverture des devinettes</b>. Ensuite, plus rien n\'est modifiable.</li></ul>' + vu, ok: 'Oui, j\'ai bien compris' }];
+    if (k === 'devin') return [
+      { ico: '🎲', color: 'amber', title: 'Les devinettes sont ouvertes', body: '<p><b>À lire à voix haute au groupe.</b></p><ul><li><b>Mimes</b> : regardez la photo ou la vidéo de chaque autre équipe et choisissez le bon mot. <b>Un seul essai par mime.</b></li><li><b>Vrai ou bluff</b> : pour chaque lieu, placez vos <b>3 pions</b> sur la ou les affirmations qui vous semblent vraies (une seule l\'est). Un seul pari par équipe.</li><li>Chaque bonne réponse vous rapporte des points, et vos propres mimes et bluffs en rapportent aussi quand les autres se font avoir.</li><li>Pas de réseau ? Les mimes déjà chargés restent visibles et vos réponses partent au retour du réseau.</li></ul>' + vu, ok: 'C\'est parti !' }];
+    return null;
+  }
+  function atelierKey() {
+    var r = route()[0];
+    if ((r === 'gge' || r === 'men') && access(r) === 'open') return r;
+    if (r === 'jeux') return (S.vote || 'off') === 'open' ? 'devin' : ((S.vote || 'off') === 'off' && !S.locked ? 'jeux' : null);
+    return null;
+  }
+  function atelierBtn(k) { return '<button class="btn ghost small" style="padding:4px 0" data-act="atelieragain" data-k="' + k + '">❓ Comment ça marche</button>'; }
   function rulesModal() {
-    if (!S.group || S.mode || v('meta.test')) return ''; // mode test : pas de pop-ups d'accueil
+    if (!S.group || S.mode) return '';
     var key = null, steps = null;
     if (!rulesAck('accueil-' + S.group)) { key = 'accueil-' + S.group; steps = rulesSteps(); }
     else if ((S.phase || {}).phase === 'apresmidi' && !rulesAck('aprem-' + S.group)) { key = 'aprem-' + S.group; steps = pmSteps(); }
+    else { var ak = atelierKey(); if (ak && !rulesAck('atelier-' + ak + '-' + S.group)) { key = 'atelier-' + ak + '-' + S.group; steps = atelierSteps(ak); } }
+    if (S.ui.atelierReview) { key = 'revoir'; steps = atelierSteps(S.ui.atelierReview); }
     if (S.ui.rulesReview) { key = 'revoir'; steps = rulesSteps(); }
     if (!steps) return '';
     var i = Math.min(S.ui.ruleStep || 0, steps.length - 1), s = steps[i];
@@ -5697,7 +5742,7 @@ var ART = (function () {
     if (S.ui.profTeam) { var TT = T.filter(function (t) { return t.g === S.ui.profTeam; })[0]; if (TT) return h + profTeamView(TT, P) + '</main>'; }
     var nRules = T.filter(function (t) { return t.rules; }).length, stale = T.filter(function (t) { return t.last && Date.now() - t.last > 20 * 60000; }).length;
     var sec = { test: '', live: '', groups: '', day: '' };
-    sec.test += '<div class="card"><h3>🧪 Tester l\'application</h3><p class="small muted" style="margin:4px 0 0">Crée une équipe de test (n° 51 à 60) avec les deux lieux ouverts, sans nom à choisir ni règles à valider : ce téléphone devient directement le téléphone principal. Elle n\'apparaît ni dans le classement ni dans les notes, et les étudiants ne voient jamais ses mimes.</p><div class="pacts"><button class="btn alt" data-act="testgo" data-s="gge">🦴 Tester en commençant par la Grande Galerie</button><button class="btn alt" data-act="testgo" data-s="men">🐾 Tester en commençant par la Ménagerie</button><button class="btn alt" data-act="testgo" data-s="gge" data-j="1">🎭 Tester les jeux (mimes, Vrai ou bluff, devinettes)</button></div><p class="small muted" style="margin:8px 0 0">En mode test, la barre violette en haut permet de passer les jeux en « préparer », « deviner » ou « résultats » (une équipe exemple avec des mimes est ajoutée), sans rien changer pour les vraies équipes.</p></div>';
+    sec.test += '<div class="card"><h3>🧪 Tester l\'application</h3><p class="small muted" style="margin:4px 0 0">Vous jouez exactement comme un étudiant : nom d\'équipe, mascotte, écrans de règles, pop-ups de chaque atelier. Seule différence : un bouton « Enseignant » au lieu de choisir les noms dans la liste de la promo, et les deux lieux restent ouverts. L\'équipe de test (n° 51 à 60) n\'apparaît ni dans le classement ni dans les notes, et les étudiants ne voient jamais ses mimes.</p><div class="pacts"><button class="btn alt" data-act="testgo" data-s="gge">🦴 Tester en commençant par la Grande Galerie</button><button class="btn alt" data-act="testgo" data-s="men">🐾 Tester en commençant par la Ménagerie</button><button class="btn alt" data-act="testgo" data-s="gge" data-j="1">🎭 Tester les jeux (mimes, Vrai ou bluff, devinettes)</button></div><p class="small muted" style="margin:8px 0 0">En mode test, la barre violette en haut permet de passer les jeux en « préparer », « deviner » ou « résultats » (une équipe exemple avec des mimes est ajoutée), sans rien changer pour les vraies équipes.</p></div>';
     sec.day += '<div class="card"><div class="row" style="flex-wrap:wrap;gap:6px"><span class="chip i">' + (ph ? '🌙 Après-midi' : '☀️ Matin') + '</span><span class="chip i">🎭 Devinettes : ' + ({ off: 'pas ouvertes', open: 'ouvertes', closed: 'closes' }[P.vote] || P.vote) + '</span><span class="chip ' + (P.locked ? '' : 'i') + '">' + (P.locked ? '🔒 Envois bloqués' : '🔓 Envois ouverts') + '</span><span class="chip i">' + T.length + ' équipes</span><span class="chip i">📢 Règles lues : ' + nRules + '/' + T.length + '</span>' + (stale ? '<span class="chip">⏸ ' + stale + ' inactive(s) > 20 min</span>' : '') + '</div>' +
       '<div class="small muted" style="margin-top:8px">Mis à jour ' + ago(S.profAt) + ' (toutes les 20 s). ' + (P.url ? '<a href="' + esc(P.url) + '" target="_blank" rel="noopener">Ouvrir le tableur</a>' : '') + '</div></div>';
     sec.live += profAlerts(T, P) + profReports(P.reports || [], false);
@@ -5799,12 +5844,14 @@ var ART = (function () {
     api('apiProfFix', profCode(), g, action, arg).then(function (r) { S.profBusy = false; if (r && r.teams) { S.prof = r; S.profAt = Date.now(); } else profLoad(); toast(action === 'msg' ? 'Message envoyé ✓ : l\'équipe le verra dans moins d\'une minute' : action === 'horaires' ? 'Horaires enregistrés ✓' : action === 'neutre' ? 'Fait ✓ : toutes les équipes le reçoivent à leur prochaine synchronisation' : 'Corrigé ✓ (le téléphone le recevra dans moins d\'une minute)'); render(); },
       function (e) { S.profBusy = false; S.profErr = String(e && e.message || e).replace(/^Error: /, ''); render(); });
   }
-  function startTest(start, jeux) {
-    api('apiProfTest', profCode(), start, deviceId()).then(function (r) {
+  function keepName() { var e = document.getElementById('j-name'); if (e && S.ui.step === 'testcreate') S.ui.name = e.value; }
+  function startTest(start, jeux, name, mascot) {
+    S.ui.busy = true; S.ui.err = ''; render();
+    api('apiProfTest', profCode(), start, deviceId(), name, mascot).then(function (r) {
       keepOrphans(); S.mode = null; S.group = null; S.state = {}; S.dirty = {}; S.ui = { g: r.g, pin: r.pin }; S.route = 'home';
       try { localStorage.setItem(LSR, JSON.stringify({})); } catch (e) {}
       render(); doJoin(null, true); if (jeux) setTimeout(function () { go('jeux'); }, 1200);
-    }, function (e) { toast(String(e && e.message || e)); });
+    }, function (e) { S.ui.busy = false; S.ui.err = String(e && e.message || e).replace(/^Error: /, ''); render(); });
   }
   /* --- affichage téléphone / tablette --- */
   var LSE = LS + '-ecran';
