@@ -448,8 +448,14 @@ html.tablette .menmap{max-width:900px;margin-left:auto;margin-right:auto}
 .uls{display:flex;justify-content:center;align-items:center;background:#fff;border-bottom:3px solid #9A4D9F;padding:8px 12px}
 .uls img{height:44px;width:auto;display:block}
 .uls.in{border-radius:12px;border:1px solid var(--line);border-bottom:3px solid #9A4D9F;margin:0 auto 10px;max-width:320px}
+
+/* Espace enseignant : onglets */
+.ptabs{position:sticky;top:0;z-index:20;display:grid;grid-template-columns:repeat(4,1fr);gap:6px;background:var(--bg);padding:8px 0 6px;margin-top:-4px}
+.ptabs button{position:relative;display:flex;flex-direction:column;align-items:center;gap:2px;border:1.5px solid var(--line);background:var(--paper);border-radius:12px;padding:8px 4px;font-weight:650;font-size:13px;cursor:pointer;color:var(--ink)}
+.ptabs button.on{border-color:var(--green);background:var(--lav);color:var(--green)}
+.ptabs .pbadge{position:absolute;top:-6px;right:-4px;background:#b5462f;color:#fff;border-radius:999px;font-size:11px;padding:1px 6px}
 </style></head><body><div id="app"></div>
-<script src="config.js?v=1795426255"></script><script>if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js", { scope: "./" }).catch(function () {});</script>
+<script src="config.js?v=1795427834"></script><script>if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js", { scope: "./" }).catch(function () {});</script>
 <script>
 /* ==== Contenu pédagogique (énoncés) : partagé client + serveur ==== */
 /* GGE : « Le spécimen disparu ». Chaque question réussie (au moins la moitié des points) dévoile l'indice du même rang. */
@@ -4230,7 +4236,7 @@ var ART = (function () {
     var R = res(), pend = Object.keys(S.dirty).length + Object.keys(S.mq || {}).length;
     var cls = S.online ? (pend ? 'off' : '') : 'err';
     var tip = S.online ? (pend ? 'envoi en cours…' : 'synchronisé') : 'hors-ligne (' + pend + ' en attente)';
-    return (v('meta.test') ? '<div class="testbar">🧪 MODE TEST (non noté) <button data-act="testend">Retour à l\'espace enseignant</button></div>' : '') + '<header class="top"><div class="in"><span class="mascot">' + esc(v('meta.mascot') || '🧭') + '</span>' +
+    return (v('meta.test') ? '<div class="testbar">🧪 MODE TEST (non noté) <button data-act="testend">Retour à l\'espace enseignant</button><span style="opacity:.85">🎭 Jeux :</span>' + [['off', 'préparer'], ['open', 'deviner'], ['closed', 'résultats']].map(function (x) { return '<button data-act="testjeux" data-v="' + x[0] + '" style="' + ((S.vote || 'off') === x[0] ? 'background:#f4b942' : '') + '">' + x[1] + '</button>'; }).join('') + '</div>' : '') + '<header class="top"><div class="in"><span class="mascot">' + esc(v('meta.mascot') || '🧭') + '</span>' +
       '<div class="grow" style="min-width:0"><div class="teamname">' + esc(v('meta.team') || 'Mon équipe') + '</div><div class="small muted">n°' + S.group + ' · <span title="' + tip + '">' + tip + '</span></div></div>' +
       '<span class="chip">⭐ ' + R.xp + ' pts</span>' + (S.info && S.info.mainSet ? (isMain() ? '<span class="chip i" title="Téléphone principal">📱</span>' : '<span class="chip" title="Consultation : seul le téléphone principal répond">👀</span>') : '') + '<button class="urgbtn" data-act="urgopen" title="Urgence : je dois quitter l\'appli" aria-label="Urgence">🚨</button><a href="#relais" class="batt" title="Plus de batterie ? Passer le relais" aria-label="Plus de batterie ? Passer le relais">🔋</a><span class="sync ' + cls + '"></span></div></header>';
   }
@@ -5294,12 +5300,18 @@ var ART = (function () {
       }
       case 'fixopen': profFix(S.ui.profTeam, 'open', { sec: d('s'), on: d('on') === '1' }); break;
       case 'fixwheel': { var sel = document.getElementById('fx-w' + d('i')); if (sel && sel.value) profFix(S.ui.profTeam, 'wheel', { slot: +d('i'), id: sel.value }); break; }
+      case 'proftab': S.ui.profTab = d('t'); render(); window.scrollTo(0, 0); break;
       case 'repdone': profFix(null, 'report', d('r')); break;
       case 'repans': S.ui.repAns = d('r') ? +d('r') : null; render(); break;
       case 'repquick': { var ta = document.getElementById('rep-ans'); if (ta) ta.value = QUICK[+d('i')]; break; }
       case 'repsendans': { var tx = ((document.getElementById('rep-ans') || {}).value || '').trim(); if (!tx) return toast('Écrivez un message ou choisissez une réponse.'); S.ui.repAns = null; profFix(+d('g'), 'msg', { text: tx, row: +d('r') }); break; }
       case 'teammsg': { var tm = ((document.getElementById('tm-msg') || {}).value || '').trim(); if (!tm) return toast('Écrivez un message.'); profFix(+d('g'), 'msg', { text: tm }); break; }
       case 'waitprof': S.ui.waitProf = true; render(); break;
+      case 'testjeux': {
+        var tv = d('v');
+        api('apiProfFix', profCode(), S.group, 'testjeux', tv).then(function () { S.vote = tv; S.games = null; S.gamesAt = 0; go('jeux'); sync(); toast(tv === 'off' ? 'Jeux : préparation des mimes (test)' : tv === 'open' ? 'Devinettes ouvertes pour le test (une équipe exemple a été ajoutée)' : 'Résultats des devinettes (test)'); }, function (e) { toast(String(e && e.message || e)); });
+        break;
+      }
       case 'feteok': S.ui.fete = null; render(); break;
       case 'fetego': S.ui.fete = null; go(d('r')); break;
       case 'feteagain': S.ui.fete = 'final'; render(); fireworks(3); break;
@@ -5319,7 +5331,7 @@ var ART = (function () {
       case 'msgok': try { localStorage.setItem(LS + '-msg-' + S.group, String(d('id'))); } catch (e) {} render(); break;
       case 'profhoraires': { var hv = function (id) { return ((document.getElementById(id) || {}).value || '').trim(); }; profFix(null, 'horaires', { date: hv('hr-date'), debut: hv('hr-debut'), echange: hv('hr-echange'), fin: hv('hr-fin') }); break; }
       case 'profneutre': { var nid = d('id') || ((document.getElementById('nt-id') || {}).value || ''); if (!nid) return toast('Choisissez une question.'); profFix(null, 'neutre', { id: nid, on: d('on') === '1', why: ((document.getElementById('nt-why') || {}).value || '').trim() }); break; }
-      case 'testgo': startTest(d('s')); break;
+      case 'testgo': startTest(d('s'), d('j') === '1'); break;
       case 'testend': { var hasP = !!profCode(); logout(); try { localStorage.removeItem(LSR); } catch (e) {} if (hasP) { S.mode = 'prof'; render(); profLoad(); } break; }
       case 'scr': try { localStorage.setItem(LSE, d('m')); } catch (e) {} applyScreen(); render(); break;
       case 'profdo': { var a = d('a'); S.ui.profAsk = null; S.profBusy = true; render(); api('apiProfAction', profCode(), a).then(function (r) { S.profBusy = false; S.prof = r; S.profAt = Date.now(); toast('Fait ✓'); render(); }, function (e) { S.profBusy = false; toast('Erreur : ' + (e && e.message || e)); render(); }); break; }
@@ -5570,7 +5582,7 @@ var ART = (function () {
     return [{ ico: '🔄', color: 'amber', title: 'Changement de lieu', body: '<p><b>À lire à voix haute au groupe.</b></p><ul><li>Votre mission du matin (' + lieuName(st) + ') est maintenant <b>figée</b> : vos réponses sont enregistrées.</li><li>Place à <b>' + lieuName(other) + '</b>. Les mêmes règles s\'appliquent : en groupe, sans internet ni IA, dans le calme.</li><li>N\'oubliez pas la <b>question à proposer</b> en fin de mission, et le bouton <span class="repdemo">⚠️ Signaler</span> en cas de souci.</li></ul>', ok: 'Oui, j\'ai bien compris' }];
   }
   function rulesModal() {
-    if (!S.group || S.mode) return '';
+    if (!S.group || S.mode || v('meta.test')) return ''; // mode test : pas de pop-ups d'accueil
     var key = null, steps = null;
     if (!rulesAck('accueil-' + S.group)) { key = 'accueil-' + S.group; steps = rulesSteps(); }
     else if ((S.phase || {}).phase === 'apresmidi' && !rulesAck('aprem-' + S.group)) { key = 'aprem-' + S.group; steps = pmSteps(); }
@@ -5654,14 +5666,15 @@ var ART = (function () {
     var T = P.teams.slice().sort(function (a, b) { return a.g - b.g; }), ph = P.phase.phase === 'apresmidi';
     if (S.ui.profTeam) { var TT = T.filter(function (t) { return t.g === S.ui.profTeam; })[0]; if (TT) return h + profTeamView(TT, P) + '</main>'; }
     var nRules = T.filter(function (t) { return t.rules; }).length, stale = T.filter(function (t) { return t.last && Date.now() - t.last > 20 * 60000; }).length;
-    h += '<div class="card"><div class="row" style="flex-wrap:wrap;gap:6px"><span class="chip i">' + (ph ? '🌙 Après-midi' : '☀️ Matin') + '</span><span class="chip i">🎭 Devinettes : ' + ({ off: 'pas ouvertes', open: 'ouvertes', closed: 'closes' }[P.vote] || P.vote) + '</span><span class="chip ' + (P.locked ? '' : 'i') + '">' + (P.locked ? '🔒 Envois bloqués' : '🔓 Envois ouverts') + '</span><span class="chip i">' + T.length + ' équipes</span><span class="chip i">📢 Règles lues : ' + nRules + '/' + T.length + '</span>' + (stale ? '<span class="chip">⏸ ' + stale + ' inactive(s) > 20 min</span>' : '') + '</div>' +
+    var sec = { test: '', live: '', groups: '', day: '' };
+    sec.test += '<div class="card"><h3>🧪 Tester l\'application</h3><p class="small muted" style="margin:4px 0 0">Crée une équipe de test (n° 51 à 60) avec les deux lieux ouverts, sans nom à choisir ni règles à valider : ce téléphone devient directement le téléphone principal. Elle n\'apparaît ni dans le classement ni dans les notes, et les étudiants ne voient jamais ses mimes.</p><div class="pacts"><button class="btn alt" data-act="testgo" data-s="gge">🦴 Tester en commençant par la Grande Galerie</button><button class="btn alt" data-act="testgo" data-s="men">🐾 Tester en commençant par la Ménagerie</button><button class="btn alt" data-act="testgo" data-s="gge" data-j="1">🎭 Tester les jeux (mimes, Vrai ou bluff, devinettes)</button></div><p class="small muted" style="margin:8px 0 0">En mode test, la barre violette en haut permet de passer les jeux en « préparer », « deviner » ou « résultats » (une équipe exemple avec des mimes est ajoutée), sans rien changer pour les vraies équipes.</p></div>';
+    sec.day += '<div class="card"><div class="row" style="flex-wrap:wrap;gap:6px"><span class="chip i">' + (ph ? '🌙 Après-midi' : '☀️ Matin') + '</span><span class="chip i">🎭 Devinettes : ' + ({ off: 'pas ouvertes', open: 'ouvertes', closed: 'closes' }[P.vote] || P.vote) + '</span><span class="chip ' + (P.locked ? '' : 'i') + '">' + (P.locked ? '🔒 Envois bloqués' : '🔓 Envois ouverts') + '</span><span class="chip i">' + T.length + ' équipes</span><span class="chip i">📢 Règles lues : ' + nRules + '/' + T.length + '</span>' + (stale ? '<span class="chip">⏸ ' + stale + ' inactive(s) > 20 min</span>' : '') + '</div>' +
       '<div class="small muted" style="margin-top:8px">Mis à jour ' + ago(S.profAt) + ' (toutes les 20 s). ' + (P.url ? '<a href="' + esc(P.url) + '" target="_blank" rel="noopener">Ouvrir le tableur</a>' : '') + '</div></div>';
-    h += profAlerts(T, P) + profReports(P.reports || [], false);
+    sec.live += profAlerts(T, P) + profReports(P.reports || [], false);
     var A = [['apresmidi', '☀️→🌙 Échanger les lieux (midi)', !ph], ['matin', '↩️ Revenir au matin', ph], ['ouvrir', '🎭 Ouvrir les devinettes', P.vote !== 'open'], ['clore', '🏁 Clore les devinettes', P.vote === 'open'], ['notes', '🎓 Mettre à jour « Notes par étudiant »', true], ['correction', '📋 Mettre à jour les feuilles de correction', true], ['bloquer', '🔒 Bloquer les envois (fin)', !P.locked], ['rouvrir', '🔓 Rouvrir les envois', P.locked], ['cleartests', '🧪 Supprimer les équipes de test', T.some(function (t) { return t.test; })]];
-    h += '<div class="card"><h3>Commandes</h3>' + (S.ui.profAsk ? '<div class="fb info">Confirmer : <b>' + esc((A.filter(function (x) { return x[0] === S.ui.profAsk; })[0] || [])[1] || '') + '</b> ?<div class="row" style="margin-top:8px"><button class="btn amber" data-act="profdo" data-a="' + S.ui.profAsk + '">Oui</button><button class="btn ghost" data-act="profno">Non</button></div></div>' : '<div class="pacts">' + A.filter(function (x) { return x[2]; }).map(function (x) { return '<button class="btn alt" data-act="profask" data-a="' + x[0] + '">' + x[1] + '</button>'; }).join('') + '</div>') + '</div>';
-    h += profHorairesCard(P) + profNeutreCard(P);
-    h += '<div class="card"><h3>🧪 Tester l\'application</h3><p class="small muted" style="margin:4px 0 0">Crée une équipe de test (n° 51 à 60) avec les deux lieux ouverts. Elle n\'apparaît ni dans le classement ni dans les notes.</p><div class="pacts"><button class="btn alt" data-act="testgo" data-s="gge">🦴 Tester en commençant par la Grande Galerie</button><button class="btn alt" data-act="testgo" data-s="men">🐾 Tester en commençant par la Ménagerie</button></div></div>';
-    h += '<div class="card"><h3>Avancement des groupes</h3><div class="small muted">GGE et Ménagerie : note actuelle /20. 📢 = règles lues. 💡 = question proposée (G = GGE, M = Ménagerie).</div></div>' +
+    sec.day += '<div class="card"><h3>Commandes</h3>' + (S.ui.profAsk ? '<div class="fb info">Confirmer : <b>' + esc((A.filter(function (x) { return x[0] === S.ui.profAsk; })[0] || [])[1] || '') + '</b> ?<div class="row" style="margin-top:8px"><button class="btn amber" data-act="profdo" data-a="' + S.ui.profAsk + '">Oui</button><button class="btn ghost" data-act="profno">Non</button></div></div>' : '<div class="pacts">' + A.filter(function (x) { return x[2]; }).map(function (x) { return '<button class="btn alt" data-act="profask" data-a="' + x[0] + '">' + x[1] + '</button>'; }).join('') + '</div>') + '</div>';
+    sec.day += profHorairesCard(P) + profNeutreCard(P);
+    sec.groups += '<div class="card"><h3>Avancement des groupes</h3><div class="small muted">GGE et Ménagerie : note actuelle /20. 📢 = règles lues. 💡 = question proposée (G = GGE, M = Ménagerie).</div></div>' +
       T.map(function (t) {
         var late = t.last && Date.now() - t.last > 20 * 60000;
         return '<div class="card pteam' + (t.test ? ' ptest' : '') + '"><div class="row"><b class="pnum">' + t.g + '</b><div class="grow"><b>' + esc(t.mascot || '') + ' ' + esc(t.team) + '</b><div class="small muted">' + esc(String(t.members || '').split('\n').join(', ')) + '</div></div><span class="chip i">⭐ ' + t.xp + '</span></div>' +
@@ -5673,7 +5686,14 @@ var ART = (function () {
             return '<div class="small" style="margin-top:8px">📱 Principal : <b>' + esc(t.mainName || 'pas choisi') + '</b> · 👥 ' + on + ' / ' + String(t.members || '').split('\n').filter(String).length + ' connectés' + (n ? ' · <span class="warn">🚪 ' + n + ' sortie' + (n > 1 ? 's' : '') + ' de l\'appli (' + Math.round(tot / 60) + ' min' + (ur ? ', dont ' + ur + ' urgence' + (ur > 1 ? 's' : '') : '') + ')</span>' : ' · aucune sortie de l\'appli') + '</div>'; })() +
           '<div class="row small" style="gap:6px;flex-wrap:wrap;margin-top:8px"><span class="chip ' + (t.rules ? 'i' : '') + '">📢 ' + (t.rules ? 'règles lues' : 'règles NON lues') + '</span><span class="chip i">🎭 ' + t.jeux.mimes + '/2 mimes' + (t.jeux.bluff ? ' · bluff ✓' : '') + '</span><span class="chip ' + (t.prop.gge && t.prop.men ? 'i' : '') + '">💡 G ' + (t.prop.gge ? '✓' : '–') + ' · M ' + (t.prop.men ? '✓' : '–') + '</span>' + (t.avis ? '<span class="chip i">📝 avis</span>' : '') + '</div><button class="btn alt block" style="margin-top:10px" data-act="profteam" data-g="' + t.g + '">🔧 Corriger / dépanner cette équipe</button></div>';
       }).join('');
-    h += '<div class="small muted" style="margin:8px 0">Tous les signalements (avec l\'état technique) sont aussi dans l\'onglet « Signalements » du tableur ; les questions proposées dans « Questions proposées ».</div>';
+    sec.live += '<div class="small muted" style="margin:8px 0">Tous les signalements (avec l\'état technique) sont aussi dans l\'onglet « Signalements » du tableur ; les questions proposées dans « Questions proposées ».</div>';
+    /* quatre onglets simples : on ne voit qu'une chose à la fois */
+    var real = T.filter(function (t) { return !t.test; }), nOpenRep = (P.reports || []).filter(function (r) { return !r.done; }).length;
+    var tab = S.ui.profTab || (real.length ? 'live' : 'test');
+    var TABS = [['test', '🧪', 'Tester', ''], ['live', '🚨', 'En direct', nOpenRep ? String(nOpenRep) : ''], ['groups', '👥', 'Groupes', real.length ? String(real.length) : ''], ['day', '⚙️', 'Journée', '']];
+    var INTRO = { test: 'Essayer l\'application comme une équipe, sans que rien ne compte pour les étudiants.', live: 'Ce qui demande votre attention maintenant : groupes bloqués et messages des étudiants (bouton ⚠️ Signaler).', groups: 'Où en est chaque groupe. Touchez « Corriger / dépanner » pour intervenir sur une équipe, sans rien effacer.', day: 'Les réglages de la journée : échange de midi, devinettes, horaires, questions neutralisées, notes.' };
+    h += '<div class="ptabs">' + TABS.map(function (x) { return '<button class="' + (tab === x[0] ? 'on' : '') + '" data-act="proftab" data-t="' + x[0] + '"><span style="font-size:20px">' + x[1] + '</span><span>' + x[2] + '</span>' + (x[3] ? '<b class="pbadge">' + x[3] + '</b>' : '') + '</button>'; }).join('') + '</div>' +
+      '<p class="small muted" style="margin:4px 2px 10px">' + INTRO[tab] + '</p>' + sec[tab];
     return h + '</main>';
   }
 
@@ -5690,7 +5710,7 @@ var ART = (function () {
     });
     var nr = (P.reports || []).filter(function (r) { return !r.done; }).length;
     if (!L.length && !nr) return '<div class="card"><h3>✅ Rien de bloquant</h3><p class="small muted" style="margin:4px 0 0">Les téléphones principaux sont en ligne et aucune urgence n\'est déclarée.</p></div>';
-    return '<div class="card" style="border:2px solid #b5462f"><h3>🚨 À regarder en priorité</h3>' + (nr ? '<div class="fb ko">⚠️ ' + nr + ' signalement' + (nr > 1 ? 's' : '') + ' non traité' + (nr > 1 ? 's' : '') + ' (en bas de la page).</div>' : '') +
+    return '<div class="card" style="border:2px solid #b5462f"><h3>🚨 À regarder en priorité</h3>' + (nr ? '<div class="fb ko">⚠️ ' + nr + ' signalement' + (nr > 1 ? 's' : '') + ' non traité' + (nr > 1 ? 's' : '') + ' (juste en dessous).</div>' : '') +
       L.map(function (x) { return '<div class="row small" style="gap:8px;margin-top:8px;align-items:flex-start"><span style="font-size:18px">' + x[0] + '</span><div class="grow">' + x[1] + '</div><button class="btn alt" style="min-height:32px;padding:4px 10px;font-size:13px" data-act="profteam" data-g="' + x[2] + '">Voir</button></div>'; }).join('') + '</div>';
   }
   /* signalements des étudiants : non traités d'abord, réponse directe à l'équipe sans rien interrompre */
@@ -5749,11 +5769,11 @@ var ART = (function () {
     api('apiProfFix', profCode(), g, action, arg).then(function (r) { S.profBusy = false; if (r && r.teams) { S.prof = r; S.profAt = Date.now(); } else profLoad(); toast(action === 'msg' ? 'Message envoyé ✓ : l\'équipe le verra dans moins d\'une minute' : action === 'horaires' ? 'Horaires enregistrés ✓' : action === 'neutre' ? 'Fait ✓ : toutes les équipes le reçoivent à leur prochaine synchronisation' : 'Corrigé ✓ (le téléphone le recevra dans moins d\'une minute)'); render(); },
       function (e) { S.profBusy = false; S.profErr = String(e && e.message || e).replace(/^Error: /, ''); render(); });
   }
-  function startTest(start) {
-    api('apiProfTest', profCode(), start).then(function (r) {
+  function startTest(start, jeux) {
+    api('apiProfTest', profCode(), start, deviceId()).then(function (r) {
       keepOrphans(); S.mode = null; S.group = null; S.state = {}; S.dirty = {}; S.ui = { g: r.g, pin: r.pin }; S.route = 'home';
       try { localStorage.setItem(LSR, JSON.stringify({})); } catch (e) {}
-      render(); doJoin(null, true);
+      render(); doJoin(null, true); if (jeux) setTimeout(function () { go('jeux'); }, 1200);
     }, function (e) { toast(String(e && e.message || e)); });
   }
   /* --- affichage téléphone / tablette --- */
