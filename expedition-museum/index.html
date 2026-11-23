@@ -442,7 +442,7 @@ html.tablette .menmap{max-width:900px;margin-left:auto;margin-right:auto}
 .mimecard .row{flex-wrap:wrap;row-gap:6px}.mimecard .row .chip{max-width:100%;white-space:normal}
 @media (max-width:360px){.row{flex-wrap:wrap;row-gap:6px}.wrap{overflow-wrap:anywhere}}
 </style></head><body><div id="app"></div>
-<script src="config.js?v=1795417124"></script><script>if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js", { scope: "./" }).catch(function () {});</script>
+<script src="config.js?v=1795420293"></script><script>if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js", { scope: "./" }).catch(function () {});</script>
 <script>
 /* ==== Contenu pédagogique (énoncés) : partagé client + serveur ==== */
 /* GGE : « Le spécimen disparu ». Chaque question réussie (au moins la moitié des points) dévoile l'indice du même rang. */
@@ -4188,7 +4188,7 @@ var ART = (function () {
       default: body = homeView();
     }
     if (S.authError) body = '<div class="fb ko" style="margin-bottom:12px">⚠️ Le serveur ne reconnaît plus votre équipe. Vos réponses sont conservées sur ce téléphone.' + (S.authError === 'badpin' ? '<div style="margin-top:8px">Le code de l\'équipe a changé : entrez le nouveau code.<div class="row" style="margin-top:6px"><input id="np-pin" inputmode="numeric" maxlength="4" placeholder="Nouveau code" style="max-width:140px"><button class="btn" data-act="newpin">Valider</button></div></div>' : '<div style="margin-top:8px"><button class="btn amber" data-act="recreate">Renvoyer toute l\'équipe au serveur</button></div>') + '<div class="small" style="margin-top:6px">Sinon, signalez-le avec le bouton ⚠️ Signaler.</div></div>' + body;
-    var html = topBar() + '<main class="wrap">' + envWarn() + body + '</main>' + navBar(r[0]) + mimeModal() + reportBtn() + reportModal() + urgentModal() + (r[0] === 'who' ? '' : rulesModal());
+    var html = topBar() + '<main class="wrap">' + envWarn() + profMsg() + body + '</main>' + navBar(r[0]) + mimeModal() + reportBtn() + reportModal() + urgentModal() + (r[0] === 'who' ? '' : rulesModal());
     if (soft) {
       // rafraîchissement discret : ne pas casser une saisie en cours
       var a = document.activeElement;
@@ -4369,6 +4369,13 @@ var ART = (function () {
   }
 
   /* ---------- accueil ---------- */
+  function profMsg() { // message des enseignants (réponse à un signalement) : s'affiche jusqu'à « Compris »
+    var m = v('meta.msg'); if (!m || !m.id) return '';
+    var seen = ''; try { seen = localStorage.getItem(LS + '-msg-' + S.group) || ''; } catch (e) {}
+    if (seen === String(m.id)) return '';
+    if (S.msgBuzz !== m.id) { S.msgBuzz = m.id; try { navigator.vibrate && navigator.vibrate([150, 80, 150]); } catch (e) {} }
+    return '<div class="fb info" style="position:fixed;top:72px;left:10px;right:10px;max-width:640px;margin:0 auto;z-index:45;border:2px solid var(--amber);box-shadow:0 8px 24px rgba(0,0,0,.25);background:#fff8ea">💬 <b>Message des enseignants</b> <span class="small muted">(' + new Date(m.at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) + ')</span><div style="margin:4px 0 8px">' + esc(m.text) + '</div><button class="btn" data-act="msgok" data-id="' + esc(String(m.id)) + '">OK, compris</button></div>';
+  }
   function horairesCard() {
     var H = horaires(), mo = moment(); if (!H.date || !(H.debut || H.echange || H.fin)) return '';
     var t = [H.debut ? '▶️ début ' + hfr(H.debut) : '', H.echange ? '🔄 échange ' + hfr(H.echange) : '', H.fin ? '🏁 fin ' + hfr(H.fin) : ''].filter(String).join(' · ');
@@ -5197,6 +5204,11 @@ var ART = (function () {
       case 'fixopen': profFix(S.ui.profTeam, 'open', { sec: d('s'), on: d('on') === '1' }); break;
       case 'fixwheel': { var sel = document.getElementById('fx-w' + d('i')); if (sel && sel.value) profFix(S.ui.profTeam, 'wheel', { slot: +d('i'), id: sel.value }); break; }
       case 'repdone': profFix(null, 'report', d('r')); break;
+      case 'repans': S.ui.repAns = d('r') ? +d('r') : null; render(); break;
+      case 'repquick': { var ta = document.getElementById('rep-ans'); if (ta) ta.value = QUICK[+d('i')]; break; }
+      case 'repsendans': { var tx = ((document.getElementById('rep-ans') || {}).value || '').trim(); if (!tx) return toast('Écrivez un message ou choisissez une réponse.'); S.ui.repAns = null; profFix(+d('g'), 'msg', { text: tx, row: +d('r') }); break; }
+      case 'teammsg': { var tm = ((document.getElementById('tm-msg') || {}).value || '').trim(); if (!tm) return toast('Écrivez un message.'); profFix(+d('g'), 'msg', { text: tm }); break; }
+      case 'msgok': try { localStorage.setItem(LS + '-msg-' + S.group, String(d('id'))); } catch (e) {} render(); break;
       case 'profhoraires': { var hv = function (id) { return ((document.getElementById(id) || {}).value || '').trim(); }; profFix(null, 'horaires', { date: hv('hr-date'), debut: hv('hr-debut'), echange: hv('hr-echange'), fin: hv('hr-fin') }); break; }
       case 'profneutre': { var nid = d('id') || ((document.getElementById('nt-id') || {}).value || ''); if (!nid) return toast('Choisissez une question.'); profFix(null, 'neutre', { id: nid, on: d('on') === '1', why: ((document.getElementById('nt-why') || {}).value || '').trim() }); break; }
       case 'testgo': startTest(d('s')); break;
@@ -5536,7 +5548,7 @@ var ART = (function () {
     var nRules = T.filter(function (t) { return t.rules; }).length, stale = T.filter(function (t) { return t.last && Date.now() - t.last > 20 * 60000; }).length;
     h += '<div class="card"><div class="row" style="flex-wrap:wrap;gap:6px"><span class="chip i">' + (ph ? '🌙 Après-midi' : '☀️ Matin') + '</span><span class="chip i">🎭 Devinettes : ' + ({ off: 'pas ouvertes', open: 'ouvertes', closed: 'closes' }[P.vote] || P.vote) + '</span><span class="chip ' + (P.locked ? '' : 'i') + '">' + (P.locked ? '🔒 Envois bloqués' : '🔓 Envois ouverts') + '</span><span class="chip i">' + T.length + ' équipes</span><span class="chip i">📢 Règles lues : ' + nRules + '/' + T.length + '</span>' + (stale ? '<span class="chip">⏸ ' + stale + ' inactive(s) > 20 min</span>' : '') + '</div>' +
       '<div class="small muted" style="margin-top:8px">Mis à jour ' + ago(S.profAt) + ' (toutes les 20 s). ' + (P.url ? '<a href="' + esc(P.url) + '" target="_blank" rel="noopener">Ouvrir le tableur</a>' : '') + '</div></div>';
-    h += profAlerts(T, P);
+    h += profAlerts(T, P) + profReports(P.reports || [], false);
     var A = [['apresmidi', '☀️→🌙 Échanger les lieux (midi)', !ph], ['matin', '↩️ Revenir au matin', ph], ['ouvrir', '🎭 Ouvrir les devinettes', P.vote !== 'open'], ['clore', '🏁 Clore les devinettes', P.vote === 'open'], ['notes', '🎓 Mettre à jour « Notes par étudiant »', true], ['correction', '📋 Mettre à jour les feuilles de correction', true], ['bloquer', '🔒 Bloquer les envois (fin)', !P.locked], ['rouvrir', '🔓 Rouvrir les envois', P.locked], ['cleartests', '🧪 Supprimer les équipes de test', T.some(function (t) { return t.test; })]];
     h += '<div class="card"><h3>Commandes</h3>' + (S.ui.profAsk ? '<div class="fb info">Confirmer : <b>' + esc((A.filter(function (x) { return x[0] === S.ui.profAsk; })[0] || [])[1] || '') + '</b> ?<div class="row" style="margin-top:8px"><button class="btn amber" data-act="profdo" data-a="' + S.ui.profAsk + '">Oui</button><button class="btn ghost" data-act="profno">Non</button></div></div>' : '<div class="pacts">' + A.filter(function (x) { return x[2]; }).map(function (x) { return '<button class="btn alt" data-act="profask" data-a="' + x[0] + '">' + x[1] + '</button>'; }).join('') + '</div>') + '</div>';
     h += profHorairesCard(P) + profNeutreCard(P);
@@ -5553,7 +5565,7 @@ var ART = (function () {
             return '<div class="small" style="margin-top:8px">📱 Principal : <b>' + esc(t.mainName || 'pas choisi') + '</b> · 👥 ' + on + ' / ' + String(t.members || '').split('\n').filter(String).length + ' connectés' + (n ? ' · <span class="warn">🚪 ' + n + ' sortie' + (n > 1 ? 's' : '') + ' de l\'appli (' + Math.round(tot / 60) + ' min' + (ur ? ', dont ' + ur + ' urgence' + (ur > 1 ? 's' : '') : '') + ')</span>' : ' · aucune sortie de l\'appli') + '</div>'; })() +
           '<div class="row small" style="gap:6px;flex-wrap:wrap;margin-top:8px"><span class="chip ' + (t.rules ? 'i' : '') + '">📢 ' + (t.rules ? 'règles lues' : 'règles NON lues') + '</span><span class="chip i">🎭 ' + t.jeux.mimes + '/2 mimes' + (t.jeux.bluff ? ' · bluff ✓' : '') + '</span><span class="chip ' + (t.prop.gge && t.prop.men ? 'i' : '') + '">💡 G ' + (t.prop.gge ? '✓' : '–') + ' · M ' + (t.prop.men ? '✓' : '–') + '</span>' + (t.avis ? '<span class="chip i">📝 avis</span>' : '') + '</div><button class="btn alt block" style="margin-top:10px" data-act="profteam" data-g="' + t.g + '">🔧 Corriger / dépanner cette équipe</button></div>';
       }).join('');
-    h += '<div class="card"><h3>⚠️ Signalements (' + P.nReports + ')</h3>' + (P.reports.length ? P.reports.map(function (r) { return '<div class="prep"><div class="small muted">' + new Date(r.t).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) + ' · n°' + esc(String(r.g || '?')) + ' ' + esc(r.team || '') + ' · ' + esc(r.screen || '') + '</div><b>' + esc(r.kind) + '</b><div>' + esc(r.text) + '</div>' + (r.done ? '<div class="small" style="color:var(--green-2)">' + esc(r.done) + '</div>' : '<button class="btn ghost" style="padding:4px 0;min-height:0" data-act="repdone" data-r="' + r.row + '">✓ Marquer comme traité</button>') + (r.g && +r.g ? ' <button class="btn ghost" style="padding:4px 8px;min-height:0" data-act="profteam" data-g="' + (+r.g) + '">🔧 Ouvrir l\'équipe</button>' : '') + '</div>'; }).join('') : '<div class="small muted">Aucun signalement pour l\'instant.</div>') + '<div class="small muted" style="margin-top:8px">Tous les signalements (avec l\'état technique) sont dans l\'onglet « Signalements » du tableur ; les questions proposées dans « Questions proposées ».</div></div>';
+    h += '<div class="small muted" style="margin:8px 0">Tous les signalements (avec l\'état technique) sont aussi dans l\'onglet « Signalements » du tableur ; les questions proposées dans « Questions proposées ».</div>';
     return h + '</main>';
   }
 
@@ -5573,6 +5585,22 @@ var ART = (function () {
     return '<div class="card" style="border:2px solid #b5462f"><h3>🚨 À regarder en priorité</h3>' + (nr ? '<div class="fb ko">⚠️ ' + nr + ' signalement' + (nr > 1 ? 's' : '') + ' non traité' + (nr > 1 ? 's' : '') + ' (en bas de la page).</div>' : '') +
       L.map(function (x) { return '<div class="row small" style="gap:8px;margin-top:8px;align-items:flex-start"><span style="font-size:18px">' + x[0] + '</span><div class="grow">' + x[1] + '</div><button class="btn alt" style="min-height:32px;padding:4px 10px;font-size:13px" data-act="profteam" data-g="' + x[2] + '">Voir</button></div>'; }).join('') + '</div>';
   }
+  /* signalements des étudiants : non traités d'abord, réponse directe à l'équipe sans rien interrompre */
+  var QUICK = ['C\'est corrigé, vous pouvez continuer.', 'Question neutralisée : passez à la suite, les points sont accordés à tout le monde.', 'Votre réponse est bien enregistrée, rien n\'est perdu.', 'Gardez l\'application ouverte, ça va repartir tout seul avec le réseau.', 'Utilisez la version « animal caché » de la station.'];
+  function profReports(L, inTeam) {
+    var open = L.filter(function (r) { return !r.done; }), done = L.filter(function (r) { return r.done; });
+    var one = function (r) {
+      var rid = 'r' + r.row, ans = S.ui.repAns === r.row;
+      return '<div class="prep" style="' + (r.done ? 'opacity:.65' : 'border-left:4px solid #b5462f;padding-left:8px') + '"><div class="small muted">' + ago(r.t) + ' · ' + (r.g && +r.g ? '<b>n°' + esc(String(r.g)) + ' ' + esc(r.team || '') + '</b>' : 'sans équipe') + (r.sec ? ' · ' + esc(r.sec === 'gge' ? 'Galerie' : r.sec === 'men' ? 'Ménagerie' : r.sec) : '') + (r.screen ? ' · écran ' + esc(r.screen) : '') + '</div>' +
+        '<b>' + esc(r.kind) + '</b><div>' + esc(r.text) + '</div>' + (r.done ? '<div class="small" style="color:var(--green-2)">' + esc(r.done) + '</div>' : '') +
+        (ans ? '<div style="margin-top:6px"><div class="small muted">Message affiché sur les téléphones de l\'équipe (rien n\'est effacé, l\'équipe continue) :</div>' + QUICK.map(function (q, i) { return '<button class="btn ghost" style="min-height:0;padding:3px 0;font-size:13px;text-align:left" data-act="repquick" data-i="' + i + '">« ' + esc(q) + ' »</button>'; }).join('<br>') +
+          '<textarea id="rep-ans" rows="2" maxlength="300" style="width:100%;margin-top:6px" placeholder="Votre message…"></textarea><div class="row" style="gap:6px;margin-top:6px"><button class="btn" data-act="repsendans" data-g="' + (+r.g) + '" data-r="' + r.row + '">Envoyer à l\'équipe</button><button class="btn ghost" data-act="repans" data-r="">Annuler</button></div></div>' :
+        '<div class="row" style="gap:4px;flex-wrap:wrap;margin-top:4px">' + (r.g && +r.g ? '<button class="btn ghost" style="padding:4px 8px;min-height:0" data-act="repans" data-r="' + r.row + '">💬 Répondre</button>' + (inTeam ? '' : '<button class="btn ghost" style="padding:4px 8px;min-height:0" data-act="profteam" data-g="' + (+r.g) + '">🔧 Dépanner l\'équipe</button>') : '') + (r.done ? '' : '<button class="btn ghost" style="padding:4px 8px;min-height:0" data-act="repdone" data-r="' + r.row + '">✓ Traité</button>') + '</div>') + '</div>';
+    };
+    return '<div class="card"' + (open.length ? ' style="border:2px solid #b5462f"' : '') + '><h3>⚠️ Signalements ' + (open.length ? '<span class="chip" style="background:#b5462f;color:#fff">' + open.length + ' à traiter</span>' : '<span class="chip g">tout est traité</span>') + '</h3>' +
+      (inTeam ? '' : '<p class="small muted" style="margin:4px 0 0">Les envois des étudiants (bouton ⚠️ Signaler) arrivent ici en direct. Vous pouvez répondre à l\'équipe et la dépanner sans interrompre la sortie : aucune réponse ni aucune note n\'est effacée.</p>') +
+      (L.length ? open.map(one).join('') + (done.length ? '<details style="margin-top:8px"><summary class="small muted">Déjà traités (' + done.length + ')</summary>' + done.map(one).join('') + '</details>' : '') : '<div class="small muted">Aucun signalement pour l\'instant.</div>') + '</div>';
+  }
   function profHorairesCard(P) {
     var H = (P.phase || {}).horaires || {};
     return '<div class="card"><h3>⏰ Horaires de la sortie</h3><p class="small muted" style="margin:4px 0 0">Heure de Paris. À l\'heure d\'échange, les lieux s\'échangent tout seuls (vous pouvez le faire avant avec le bouton). Avant le début, les équipes se connectent et lisent les règles mais ne peuvent pas répondre ; après la fin, plus aucune réponse n\'est acceptée. Laissez vide pour ne rien automatiser.</p>' +
@@ -5591,6 +5619,8 @@ var ART = (function () {
     var h = '<div class="card"><button class="btn ghost" style="padding-left:0" data-act="profteamx">← Toutes les équipes</button><h2>' + esc(t.mascot || '') + ' n°' + t.g + ' · ' + esc(t.team) + (t.test ? ' (test)' : '') + '</h2>' +
       '<div class="small muted">Code d\'équipe : <b>' + esc(t.pin) + '</b> · dernière activité ' + ago(t.last) + ' · GGE ' + fmt(t.gge.total) + '/20 · Ménagerie ' + fmt(t.men.total) + '/20</div>' +
       '<div class="fb info" style="margin-top:10px">Ces corrections se font en direct, sans mettre la sortie en pause : le téléphone de l\'équipe les reçoit à sa prochaine synchronisation (quelques secondes). Rien n\'est effacé, tout est noté dans l\'onglet « Journal enseignant ».</div>' + (S.profErr ? '<div class="fb ko">' + esc(S.profErr) + '</div>' : '') + '</div>';
+    var TR = (P.reports || []).filter(function (r) { return String(r.g) === String(t.g); });
+    h += (TR.length ? profReports(TR, true) : '') + '<div class="card"><h3>💬 Envoyer un message à l\'équipe</h3><p class="small muted" style="margin:4px 0 0">Il s\'affiche sur tous les téléphones de l\'équipe, sans rien interrompre.</p><textarea id="tm-msg" rows="2" maxlength="300" style="width:100%;margin-top:6px" placeholder="Votre message…"></textarea><button class="btn" style="margin-top:6px" data-act="teammsg" data-g="' + t.g + '">Envoyer</button></div>';
     h += '<div class="card"><h3>✏️ Note à la main (remplace la note calculée)</h3><p class="small muted" style="margin:4px 0 0">Laissez vide pour garder la note calculée automatiquement. La note calculée reste visible dans le tableur.</p>' +
       '<div class="grid2"><label class="f">GGE /20<input type="text" inputmode="decimal" id="ov-gge" value="' + (ov.gge != null ? ov.gge : '') + '" placeholder="auto (' + fmt(t.gge.total) + ')"></label><label class="f">Ménagerie /20<input type="text" inputmode="decimal" id="ov-men" value="' + (ov.men != null ? ov.men : '') + '" placeholder="auto (' + fmt(t.men.total) + ')"></label></div>' +
       '<label class="f">Points d\'expédition à ajouter ou retirer (ex. 20 ou -10)<input type="text" inputmode="numeric" id="ov-xp" value="' + (ov.xp || '') + '"></label><label class="f">Raison (pour le journal)<input type="text" id="ov-why" value="' + esc(ov.why || '') + '" placeholder="ex. question 4 ambiguë, signalement accepté"></label>' +
@@ -5608,7 +5638,7 @@ var ART = (function () {
   }
   function profFix(g, action, arg) {
     S.profErr = ''; S.profBusy = true; render();
-    api('apiProfFix', profCode(), g, action, arg).then(function (r) { S.profBusy = false; if (r && r.teams) { S.prof = r; S.profAt = Date.now(); } else profLoad(); toast(action === 'horaires' ? 'Horaires enregistrés ✓' : action === 'neutre' ? 'Fait ✓ : toutes les équipes le reçoivent à leur prochaine synchronisation' : 'Corrigé ✓ (le téléphone le recevra dans moins d\'une minute)'); render(); },
+    api('apiProfFix', profCode(), g, action, arg).then(function (r) { S.profBusy = false; if (r && r.teams) { S.prof = r; S.profAt = Date.now(); } else profLoad(); toast(action === 'msg' ? 'Message envoyé ✓ : l\'équipe le verra dans moins d\'une minute' : action === 'horaires' ? 'Horaires enregistrés ✓' : action === 'neutre' ? 'Fait ✓ : toutes les équipes le reçoivent à leur prochaine synchronisation' : 'Corrigé ✓ (le téléphone le recevra dans moins d\'une minute)'); render(); },
       function (e) { S.profBusy = false; S.profErr = String(e && e.message || e).replace(/^Error: /, ''); render(); });
   }
   function startTest(start) {
