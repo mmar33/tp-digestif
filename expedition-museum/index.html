@@ -442,7 +442,7 @@ html.tablette .menmap{max-width:900px;margin-left:auto;margin-right:auto}
 .mimecard .row{flex-wrap:wrap;row-gap:6px}.mimecard .row .chip{max-width:100%;white-space:normal}
 @media (max-width:360px){.row{flex-wrap:wrap;row-gap:6px}.wrap{overflow-wrap:anywhere}}
 </style></head><body><div id="app"></div>
-<script src="config.js?v=1795293950"></script><script>if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js", { scope: "./" }).catch(function () {});</script>
+<script src="config.js?v=1795417124"></script><script>if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js", { scope: "./" }).catch(function () {});</script>
 <script>
 /* ==== Contenu pédagogique (énoncés) : partagé client + serveur ==== */
 /* GGE : « Le spécimen disparu ». Chaque question réussie (au moins la moitié des points) dévoile l'indice du même rang. */
@@ -706,9 +706,9 @@ var ESC = [
         { sec: '⚖️ Bien-être', t: 'Pour ne pas l\'effrayer, on évite d\'approcher un bovin…', o: [['derriere', 'juste derrière lui (son angle mort)'], ['cote', 'de côté, en s\'annonçant à la voix'], ['loin', 'lentement, à distance']] }],
       hint: "Cétartiodactyles : poids entre les doigts III et IV ; les doigts II et V sont des ergots. Cornes : production du tégument sur un cornillon osseux, gardée toute la vie (contrairement aux bois des cervidés)." },
     reveal: "Le gaur est un bovin : 4 compartiments gastriques, un canon formé de deux métatarsiens soudés, et des cornes que mâles et femelles gardent toute leur vie. Il est classé vulnérable : la ménagerie participe à son programme d'élevage." },
-  { id: 'c3', title: 'Le souffle', icon: '🫁', where: 'Un animal au repos : tapir, gaur, vigogne, orang-outan, wallaby, kangourou ou panthère',
+  { id: 'c3', title: 'Le souffle', icon: '🫁', where: 'Un animal au repos : tapir, gaur, vigogne, wallaby ou panthère',
     story: "« Un patient m'inquiétait. Vérifiez sa respiration : l'épreuve n'est réussie que si vos calculs sont justes et votre conclusion correcte. »",
-    v: { fr: true, label: 'Un animal est au repos et visible', where: 'Au choix : tapir, gaur, vigogne, orang-outan, wallaby, kangourou ou panthère',
+    v: { fr: true, label: 'Un animal est au repos et visible', where: 'Au choix : tapir, gaur, vigogne, wallaby ou panthère',
       task: "Choisissez un animal au repos (un animal qui dort, c'est parfait). Au moins 2 étudiants comptent chacun 3 fois pendant 1 minute avec le compteur. Calculez moyennes, écarts-types et moyenne du groupe, puis comparez à la référence.",
       hint: "σ = √[Σ(xᵢ − x̄)² / (n − 1)] avec n = 3, arrondi à 0,1. La référence de votre espèce est dans le tableau. Toutes les cases d'un étudiant doivent être remplies." },
     a: { label: 'Aucun animal visible', where: 'Où vous voulez',
@@ -1214,7 +1214,7 @@ function mimeCards(g) {
 }
 /* ==== Vrai ou bluff du Muséum : 3 affirmations sur un lieu précis (1 vraie, 2 fausses) ==== */
 var BLUFF_LIEUX = [['gge-rdc', 'GGE : la grande parade (rez-de-chaussée)'], ['gge-loup', 'GGE : vitrine du loup et du lynx'], ['gge-disparus', 'GGE : les espèces disparues'], ['gge-domest', 'GGE : la domestication (poule, dindon, mouton…)'], ['gge-rhone', 'GGE : le Rhône transformé'], ['gge-autre', 'GGE : une autre vitrine ou un autre panneau'],
-  ['m-orang', 'Ménagerie : panneau et enclos des orangs-outans'], ['m-tapir', 'Ménagerie : panneau et enclos du tapir'], ['m-cheval', 'Ménagerie : panneau et enclos des chevaux de Przewalski'], ['m-panthere', 'Ménagerie : panneau et enclos des panthères'], ['m-macropodes', 'Ménagerie : panneau et enclos des wallabies et kangourous'], ['m-diable', 'Ménagerie : panneau et enclos des diables de Tasmanie'], ['m-nandou', 'Ménagerie : panneau et enclos des nandous'], ['m-vivarium', 'Ménagerie : vivarium (panneaux et terrariums)'], ['m-autre', 'Ménagerie : un autre panneau ou enclos'], ['jardin', 'Jardin des Plantes : statues, serres, grilles…']];
+  ['m-tapir', 'Ménagerie : panneau et enclos des tapirs'], ['m-cheval', 'Ménagerie : panneau et enclos des chevaux de Przewalski'], ['m-gaur', 'Ménagerie : panneau et enclos des gaurs'], ['m-oryx', 'Ménagerie : panneau et enclos des oryx d\'Arabie'], ['m-macropodes', 'Ménagerie : panneau et enclos des wallabies et pademelons'], ['m-nandou', 'Ménagerie : panneau et enclos des nandous'], ['m-casoar', 'Ménagerie : panneau et enclos du casoar'], ['m-panthere', 'Ménagerie : panneaux et enclos des panthères'], ['m-vivarium', 'Ménagerie : vivarium (panneaux et terrariums)'], ['m-montagne', 'Ménagerie : vigognes, markhors ou takins'], ['m-panda', 'Ménagerie : panneau et enclos des pandas roux'], ['m-tropic', 'Ménagerie : binturong, tamarins-lions ou sangliers des Visayas'], ['m-autre', 'Ménagerie : un autre panneau ou enclos'], ['jardin', 'Jardin des Plantes : statues, serres, grilles…']];
 var BLUFF_AIDE = { ok: ["Le panneau du tapir indique qu'il pèse jusqu'à 300 kg", "L'enclos des wallabies a un abri en bois avec un toit vert", 'Le loup de la vitrine a la gueule ouverte'], ko: ["Il y a trois tapirs dans l'enclos", 'La panthère dort sur un rocher'] };
 
 /* ==== Questionnaire de fin (un par téléphone) ==== */
@@ -4125,7 +4125,7 @@ var ART = (function () {
     }, function () { flushingO = false; });
   }
   function sync() {
-    flushOrphans();
+    flushOrphans(); flushGuesses();
     if (!S.group || S.syncing || S.mode === 'ecran' || S.authError) return;
     S.syncing = true; lastAttempt = Date.now();
     var sent = {}; Object.keys(S.dirty).forEach(function (k) { sent[k] = S.dirty[k]; });
@@ -4793,7 +4793,7 @@ var ART = (function () {
   }
 
   /* ---- épreuve « Le souffle », version observation : compteur de respirations ---- */
-  var FRSP = ['tapir', 'gaur', 'vigogne', 'orang', 'wallaby', 'kangourou', 'pantherecn', 'nebuleuse'];
+  var FRSP = ['tapir', 'gaur', 'vigogne', 'wallaby', 'pantherecn', 'nebuleuse']; // animaux présents (pas d'orang-outan ni de kangourou roux d'après les panneaux)
   function frBody(L, V, st) {
     var p = 'esc.c3.', dis = st.opened || S.locked || access('men') !== 'open', h = '';
     h += '<div class="card"><details ' + (S.ui['open-frhow'] ? 'open' : '') + ' data-keep="frhow"><summary><b>Rappel : comment mesurer une FR ?</b></summary>' + breathHow() + '</details></div>';
@@ -4886,7 +4886,7 @@ var ART = (function () {
     var h = '<div class="card" style="border-color:var(--amber)"><h3>' + (st === 'open' ? '🎲 Les devinettes sont ouvertes !' : '🏁 Résultats des devinettes') + '</h3>' + (st === 'closed' && G.xp != null ? '<p class="small" style="margin:4px 0 0">Votre équipe a gagné <b>' + G.xp + ' points</b> avec les mimes et Vrai ou bluff.</p>' : '<p class="small muted" style="margin:4px 0 0">Un seul essai par mime et un seul pari par « Vrai ou bluff ».</p>') + '</div>';
     h += '<h3>🎭 Devinez les mimes</h3>' + (G.mimes.length ? '' : '<div class="card muted small">Aucun mime à deviner pour le moment.</div>');
     G.mimes.forEach(function (m) {
-      var res = st === 'closed' ? (m.mine === m.answer ? '<span class="chip g">✓ trouvé</span>' : '<span class="chip">✗ ' + esc(m.answer) + '</span>') : (m.mine ? '<span class="chip i">répondu</span>' : '');
+      var res = st === 'closed' ? (m.mine === m.answer ? '<span class="chip g">✓ trouvé</span>' : '<span class="chip">✗ ' + esc(m.answer) + '</span>') : (m.mine ? (m.pend ? '<span class="chip">⏳ en attente de réseau</span>' : '<span class="chip i">répondu</span>') : (m.cached ? '<span class="chip">📥 prêt hors réseau</span>' : ''));
       h += '<button class="card mission" data-act="mview" data-g="' + m.g + '" data-c="' + m.card + '"><div class="ico">' + (m.kind === 'video' ? '🎬' : '📷') + '</div><div class="grow" style="text-align:left"><b>' + esc(m.mascot) + ' ' + esc(m.team) + '</b><div class="small muted">' + esc(m.cat) + (st === 'closed' ? ' · ' + m.found + ' / ' + m.of + ' équipes ont trouvé' : '') + '</div></div>' + res + '</button>';
     });
     if (G.myMimes) h += '<div class="card small"><b>Vos mimes</b>' + G.myMimes.map(function (m) { return '<div>« ' + esc(m.word) + ' » : trouvé par ' + m.found + ' équipe' + (m.found > 1 ? 's' : '') + ' sur ' + m.of + '</div>'; }).join('') + '</div>';
@@ -4896,13 +4896,83 @@ var ART = (function () {
       h += '<div class="card bluff"><div class="small muted">' + esc(p.mascot) + ' ' + esc(p.team) + '</div><div class="term" style="font-size:19px">📍 ' + esc(p.lieu) + '</div>' + p.opts.map(function (d, i) {
         var cls = st === 'closed' ? (i === p.answer ? 'right' : (cur[i] ? 'wrong' : '')) : '';
         return '<div class="bet ' + cls + '"><div class="grow">' + esc(d) + '</div><div class="tok">' + (open ? '<button data-act="bet" data-g="' + key + '" data-i="' + i + '" data-d="-1" ' + (cur[i] ? '' : 'disabled') + '>−</button>' : '') + '<span>' + (cur[i] ? '🪙'.repeat(cur[i]) : '·') + '</span>' + (open ? '<button data-act="bet" data-g="' + key + '" data-i="' + i + '" data-d="1" ' + (left ? '' : 'disabled') + '>+</button>' : '') + '</div></div>';
-      }).join('') + (open ? '<div class="row" style="margin-top:8px"><span class="small muted grow">' + (left ? left + ' pion' + (left > 1 ? 's' : '') + ' à placer' : 'Tous vos pions sont placés') + '</span><button class="btn" data-act="betsend" data-g="' + key + '" ' + (left ? 'disabled' : '') + '>Parier</button></div>' : (st === 'open' ? '<div class="fb ok">Pari enregistré.</div>' : '')) +
+      }).join('') + (open ? '<div class="row" style="margin-top:8px"><span class="small muted grow">' + (left ? left + ' pion' + (left > 1 ? 's' : '') + ' à placer' : 'Tous vos pions sont placés') + '</span><button class="btn" data-act="betsend" data-g="' + key + '" ' + (left ? 'disabled' : '') + '>Parier</button></div>' : (st === 'open' ? (p.pend ? '<div class="fb info">⏳ Pari gardé sur le téléphone : il partira dès le retour du réseau.</div>' : '<div class="fb ok">Pari enregistré.</div>') : '')) +
         (st === 'closed' ? '<button class="btn ghost" style="padding-left:0" data-act="mview" data-g="' + key + '" data-c="b1">📷 Voir la preuve</button>' : '') + '</div>';
     });
     if (G.myBluff) h += '<div class="card small"><b>Votre bluff (' + esc(G.myBluff.lieu) + ')</b><div>Pions sur l\'affirmation vraie : ' + G.myBluff.tokens[0] + ' · sur vos bluffs : ' + (G.myBluff.tokens[1] + G.myBluff.tokens[2]) + '</div></div>';
     return h;
   }
-  function loadGames() { if (S.gLoading) return; S.gLoading = true; api('apiGames', S.group, S.pin).then(function (r) { S.gLoading = false; S.games = r; S.gamesAt = Date.now(); S.vote = r.vote; render(true); }, function () { S.gLoading = false; S.gamesAt = Date.now(); }); }
+  /* --- jeux hors réseau : liste des devinettes gardée sur le téléphone, mimes téléchargés à l'avance,
+         réponses et paris mis en file d'attente puis envoyés au retour du réseau --- */
+  var LSJ = LS + '-jeux', LSG = LS + '-paris';
+  function saveGames() { try { if (S.games) localStorage.setItem(LSJ, JSON.stringify({ g: S.group, games: S.games })); } catch (e) {} }
+  function loadGamesLocal() { try { var x = JSON.parse(localStorage.getItem(LSJ) || 'null'); if (x && String(x.g) === String(S.group)) { S.games = x.games; S.vote = S.vote && S.vote !== 'off' ? S.vote : x.games.vote; } } catch (e) {} }
+  function guessQ() { try { return JSON.parse(localStorage.getItem(LSG) || '[]') || []; } catch (e) { return []; } }
+  function setGuessQ(q) { try { localStorage.setItem(LSG, JSON.stringify(q)); } catch (e) {} }
+  function gameEntry(kind, owner, card) { var G = S.games || {}; return kind === 'mime' ? (G.mimes || []).filter(function (x) { return String(x.g) === String(owner) && x.card === card; })[0] : (G.bluff || []).filter(function (x) { return String(x.g) === String(owner); })[0]; }
+  function overlayQueue() { guessQ().forEach(function (q) { if (String(q.group) !== String(S.group)) return; var e = gameEntry(q.kind, q.owner, q.card); if (e && !e.mine) { e.mine = q.value; e.pend = true; } }); }
+  function queueGuess(kind, owner, card, value) {
+    if (!isMain()) return toast('Seul le téléphone principal peut répondre aux devinettes.');
+    var e = gameEntry(kind, owner, card); if (!e || e.mine) return;
+    e.mine = value; e.pend = true; saveGames();
+    setGuessQ(guessQ().concat([{ id: Date.now() + '-' + Math.random(), group: S.group, pin: S.pin, kind: kind, owner: owner, card: card, value: value, t: now() }]));
+    render(); flushGuesses(true);
+  }
+  var flushingG = false;
+  function flushGuesses(fromClick) {
+    var q = guessQ(); if (!q.length || flushingG) return; flushingG = true; var x = q[0];
+    var done = function (keepMine, msg) { flushingG = false; setGuessQ(guessQ().filter(function (y) { return y.id !== x.id; })); var e = String(x.group) === String(S.group) ? gameEntry(x.kind, x.owner, x.card) : null; if (e) { e.pend = false; if (!keepMine) e.mine = null; } saveGames(); if (msg) toast(msg); render(); flushGuesses(); };
+    api('apiGuess', x.group, x.pin, x.kind, x.owner, x.card, x.value, deviceId(), x.t).then(function (r) {
+      if (r.status === 'ok' || r.status === 'already') done(true, fromClick ? (x.kind === 'mime' ? 'Réponse enregistrée ✓' : 'Pari enregistré 🪙') : '');
+      else done(false, r.status === 'closed' ? 'Les devinettes sont closes : réponse non prise en compte.' : r.status === 'notmain' ? 'Seul le téléphone principal peut répondre aux devinettes.' : 'Réponse refusée.');
+    }, function () { flushingG = false; if (fromClick) toast('Pas de réseau : réponse gardée, elle partira toute seule ⏳'); });
+  }
+  /* mimes des autres équipes gardés dans le téléphone (IndexedDB) pour les regarder sans réseau */
+  var IDB = null;
+  function idb() { if (IDB) return IDB; IDB = new Promise(function (ok, ko) { try { var r = indexedDB.open('em-medias', 1); r.onupgradeneeded = function () { r.result.createObjectStore('m'); }; r.onsuccess = function () { ok(r.result); }; r.onerror = function () { ko(r.error); }; } catch (e) { ko(e); } }); return IDB; }
+  function idbGet(k) { return idb().then(function (db) { return new Promise(function (ok) { try { var q = db.transaction('m').objectStore('m').get(k); q.onsuccess = function () { ok(q.result || null); }; q.onerror = function () { ok(null); }; } catch (e) { ok(null); } }); }, function () { return null; }); }
+  function idbPut(k, v) { return idb().then(function (db) { return new Promise(function (ok) { try { var t = db.transaction('m', 'readwrite'); t.objectStore('m').put(v, k); t.oncomplete = function () { ok(true); }; t.onerror = function () { ok(false); }; } catch (e) { ok(false); } }); }, function () { return false; }); }
+  function mkey(g, c) { return S.group + '|' + g + '|' + c; }
+  function fetchMedia(g, c, onp) { // { type, blob } depuis le téléphone, sinon téléchargé par morceaux
+    return idbGet(mkey(g, c)).then(function (hit) {
+      if (hit && hit.blob) return hit;
+      return new Promise(function (ok, ko) {
+        var parts = [];
+        var next = function (i) {
+          api('apiMedia', S.group, S.pin, g, c, i).then(function (r) {
+            if (r.status !== 'ok') return ko(r.status);
+            parts.push(r.data); if (onp) onp(parts.length / r.parts);
+            if (parts.length < r.parts) return next(i + 1);
+            var bin = atob(parts.join('')), u8 = new Uint8Array(bin.length); for (var k = 0; k < bin.length; k++) u8[k] = bin.charCodeAt(k);
+            var res = { type: r.type, blob: new Blob([u8], { type: r.type }) };
+            if (String(g) !== String(S.group)) idbPut(mkey(g, c), res);
+            ok(res);
+          }, function () { ko('net'); });
+        };
+        next(0);
+      });
+    });
+  }
+  var prefetching = false;
+  function prefetchMedia() { // en tâche de fond, photos d'abord : on peut ensuite deviner sans réseau
+    var G = S.games; if (prefetching || !G || G.vote === 'off' || !navigator.onLine) return;
+    var todo = (G.mimes || []).filter(function (m) { return !m.cached; }).sort(function (a, b) { return (a.kind === 'video') - (b.kind === 'video'); });
+    if (!todo.length) return; prefetching = true;
+    var one = function (i) {
+      if (i >= todo.length || !S.games) { prefetching = false; return render(true); }
+      var m = todo[i];
+      fetchMedia(m.g, m.card).then(function () { m.cached = true; saveGames(); one(i + 1); }, function (e) { if (e === 'net') { prefetching = false; return; } one(i + 1); });
+    };
+    one(0);
+  }
+  function markCached() { var G = S.games; if (!G) return Promise.resolve(); return Promise.all((G.mimes || []).map(function (m) { return idbGet(mkey(m.g, m.card)).then(function (h) { m.cached = !!h; }); })); }
+  function loadGames() {
+    if (S.gLoading) return; S.gLoading = true;
+    api('apiGames', S.group, S.pin).then(function (r) {
+      S.gLoading = false; S.games = r; S.gamesAt = Date.now(); S.vote = r.vote; overlayQueue();
+      markCached().then(function () { saveGames(); render(true); prefetchMedia(); });
+    }, function () { S.gLoading = false; S.gamesAt = Date.now(); if (!S.games) loadGamesLocal(); render(true); });
+  }
 
   /* --- visionneuse protégée : aucun lien, aucun fichier, filigrane au nom de l'équipe qui regarde --- */
   function mimeModal() {
@@ -4917,35 +4987,24 @@ var ART = (function () {
       h += '<div class="small muted" style="margin-top:8px">' + esc(entry.cat) + ' : qu\'ont-ils mimé ?</div>' + entry.opts.map(function (o) {
         var cls = entry.mine ? (S.vote === 'closed' && o === entry.answer ? 'right' : (entry.mine === o ? (S.vote === 'closed' ? 'wrong' : 'sel') : '')) : '';
         return '<button class="opt ' + cls + '" data-act="mguess" data-o="' + esc(o) + '" ' + (entry.mine || S.vote !== 'open' ? 'disabled' : '') + '>' + esc(o) + '</button>';
-      }).join('');
+      }).join('') + (entry.pend ? '<div class="fb info small">⏳ Réponse gardée sur le téléphone : elle partira dès le retour du réseau.</div>' : '') + (!isMain() && S.vote === 'open' && !entry.mine ? '<div class="small muted">Seul le téléphone principal peut répondre.</div>' : '');
     }
     return h + '</div></div>';
   }
   function sendBet(g) {
     var B = ((S.games || {}).bluff || []).filter(function (x) { return String(x.g) === String(g); })[0], bets = (S.ui.bets || {})[g];
     if (!B || B.mine || !bets) return;
-    api('apiGuess', S.group, S.pin, 'bluff', +g, 'b', bets, deviceId()).then(function (r) {
-      if (r.status === 'ok' || r.status === 'already') { B.mine = r.value || bets; toast('Pari enregistré 🪙'); }
-      else toast(r.status === 'closed' ? 'Les paris sont clos.' : 'Pari refusé.');
-      render();
-    }, function () { toast('Pas de réseau, réessayez.'); });
+    queueGuess('bluff', +g, 'b', bets.slice());
   }
   function openViewer(g, c) {
     var own = String(g) === String(S.group), M = S.ui.viewer = { g: g, c: c, own: own, parts: [], p: 0 };
     render();
-    var next = function (i) {
-      api('apiMedia', S.group, S.pin, g, c, i).then(function (r) {
-        if (S.ui.viewer !== M) return;
-        if (r.status !== 'ok') { M.err = r.status === 'closed' ? 'Les mimes des autres équipes seront visibles à l\'ouverture des devinettes.' : 'Mime indisponible.'; return render(); }
-        M.parts.push(r.data); M.p = M.parts.length / r.parts;
-        if (M.parts.length < r.parts) { render(); return next(i + 1); }
-        var bin = atob(M.parts.join('')), u8 = new Uint8Array(bin.length); for (var k = 0; k < bin.length; k++) u8[k] = bin.charCodeAt(k);
-        M.parts = null; M.kind = r.type.indexOf('video') === 0 ? 'video' : 'photo';
-        M.url = URL.createObjectURL(new Blob([u8], { type: r.type }));
-        render(); drawPhoto();
-      }, function () { M.err = 'Pas de réseau, réessayez.'; render(); });
-    };
-    next(0);
+    fetchMedia(g, c, function (p) { if (S.ui.viewer === M) { M.p = p; render(); } }).then(function (r) {
+      if (S.ui.viewer !== M) return;
+      M.kind = r.type.indexOf('video') === 0 ? 'video' : 'photo'; M.url = URL.createObjectURL(r.blob);
+      var e = own ? null : gameEntry('mime', g, c); if (e && !e.cached) { e.cached = true; saveGames(); }
+      render(); drawPhoto();
+    }, function (st) { if (S.ui.viewer !== M) return; M.err = st === 'closed' ? 'Les mimes des autres équipes seront visibles à l\'ouverture des devinettes.' : st === 'net' ? 'Pas de réseau : ce mime n\'a pas encore été téléchargé. Réessayez dès que vous captez.' : 'Mime indisponible.'; render(); });
   }
   function drawPhoto() {
     var M = S.ui.viewer, cv = document.getElementById('mcan'); if (!M || !cv || M.kind !== 'photo') return;
@@ -5018,7 +5077,7 @@ var ART = (function () {
         if (r.status === 'ok') { delete S.mq[card]; saveMq(); if (mine) mergeServer(r.state); saveLocal(); toast(card === 'b1' ? 'Photo-preuve envoyée 📷' : (card === 'f1' || card === 'p1' || card === 'p2' ? 'Photo envoyée ! 📷' : 'Mime envoyé ! +15 pts')); confetti(); flushMedia(); }
         else if (!mine && r.status !== 'missing') { delete S.mq[card]; saveMq(); flushMedia(); }
         else if (r.status === 'notmain') { delete S.mq[card]; saveMq(); notMainToast(); }
-        else if (r.status === 'locked' || r.status === 'closedsec') { delete S.mq[card]; saveMq(); toast(r.status === 'closedsec' ? 'Mission fermée.' : 'Envois fermés.'); }
+        else if (r.status === 'locked' || r.status === 'closedsec' || r.status === 'closedgame') { delete S.mq[card]; saveMq(); toast(r.status === 'closedsec' ? 'Mission fermée.' : r.status === 'closedgame' ? 'Les devinettes ont déjà commencé : ce mime n\'a pas pu être ajouté.' : 'Envois fermés.'); }
         else if (r.status === 'toobig') { delete S.mq[card]; saveMq(); toast('Fichier trop lourd.'); }
         else if (r.status === 'missing') return step(r.part);
         render();
@@ -5271,7 +5330,7 @@ var ART = (function () {
       case 'mguess': {
         var MV = S.ui.viewer, en = ((S.games || {}).mimes || []).filter(function (x) { return String(x.g) === String(MV.g) && x.card === MV.c; })[0], guess = d('o');
         if (!en || en.mine) break;
-        api('apiGuess', S.group, S.pin, 'mime', MV.g, MV.c, guess, deviceId()).then(function (r) { if (r.status === 'ok' || r.status === 'already') { en.mine = r.value || guess; toast('Réponse enregistrée'); render(); } else toast(r.status === 'closed' ? 'Les devinettes sont closes.' : 'Réponse refusée.'); }, function () { toast('Pas de réseau, réessayez.'); });
+        queueGuess('mime', MV.g, MV.c, guess);
         break;
       }
       case 'bet': {
@@ -5679,6 +5738,7 @@ var ART = (function () {
     window.__demoKick = function () { if (S.mode === 'prof') profLoad(); else if (S.group) scheduleSync(50); };
     setTimeout(flushReports, 3000);
     setTimeout(loadEtu, 2500);
+    if (S.group) loadGamesLocal(); // devinettes déjà chargées : jouables même sans réseau au redémarrage
     if (!document.hidden) cameBack();
   }
   start();
