@@ -449,7 +449,7 @@ html.tablette .menmap{max-width:900px;margin-left:auto;margin-right:auto}
 .uls img{height:44px;width:auto;display:block}
 .uls.in{border-radius:12px;border:1px solid var(--line);border-bottom:3px solid #9A4D9F;margin:0 auto 10px;max-width:320px}
 </style></head><body><div id="app"></div>
-<script src="config.js?v=1795421791"></script><script>if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js", { scope: "./" }).catch(function () {});</script>
+<script src="config.js?v=1795426255"></script><script>if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js", { scope: "./" }).catch(function () {});</script>
 <script>
 /* ==== Contenu pédagogique (énoncés) : partagé client + serveur ==== */
 /* GGE : « Le spécimen disparu ». Chaque question réussie (au moins la moitié des points) dévoile l'indice du même rang. */
@@ -4193,7 +4193,8 @@ var ART = (function () {
   function render(soft) {
     if (S.ui && S.ui.spinning) return; // pas de redessin pendant que la roue tourne
     var mode = S.mode;
-    if (window.APP_CONFIG && !window.APP_CONFIG.api) { $app.innerHTML = ULS() + '<div class="hero" style="background-image:url(' + IMG.hero + ')"><div class="t"><div class="kick">Sortie MNHN · UniLaSalle Rouen</div><h1>Expédition Muséum</h1></div></div><main class="wrap"><div class="card center" style="padding:28px 16px"><div style="font-size:46px">🧭</div><h2>L\'application ouvrira le jour de la sortie</h2><p class="small">Gardez cette page : le jour J, scannez à nouveau le QR code ou rechargez la page.</p></div></main>'; return; }
+    if (window.APP_CONFIG && !window.APP_CONFIG.api) { $app.innerHTML = ULS() + '<div class="hero" style="background-image:url(' + IMG.hero + ')"><div class="t"><div class="kick">Sortie MNHN · UniLaSalle Rouen</div><h1>Expédition Muséum</h1></div></div><main class="wrap"><div class="card center" style="padding:28px 16px"><div style="font-size:46px">🧭</div><h2>L\'application ouvrira le jour de la sortie</h2><p class="small">Gardez cette page : le jour J, scannez à nouveau le QR code ou rechargez la page.</p></div>' +
+      (S.ui.waitProf ? '<div class="card"><h3 style="margin-top:0">🧑‍🏫 Espace enseignant</h3><p class="small">Le serveur de l\'application (le tableur Google des notes) n\'est pas encore branché. Dès qu\'il le sera, cette page affichera l\'appli normale, avec le lien « Espace enseignant » en bas de l\'écran d\'accueil (même QR code, même adresse).</p><p class="small muted" style="margin:0">En attendant, tout se teste dans la démo.</p></div>' : '<div class="center small" style="margin:14px 0 40px"><button class="linkbtn" data-act="waitprof">🧑‍🏫 Espace enseignant</button></div>') + '</main>'; return; }
     if (mode === 'ecran') { $app.innerHTML = screenBoard(); return; }
     if (mode === 'prof') { var ph2 = profView(); if (ph2 !== lastHtml) { var kv = {}; $app.querySelectorAll('input[id],textarea[id]').forEach(function (e) { if (e.value !== e.defaultValue) kv[e.id] = e.value; }); $app.innerHTML = ph2; lastHtml = ph2; Object.keys(kv).forEach(function (id) { var e = document.getElementById(id); if (e) e.value = kv[id]; }); } return; }
     if (!S.group) { var jh = joinView() + reportBtn() + reportModal(); if (soft && document.activeElement && /INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName)) return; if (jh !== lastHtml) { $app.innerHTML = jh; lastHtml = jh; } return; }
@@ -5298,6 +5299,7 @@ var ART = (function () {
       case 'repquick': { var ta = document.getElementById('rep-ans'); if (ta) ta.value = QUICK[+d('i')]; break; }
       case 'repsendans': { var tx = ((document.getElementById('rep-ans') || {}).value || '').trim(); if (!tx) return toast('Écrivez un message ou choisissez une réponse.'); S.ui.repAns = null; profFix(+d('g'), 'msg', { text: tx, row: +d('r') }); break; }
       case 'teammsg': { var tm = ((document.getElementById('tm-msg') || {}).value || '').trim(); if (!tm) return toast('Écrivez un message.'); profFix(+d('g'), 'msg', { text: tm }); break; }
+      case 'waitprof': S.ui.waitProf = true; render(); break;
       case 'feteok': S.ui.fete = null; render(); break;
       case 'fetego': S.ui.fete = null; go(d('r')); break;
       case 'feteagain': S.ui.fete = 'final'; render(); fireworks(3); break;
